@@ -2,14 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { ModuleProvider } from './contexts/ModuleContext';
 import { Property, WorkflowTemplate, WorkflowInstance } from './types';
 import { mockProperties } from './lib/mockData';
-import { TurnkeyApp } from './components/TurnkeyApp';
 import { supabase } from './lib/supabase';
+import { WorkflowEngine } from './lib/workflowEngine';
+import { TurnkeyApp } from './components/TurnkeyApp';
 
 function App() {
-  // Auth state
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(false);
-
   // Core state for the application
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [properties, setProperties] = useState<Property[]>(mockProperties);
@@ -18,59 +15,368 @@ function App() {
   const [selectedView, setSelectedView] = useState('dashboard');
   const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowInstance | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  
-  // Load data from database
+
+  // Check if user has completed onboarding when logged in
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load workflow templates from database
-        const { data: templatesData, error: templatesError } = await supabase
-          .from('workflow_templates')
-          .select('*')
-          .order('name');
-        
-        if (templatesError) {
-          console.error('Error loading templates:', templatesError);
-        } else {
-          console.log('🔍 DATABASE TEMPLATES DEBUG:');
-          console.log('Raw database response:', templatesData);
-          console.log('Number of templates loaded:', templatesData?.length || 0);
-          if (templatesData && templatesData.length > 0) {
-            templatesData.forEach((template, index) => {
-              console.log(`Template ${index + 1}:`, {
-                id: template.id,
-                name: template.name,
-                key: template.key,
-                category: template.category,
-                stages: template.stages,
-                workstreams: template.workstreams?.length || 0,
-                created_at: template.created_at
-              });
-            });
-          }
-          setTemplates(templatesData || []);
-        }
-      } catch (error) {
-        console.error('Error loading data:', error);
+    if (isLoggedIn) {
+      const hasCompletedOnboarding = localStorage.getItem('turnkey_onboarding_completed');
+      if (!hasCompletedOnboarding) {
+        setShowOnboarding(true);
       }
-    };
+      loadData();
+    }
+  }, [isLoggedIn]);
 
-    loadData();
-  }, []);
-
-  // Handle login
   const handleLogin = () => {
-    setLoading(true);
-    // Simulate loading
-    setTimeout(() => {
     setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('turnkey_onboarding_completed', 'true');
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingSkip = () => {
+    localStorage.setItem('turnkey_onboarding_completed', 'true');
+    setShowOnboarding(false);
+  };
+
+  // Get workflow instance for selected property
+  const selectedWorkflowInstance = selectedProperty 
+    ? workflowInstances.find(wi => wi.property_id === selectedProperty.id) || null
+    : null;
+
+  const handleWorkflowUpdate = async (updates: any) => {
+    console.log('Workflow update:', updates);
+    
+    try {
+      if (updates.action === 'start_workstream') {
+        await WorkflowEngine.activateWorkstream(updates.target);
+      } else if (updates.action === 'complete_workstream') {
+        await WorkflowEngine.completeWorkstream(updates.target);
+      }
+      
+      // Reload data to reflect changes
+      loadData();
+    } catch (error) {
+      console.error('Error updating workflow:', error);
+    }
+  };
+
+  const handlePropertySelect = (property: Property) => {
+    setSelectedProperty(property);
+  };
+
+  const handleClosePropertyPanel = () => {
+    setSelectedProperty(null);
+  };
+
+  const handlePropertyUpdate = (updatedProperty: Property) => {
+    // Update the property in the properties array
+    setProperties(prevProperties => 
+      prevProperties.map(prop => 
+        prop.id === updatedProperty.id ? updatedProperty : prop
+      )
+    );
+    
+    // Update the selected property if it's the one being updated
+    if (selectedProperty && selectedProperty.id === updatedProperty.id) {
+      setSelectedProperty(updatedProperty);
+    }
+  };
+
+  const handleNavigateToProperty = (property: Property) => {
+    setSelectedView('asset_register');
+    setSelectedProperty(property);
+  };
+
+  const handleViewSelect = (view: string, data?: any) => {
+    setSelectedView(view);
+    setSelectedData(data);
+    setSelectedProperty(null); // Close property panel when switching views
+  };
+
+  const handlePushToWorkflow = async (property: Property, template: WorkflowTemplate, workflowName: string) => {
+    console.log('handlePushToWorkflow called with:', { property: property.id, template: template.key, workflowName });
+    
+    try {
+      // Create workflow instance first
+      console.log('Creating workflow instance...');
+      const { data: instanceData, error: instanceError } = await supabase
+        .from('workflow_instances')
+        .insert([
+          {
+            user_id: mockUserId,
+            template_id: template.id,
+            property_id: property.id,
+            name: workflowName,
+            status: 'not_started',
+            completion_percentage: 0,
+          }
+        ])
+        .select('id')
+        .single();
+      
+      if (instanceError || !instanceData) {
+        console.error('Failed to create workflow instance:', instanceError);
+        throw new Error(`Failed to create workflow instance: ${instanceError?.message || 'Unknown error'}`);
+      }
+
+      console.log('Workflow instance created:', instanceData.id);
+
+      // Create workstreams from template
+      if (template.workstreams) {
+        console.log('Creating workstreams...');
+        const workstreamsToInsert = template.workstreams.map((ws, index) => ({
+          workflow_instance_id: instanceData.id,
+          template_workstream_key: ws.key,
+          name: ws.name,
+          description: ws.name,
+          order_index: index + 1,
+          fields: ws.fields || [],
+          form_data: {},
+          status: 'pending',
+          can_start: index === 0, // First workstream can start immediately
+        }));
+
+        const { error: workstreamsError } = await supabase
+          .from('workstreams')
+          .insert(workstreamsToInsert);
+
+        if (workstreamsError) {
+          console.error('Failed to create workstreams:', workstreamsError);
+          throw new Error(`Failed to create workstreams: ${workstreamsError.message}`);
+        }
+
+        console.log('Workstreams created successfully');
+      }
+
+      // Start the workflow (activate first workstream)
+      console.log('Starting workflow...');
+      await WorkflowEngine.startWorkflow(instanceData.id);
+      console.log('Workflow started successfully');
+      
+      console.log('Created workflow instance:', instanceData.id);
+      // Reload data to show the new workflow instance
+      console.log('Reloading data...');
+      await loadData();
+      console.log('Data reloaded successfully');
+      
+    } catch (error) {
+      console.error('Error creating workflow:', error);
+      
+      // Add more specific error messages for common issues
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('CORS error: Unable to connect to database. Make sure you\'re running on port 5173.');
+        }
+        throw error;
+      }
+      
+      throw new Error('Unknown error occurred while creating workflow');
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load workflow templates
+      const { data: templatesData, error: templatesError } = await supabase
+        .from('workflow_templates')
+        .select('*')
+        .order('name');
+      
+      if (templatesError) {
+        console.error('Error loading templates:', templatesError);
+      } else {
+        setTemplates(templatesData || []);
+      }
+
+      // Load properties
+      const { data: propertiesData, error: propertiesError } = await supabase
+        .from('properties')
+        .select('*')
+        .order('name');
+      
+      if (propertiesError) {
+        console.error('Error loading properties:', propertiesError);
+        // Fallback to mock data if properties table doesn't exist yet
+        setProperties(mockProperties);
+      } else {
+        setProperties(propertiesData || []);
+      }
+
+      // Load workflow instances with workstreams
+      const { data: instancesData, error: instancesError } = await supabase
+        .from('workflow_instances')
+        .select(`
+          *,
+          workstreams!workflow_instance_id (*)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (instancesError) {
+        console.error('Error loading workflow instances:', instancesError);
+      } else {
+        setWorkflowInstances(instancesData || []);
+      }
+      
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
+  };
+
+  const renderMainContent = () => {
+    switch (selectedView) {
+      case 'dashboard':
+        return (
+          <Dashboard 
+            properties={properties}
+            workflowInstances={workflowInstances}
+          />
+        );
+      case 'property_register':
+        return (
+          <div className="flex-1 p-6 overflow-hidden">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">Property Register</h1>
+              <p className="text-sm text-gray-500">Manage your property portfolio</p>
+            </div>
+            <PropertiesTable
+              properties={properties}
+              workflowInstances={workflowInstances}
+              selectedProperty={selectedProperty}
+              onPropertySelect={handlePropertySelect}
+              onPropertiesUpdate={handlePropertyUpdate}
+            />
+          </div>
+        );
+        
+      case 'task_manager':
+        return (
+          <TaskManager
+            properties={properties}
+            workflowInstances={workflowInstances}
+            templates={templates}
+            onPushToWorkflow={handlePushToWorkflow}
+            onNavigateToProperty={handleNavigateToProperty}
+            onDataRefresh={loadData}
+          />
+        );
+        
+      case 'workflow_templates':
+        return (
+          <div className="flex-1 p-6">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">Workflow Templates</h1>
+              <p className="text-sm text-gray-500">Available workflow templates for your operations</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {templates.map((template) => (
+                <div key={template.id} className="bg-white p-6 rounded-lg shadow border border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">{template.name}</h3>
+                  <p className="text-sm text-gray-500 mb-4">{template.description}</p>
+                  <div className="text-xs text-gray-400">
+                    <div>Key: {template.key}</div>
+                    <div>Category: {template.category}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        
+      case 'template_detail':
+        return (
+          <div className="flex-1 p-6">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">{selectedData?.name}</h1>
+              <p className="text-sm text-gray-500">{selectedData?.description}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium text-gray-700">Template Key:</span> {selectedData?.key}
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Category:</span> {selectedData?.category}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+        
+      case 'workstream_detail':
+        return (
+          <div className="flex-1 p-6">
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-900">{selectedData?.workflow?.name}</h1>
+              <p className="text-sm text-gray-500">Workstream: {selectedData?.workstream?.name}</p>
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="grid grid-cols-2 gap-4 text-sm mb-6">
+                <div>
+                  <span className="font-medium text-gray-700">Status:</span> {selectedData?.workstream?.status}
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Order:</span> {selectedData?.workstream?.order_index}
+                </div>
+              </div>
+              {selectedData?.workstream?.fields && (
+                <div>
+                  <h3 className="font-medium text-gray-900 mb-2">Fields</h3>
+                  <pre className="text-xs bg-gray-50 p-4 rounded overflow-auto">
+                    {JSON.stringify(selectedData.workstream.fields, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+        
+      default:
+        // Handle dynamic workflow views
+        if (selectedView.startsWith('workflow_')) {
+          const workflowId = selectedView.replace('workflow_', '');
+          const workflow = workflowInstances.find(wi => wi.id === workflowId);
+          
+          if (workflow) {
+            return (
+              <div className="flex-1 flex flex-col">
+                <div className="p-6 border-b border-gray-200">
+                  <h1 className="text-2xl font-bold text-gray-900">{workflow.name}</h1>
+                  <p className="text-sm text-gray-500">Progress: {workflow.completion_percentage}%</p>
+                </div>
+                <WorkstreamsTab
+                  workflowInstance={workflow}
+                  onWorkflowUpdate={handleWorkflowUpdate}
+                />
+              </div>
+            );
+          }
+        }
+        
+        return (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <p>Select a view from the sidebar</p>
+            </div>
+          </div>
+        );
+    }
   };
 
   // Landing Page Component
   if (!isLoggedIn) {
-        return (
+    return (
       <div className="bg-gradient-to-br from-blue-50 via-orange-50 to-blue-50">
         {/* Top Navigation - Base44 Style */}
         <nav className="flex justify-between items-center p-6 bg-white/80 backdrop-blur-sm border-b border-gray-100">
@@ -218,9 +524,9 @@ function App() {
                           <span>Legal review</span>
                         </div>
                         <div className="text-xs text-gray-500 mt-4">Building workflow...</div>
-            </div>
-          </div>
-            </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-4">The system's built automatically</h3>
                 <p className="text-gray-600 mb-6">
@@ -299,7 +605,7 @@ function App() {
                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mr-3">
                     <span className="text-orange-600 font-bold">SM</span>
                   </div>
-                <div>
+                  <div>
                     <div className="font-semibold">Sarah Martinez</div>
                     <div className="text-gray-500 text-sm">Property Manager</div>
                   </div>
@@ -311,8 +617,8 @@ function App() {
                 <div className="flex items-center">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
                     <span className="text-blue-600 font-bold">MJ</span>
-                </div>
-                <div>
+                  </div>
+                  <div>
                     <div className="font-semibold">Michael Johnson</div>
                     <div className="text-gray-500 text-sm">Real Estate Investor</div>
                   </div>
@@ -325,7 +631,7 @@ function App() {
                   <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
                     <span className="text-green-600 font-bold">AC</span>
                   </div>
-                <div>
+                  <div>
                     <div className="font-semibold">Amanda Chen</div>
                     <div className="text-gray-500 text-sm">Portfolio Director</div>
                   </div>
@@ -449,12 +755,12 @@ function App() {
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
               So, what are we building?
             </h2>
-              <button 
-                onClick={handleLogin}
+            <button 
+              onClick={handleLogin}
               className="px-12 py-4 bg-orange-500 text-white text-xl font-semibold rounded-2xl hover:bg-orange-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
-              >
+            >
               Start building
-              </button>
+            </button>
             <p className="text-gray-400 mt-6">
               Turnkey is the AI-powered platform that lets real estate professionals build fully functioning workflows in minutes. Using nothing but natural language, Turnkey enables anyone to turn their processes into automated systems that are ready to use, no integrations required.
             </p>
@@ -480,13 +786,13 @@ function App() {
     <TurnkeyApp
       properties={properties}
       setProperties={setProperties}
-        templates={templates}
+      templates={templates}
       setTemplates={setTemplates}
-        workflowInstances={workflowInstances}
+      workflowInstances={workflowInstances}
       setWorkflowInstances={setWorkflowInstances}
       selectedProperty={selectedProperty}
       setSelectedProperty={setSelectedProperty}
-        selectedView={selectedView}
+      selectedView={selectedView}
       setSelectedView={setSelectedView}
       selectedWorkflow={selectedWorkflow}
       setSelectedWorkflow={setSelectedWorkflow}
