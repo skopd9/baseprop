@@ -4,6 +4,7 @@ import { Property, WorkflowTemplate, WorkflowInstance } from './types';
 import { mockProperties } from './lib/mockData';
 import { TurnkeyApp } from './components/TurnkeyApp';
 import { AuthModal } from './components/AuthModal';
+import { ConfigurationChat } from './components/ConfigurationChat';
 import { supabase } from './lib/supabase';
 
 function App() {
@@ -11,6 +12,8 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showConfigurationChat, setShowConfigurationChat] = useState(false);
+  const [userConfiguration, setUserConfiguration] = useState<any>(null);
 
   // Core state for the application
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
@@ -78,6 +81,8 @@ function App() {
   const handleAuthSuccess = () => {
     setIsLoggedIn(true);
     setShowAuthModal(false);
+    // Show configuration chat for new users
+    setShowConfigurationChat(true);
     // Hide the ElevenLabs widget when logged in
     hideElevenLabsWidget();
   };
@@ -571,6 +576,121 @@ function App() {
     );
   }
 
+  // Create demo properties based on user configuration
+  const createDemoProperties = (config: any) => {
+    const demoProperties: Property[] = [
+      {
+        id: 'demo-1',
+        asset_register_id: 'DEMO-001',
+        name: 'Metro Office Tower',
+        address: '123 Business District, Downtown',
+        property_type: 'stand_alone_buildings',
+        property_sub_type: 'office',
+        square_feet: 45000,
+        units: 12,
+        acquisition_date: '2023-01-15',
+        acquisition_price: 8500000,
+        current_value: 9200000,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'demo-2',
+        asset_register_id: 'DEMO-002',
+        name: 'Riverside Apartments',
+        address: '456 River View Lane, Midtown',
+        property_type: 'horizontal_properties',
+        property_sub_type: 'apartment',
+        square_feet: 32000,
+        units: 24,
+        acquisition_date: '2022-08-20',
+        acquisition_price: 5200000,
+        current_value: 5800000,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'demo-3',
+        asset_register_id: 'DEMO-003',
+        name: 'Tech Campus Plaza',
+        address: '789 Innovation Drive, Tech District',
+        property_type: 'stand_alone_buildings',
+        property_sub_type: 'commercial',
+        square_feet: 68000,
+        units: 8,
+        acquisition_date: '2023-03-10',
+        acquisition_price: 12300000,
+        current_value: 13100000,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'demo-4',
+        asset_register_id: 'DEMO-004',
+        name: 'Heritage Retail Center',
+        address: '321 Main Street, Historic Quarter',
+        property_type: 'stand_alone_buildings',
+        property_sub_type: 'retail',
+        square_feet: 28000,
+        units: 16,
+        acquisition_date: '2022-11-05',
+        acquisition_price: 4100000,
+        current_value: 4650000,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'demo-5',
+        asset_register_id: 'DEMO-005',
+        name: 'Industrial Park East',
+        address: '987 Manufacturing Way, Industrial Zone',
+        property_type: 'stand_alone_buildings',
+        property_sub_type: 'industrial',
+        square_feet: 95000,
+        units: 4,
+        acquisition_date: '2023-02-28',
+        acquisition_price: 6800000,
+        current_value: 7200000,
+        status: 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+    ];
+
+    // Add demo properties to existing properties
+    setProperties(prev => [...prev, ...demoProperties]);
+  };
+
+  // Handle configuration completion
+  const handleConfigurationComplete = (config: any) => {
+    console.log('Configuration completed:', config);
+    setUserConfiguration(config);
+    
+    // Create demo properties for demonstration
+    createDemoProperties(config);
+    
+    setShowConfigurationChat(false);
+  };
+
+  // Handle configuration skip
+  const handleConfigurationSkip = () => {
+    setShowConfigurationChat(false);
+  };
+
+  // Show configuration chat after login but before main app
+  if (isLoggedIn && showConfigurationChat) {
+    return (
+      <ConfigurationChat
+        onConfigurationComplete={handleConfigurationComplete}
+        onSkip={handleConfigurationSkip}
+      />
+    );
+  }
+
   // Project Builder App (original functionality)
   if (loading) {
     return (
@@ -599,6 +719,7 @@ function App() {
       setSelectedWorkflow={setSelectedWorkflow}
       showOnboarding={showOnboarding}
       setShowOnboarding={setShowOnboarding}
+      userConfiguration={userConfiguration}
     />
   );
 }

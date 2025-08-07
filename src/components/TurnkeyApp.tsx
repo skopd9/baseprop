@@ -31,6 +31,7 @@ interface TurnkeyAppProps {
   setSelectedWorkflow: React.Dispatch<React.SetStateAction<WorkflowInstance | null>>;
   showOnboarding: boolean;
   setShowOnboarding: React.Dispatch<React.SetStateAction<boolean>>;
+  userConfiguration?: any;
 }
 
 export const TurnkeyApp: React.FC<TurnkeyAppProps> = (props) => {
@@ -133,7 +134,8 @@ const ValuationsModule: React.FC<TurnkeyAppProps> = ({
   selectedWorkflow,
   setSelectedWorkflow,
   showOnboarding,
-  setShowOnboarding
+  setShowOnboarding,
+  userConfiguration
 }) => {
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
   const { currentModule, availableModules, switchModule } = useModule();
