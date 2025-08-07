@@ -3,12 +3,14 @@ import { ModuleProvider } from './contexts/ModuleContext';
 import { Property, WorkflowTemplate, WorkflowInstance } from './types';
 import { mockProperties } from './lib/mockData';
 import { TurnkeyApp } from './components/TurnkeyApp';
+import { AuthModal } from './components/AuthModal';
 import { supabase } from './lib/supabase';
 
 function App() {
   // Auth state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Core state for the application
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
@@ -58,19 +60,90 @@ function App() {
     loadData();
   }, []);
 
-  // Handle login
+  // Manage ElevenLabs widget visibility
+  useEffect(() => {
+    if (isLoggedIn) {
+      hideElevenLabsWidget();
+    } else {
+      showElevenLabsWidget();
+    }
+  }, [isLoggedIn]);
+
+  // Handle login - open auth modal
   const handleLogin = () => {
-    setLoading(true);
-    // Simulate loading
-    setTimeout(() => {
-    setIsLoggedIn(true);
-      setLoading(false);
-    }, 1000);
+    setShowAuthModal(true);
   };
 
-  // Handle voice agent
-  const handleTryVoiceAgent = () => {
-    window.open('https://elevenlabs.io/app/talk-to?agent_id=agent_01jyrmn6w3e448zv4t637cev3b', '_blank');
+  // Handle successful authentication
+  const handleAuthSuccess = () => {
+    setIsLoggedIn(true);
+    setShowAuthModal(false);
+    // Hide the ElevenLabs widget when logged in
+    hideElevenLabsWidget();
+  };
+
+  // Function to hide ElevenLabs widget
+  const hideElevenLabsWidget = () => {
+    const widgetContainer = document.getElementById('elevenlabs-widget-container');
+    if (widgetContainer) {
+      widgetContainer.style.display = 'none';
+    }
+  };
+
+  // Function to show ElevenLabs widget
+  const showElevenLabsWidget = () => {
+    const widgetContainer = document.getElementById('elevenlabs-widget-container');
+    if (widgetContainer) {
+      widgetContainer.style.display = 'block';
+    }
+  };
+
+  // Handle voice agent - directly start the conversation
+  const handleTryVoiceAgent = async () => {
+    // Function to try clicking the widget
+    const tryClickWidget = () => {
+      const widget = document.querySelector('elevenlabs-convai') as any;
+      if (!widget) return false;
+      
+      try {
+        // Method 1: Look for buttons in shadow DOM or regular DOM
+        const widgetButton = widget.shadowRoot?.querySelector('button') || 
+                            widget.querySelector('button') ||
+                            widget.querySelector('[role="button"]') ||
+                            widget.shadowRoot?.querySelector('[data-testid*="call"]') ||
+                            widget.shadowRoot?.querySelector('.convai-trigger-button');
+        
+        if (widgetButton) {
+          widgetButton.click();
+          return true;
+        }
+        
+        // Method 2: Try clicking the widget itself
+        widget.click();
+        return true;
+      } catch (error) {
+        console.log('Click attempt failed:', error);
+        return false;
+      }
+    };
+    
+    // Try immediately first
+    if (tryClickWidget()) return;
+    
+    // If that fails, wait a bit for the widget to fully load and try again
+    setTimeout(() => {
+      if (!tryClickWidget()) {
+        // Final fallback: scroll to widget
+        const widget = document.querySelector('elevenlabs-convai');
+        if (widget) {
+          widget.scrollIntoView({ behavior: 'smooth' });
+          // Also try to focus the widget to make it more visible
+          if ('focus' in widget) {
+            (widget as any).focus();
+          }
+        }
+      }
+    }, 500);
   };
 
   // Landing Page Component
@@ -87,9 +160,9 @@ function App() {
             <a href="#pricing" className="text-gray-600 hover:text-gray-900 font-medium">Pricing</a>
           <button 
             onClick={handleLogin}
-              className="px-6 py-2 bg-orange-500 text-white font-medium rounded-lg hover:bg-orange-600 transition-all duration-300"
+            className="px-6 py-2 bg-orange-500 text-white font-medium rounded-lg hover:bg-orange-600 transition-all duration-300"
           >
-              Start Building
+            Start Building
           </button>
           </div>
         </nav>
@@ -128,7 +201,7 @@ function App() {
                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12C10.9 12 10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19C8.1 19 5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17C14.8 17 17 14.8 17 12V10H19ZM12 20.5C12.3 20.5 12.5 20.8 12.5 21S12.3 21.5 12 21.5H12C8.7 21.5 6 18.8 6 15.5V14H8V15.5C8 17.7 9.8 19.5 12 19.5C14.2 19.5 16 17.7 16 15.5V14H18V15.5C18 18.8 15.3 21.5 12 21.5Z"/>
                 </svg>
-                Try Voice Agent
+                Talk to AI
               </button>
             </div>
 
@@ -162,44 +235,6 @@ function App() {
           <div className="absolute top-20 left-20 w-32 h-32 bg-orange-200 rounded-full opacity-20 animate-pulse"></div>
           <div className="absolute bottom-20 right-20 w-48 h-48 bg-blue-200 rounded-full opacity-20 animate-pulse" style={{animationDelay: '1s'}}></div>
           <div className="absolute top-1/2 left-10 w-16 h-16 bg-orange-300 rounded-full opacity-30 animate-bounce"></div>
-        </div>
-
-        {/* Voice Agent Section */}
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 py-16 px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="bg-white rounded-3xl p-8 shadow-xl">
-              <div className="flex items-center justify-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-600 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12C10.9 12 10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19C8.1 19 5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17C14.8 17 17 14.8 17 12V10H19ZM12 20.5C12.3 20.5 12.5 20.8 12.5 21S12.3 21.5 12 21.5H12C8.7 21.5 6 18.8 6 15.5V14H8V15.5C8 17.7 9.8 19.5 12 19.5C14.2 19.5 16 17.7 16 15.5V14H18V15.5C18 18.8 15.3 21.5 12 21.5Z"/>
-                  </svg>
-                </div>
-              </div>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                Try our AI Voice Agent
-              </h2>
-              <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
-                Skip the forms and just talk! Our AI voice agent can help you design your perfect real estate workflow through natural conversation. Simply describe your process and watch it come to life.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-                <button 
-                  onClick={handleTryVoiceAgent}
-                  className="px-8 py-4 bg-gradient-to-r from-purple-500 to-blue-600 text-white text-lg font-semibold rounded-xl hover:from-purple-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-3"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12C10.9 12 10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19C8.1 19 5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17C14.8 17 17 14.8 17 12V10H19ZM12 20.5C12.3 20.5 12.5 20.8 12.5 21S12.3 21.5 12 21.5H12C8.7 21.5 6 18.8 6 15.5V14H8V15.5C8 17.7 9.8 19.5 12 19.5C14.2 19.5 16 17.7 16 15.5V14H18V15.5C18 18.8 15.3 21.5 12 21.5Z"/>
-                  </svg>
-                  Start Voice Chat
-                </button>
-                <div className="text-sm text-gray-500">
-                  No signup required • Try it now
-                </div>
-              </div>
-              <div className="mt-6 text-sm text-gray-400">
-                Powered by advanced AI • Voice recognition in multiple languages
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Main Value Proposition - Base44 Style */}
@@ -525,6 +560,13 @@ function App() {
             </p>
           </div>
         </div>
+
+        {/* Auth Modal */}
+        <AuthModal 
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleAuthSuccess}
+        />
       </div>
     );
   }
