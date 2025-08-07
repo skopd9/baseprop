@@ -10,14 +10,14 @@ function App() {
       <div className="relative z-10 text-center">
         <h1 className="text-8xl md:text-9xl lg:text-[12rem] font-bold tracking-wider text-white drop-shadow-2xl">
           <span className="bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent animate-pulse-slow">
-            REOS
+            turnkey
           </span>
         </h1>
         
         {/* Subtle glow effect */}
         <div className="absolute inset-0 blur-3xl opacity-30">
           <h1 className="text-8xl md:text-9xl lg:text-[12rem] font-bold tracking-wider text-purple-400">
-            REOS
+            turnkey
           </h1>
         </div>
       </div>
