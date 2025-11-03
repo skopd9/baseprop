@@ -7,6 +7,13 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  # Exclude documentation files from secret scanning (they contain example placeholders)
+  SECRETS_SCAN_OMIT_PATHS = "*.md,*.MD"
+  # Note: VITE_* environment variables are embedded in the client bundle by design.
+  # If these are marked as "secrets" in Netlify UI but are meant to be public
+  # (like Supabase anon key or OAuth client IDs), you should either:
+  # 1. Remove them from Netlify's "Secrets" and add as regular environment variables, OR
+  # 2. Add them to SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES in Netlify UI
 
 [[redirects]]
   from = "/*"

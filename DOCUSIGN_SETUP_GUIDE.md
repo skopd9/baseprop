@@ -4,8 +4,8 @@
 
 Your DocuSign credentials are configured:
 ```
-Integration Key: bc1d616b-ace6-4e51-a145-1171af5e1376
-Account ID: 2b214df1-f112-4748-a77e-e4d5d3237eec
+Integration Key: YOUR_INTEGRATION_KEY
+Account ID: YOUR_ACCOUNT_ID
 Redirect URL: http://localhost:5173/docusign-callback
 ```
 
@@ -239,8 +239,8 @@ Add to your `.env`:
 
 ```bash
 # Existing (already set ✅)
-VITE_DOCUSIGN_INTEGRATION_KEY=bc1d616b-ace6-4e51-a145-1171af5e1376
-VITE_DOCUSIGN_ACCOUNT_ID=2b214df1-f112-4748-a77e-e4d5d3237eec
+VITE_DOCUSIGN_INTEGRATION_KEY=YOUR_INTEGRATION_KEY
+VITE_DOCUSIGN_ACCOUNT_ID=YOUR_ACCOUNT_ID
 VITE_DOCUSIGN_REDIRECT_URL=http://localhost:5173/docusign-callback
 
 # New - Add these

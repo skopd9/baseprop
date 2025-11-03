@@ -5,8 +5,8 @@
 Your DocuSign credentials are properly configured in `.env`:
 
 ```bash
-✅ Integration Key: bc1d616b-ace6-4e51-a145-1171af5e1376
-✅ Account ID: 2b214df1-f112-4748-a77e-e4d5d3237eec  
+✅ Integration Key: YOUR_INTEGRATION_KEY
+✅ Account ID: YOUR_ACCOUNT_ID  
 ✅ Redirect URL: http://localhost:5173/docusign-callback
 ```
 
