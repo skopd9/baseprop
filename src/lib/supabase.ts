@@ -8,13 +8,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing required environment variables: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set');
 }
 
-console.log('🔧 Supabase Config:', { 
-  url: supabaseUrl, 
-  keyLength: supabaseAnonKey.length,
-  envUrl: import.meta.env.VITE_SUPABASE_URL,
-  envKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'loaded' : 'missing'
-});
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Database service functions
