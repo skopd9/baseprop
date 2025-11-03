@@ -1,0 +1,15 @@
+# Netlify deployment configuration for Base Prop
+# Repository: https://github.com/skopd9/baseprop
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+

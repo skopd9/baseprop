@@ -1,0 +1,44 @@
+# GitHub Actions workflow for Base Prop
+# Repository: https://github.com/skopd9/baseprop
+# This workflow ensures deployments always use the correct repository
+
+name: Deploy Base Prop
+
+on:
+  push:
+    branches:
+      - main
+    # Repository must be: https://github.com/skopd9/baseprop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Ensure we're using the correct repository
+          repository: skopd9/baseprop
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Verify repository
+        run: |
+          REPO_URL=$(git remote get-url origin)
+          if [ "$REPO_URL" != "https://github.com/skopd9/baseprop.git" ]; then
+            echo "ERROR: Repository URL mismatch!"
+            echo "Expected: https://github.com/skopd9/baseprop.git"
+            echo "Got: $REPO_URL"
+            exit 1
+          fi
+          echo "✓ Repository verified: $REPO_URL"
+
