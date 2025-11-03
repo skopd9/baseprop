@@ -67,7 +67,15 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
 
   // Landing Page - Focused on Landlord Workflow
   return (
-    <div className="bg-gradient-to-br from-blue-50 via-green-50 to-blue-50">
+    <div className="bg-gradient-to-br from-blue-50 via-green-50 to-blue-50 min-h-screen flex flex-col">
+      {/* Alpha Launch Banner */}
+      <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 px-4 text-center text-sm font-medium shadow-md z-50">
+        <span className="inline-flex items-center">
+          <span className="mr-2">🚀</span>
+          Alpha Launch - Welcome to our early release! We're actively improving based on your feedback.
+        </span>
+      </div>
+
       {/* Top Navigation */}
       <nav className="flex justify-between items-center p-6 bg-white/80 backdrop-blur-sm border-b border-gray-100">
         <div className="text-2xl font-bold text-gray-900">
@@ -378,6 +386,19 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
           </p>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 py-4 px-6 mt-auto">
+        <div className="flex flex-col md:flex-row items-center justify-between text-sm text-gray-600 max-w-7xl mx-auto">
+          <div className="mb-2 md:mb-0">
+            <p className="font-medium text-gray-900">Base Prop</p>
+            <p className="text-xs text-gray-500 mt-1">© {new Date().getFullYear()} All rights reserved</p>
+          </div>
+          <div className="flex items-center space-x-4 text-xs">
+            <span>Version 1.0 Alpha</span>
+          </div>
+        </div>
+      </footer>
 
       {/* Auth Modal */}
       <AuthModal
