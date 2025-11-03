@@ -1,39 +1,87 @@
-# Turnkey - Real Estate Workflow Engine
+# PropertyFlow - UK Property Management for Landlords
 
-Turnkey is a comprehensive real estate workflow management system that enables property teams to manage assets across multiple interconnected workflows. Built with React, TypeScript, and Tailwind CSS, it provides an intuitive interface for managing complex real estate processes.
+PropertyFlow is a comprehensive property management system designed specifically for UK residential landlords, with support for Greece and USA markets. Built with React, TypeScript, and Tailwind CSS, it provides an intuitive interface for managing rental properties, tenants, and UK compliance requirements.
 
-## 🏗️ Core Features
+## 🇬🇧 UK-Focused Features
 
-### Workflow Management
-- **Workflow Templates**: Pre-defined workflow structures for common real estate processes
-- **Workflow Instances**: Property-specific workflow executions
-- **Workstreams**: Parallel or linear sub-processes within workflows
-- **Stage Tracking**: Detailed progress tracking for each workflow stage
+PropertyFlow is built with UK landlords in mind, including:
 
-### AI-Powered Assistant
-- **Natural Language Processing**: Chat with AI to modify workflows
-- **Workflow Modifications**: Add/remove workstreams and stages via conversation
-- **Progress Summaries**: Get AI-generated summaries of workflow status
-- **Smart Recommendations**: AI suggests workflow improvements
+- **Full UK Compliance Tracking** - All 10 mandatory certificates and checks
+- **HMO Support** - Complete HMO licensing and multi-unit management
+- **UK Terminology** - Postcodes, council tax, letting agents, deposit protection
+- **Deposit Rules** - 5-week deposit cap (Tenant Fees Act 2019)
+- **Right to Rent** - Built-in Right to Rent checking workflow
+- **Gov.uk Integration** - Links to official guidance and resources
+
+### Additional Country Support
+- 🇬🇷 **Greece** (Basic support with expansion planned)
+- 🇺🇸 **USA** (Basic support with expansion planned)
+
+[→ Read Multi-Country Setup Guide](./MULTI_COUNTRY_SETUP.md)
+
+## 🏠 Core Features
 
 ### Property Management
-- **Property Registry**: Centralized property database
-- **Financial Tracking**: Acquisition prices, current values, and appreciation
-- **Status Management**: Track property lifecycle stages
-- **Multi-Property Support**: Manage multiple properties simultaneously
+- **Portfolio Overview**: Track all your rental properties in one dashboard
+- **HMO Support**: Full support for Houses in Multiple Occupation with individual unit management
+- **Financial Tracking**: Monitor purchase prices, rental income, and property expenses
+- **Occupancy Status**: Real-time tracking of vacant, occupied, and maintenance properties
+- **Multi-Country**: Manage properties across UK, Greece, and USA
+
+### Tenant Management
+- **Complete Tenant Database**: Store all tenant information and contact details
+- **Lease Tracking**: Monitor lease agreements, start dates, and rental amounts
+- **Rent Collection**: Track payments and identify overdue accounts
+- **Right to Rent**: UK Right to Rent compliance tracking
+- **Deposit Protection**: Track UK deposit protection schemes
+- **Agent Support**: Record which tenants were found via letting agents
+
+### UK Compliance Management
+Track all mandatory UK landlord requirements:
+
+1. ✅ **Gas Safety Certificate** (Annual)
+2. ✅ **EICR** - Electrical Installation Condition Report (5 years)
+3. ✅ **EPC** - Energy Performance Certificate (10 years, min rating E)
+4. ✅ **Deposit Protection** (Within 30 days)
+5. ✅ **Right to Rent Checks** (Before tenancy)
+6. ✅ **Legionella Risk Assessment**
+7. ✅ **Smoke Alarm Certificate**
+8. ✅ **Carbon Monoxide Alarm Certificate**
+9. ✅ **Fire Safety Certificate** (HMO)
+10. ✅ **HMO License** (5 years)
+
+**Automated Reminders:** Never miss a renewal deadline  
+[→ Read Full UK Compliance Guide](./UK_COMPLIANCE_GUIDE.md)
+
+### Maintenance & Operations
+- **Inspection Scheduling**: Plan routine, move-in, and move-out inspections
+- **Repair Management**: Log and track maintenance requests
+- **Expense Tracking**: Record all property-related expenses
+- **Contractor Database**: Maintain preferred supplier information
+
+### User Types Supported
+
+PropertyFlow supports three distinct user workflows:
+
+1. **Direct Landlords** - Self-managing landlords with full control
+2. **Agent-Using Landlords** - Use letting agents, maintain oversight
+3. **Property Managers** - Professionals managing for multiple landlords
+
+[→ Read User Types Guide](./USER_TYPES.md)
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+ (recommended)
 - npm or yarn
+- Supabase account (for database)
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd Turnkey
+   git clone https://github.com/skopd9/baseprop.git
+   cd baseprop
    ```
 
 2. **Install dependencies**
@@ -42,136 +90,122 @@ Turnkey is a comprehensive real estate workflow management system that enables p
    ```
 
 3. **Set up environment variables**
+   
    Create a `.env` file in the root directory:
    ```env
-   # Supabase Configuration
+   # Supabase Configuration (Required)
    VITE_SUPABASE_URL=your-supabase-project-url
    VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 
-   # OpenAI Configuration
+   # Optional - For AI features
    VITE_OPENAI_API_KEY=your-openai-api-key
+   
+   # Optional - For maps (future use)
+   VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key
    ```
 
-4. **Start the development server**
+4. **Set up the database**
+   
+   Run the database schema in your Supabase SQL editor:
+   ```bash
+   # Copy contents of uk_landlord_schema.sql
+   # Paste into Supabase SQL Editor
+   # Execute
+   ```
+
+5. **Start the development server**
    ```bash
    npm run dev
    ```
 
-5. **Open your browser**
+6. **Open your browser**
+   
    Navigate to `http://localhost:5173`
 
 ## 📊 Database Schema
 
 ### Core Tables
 
-#### Properties
-```sql
-CREATE TABLE properties (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  address TEXT NOT NULL,
-  property_type TEXT NOT NULL CHECK (property_type IN ('residential', 'commercial', 'industrial', 'mixed')),
-  square_feet INTEGER NOT NULL,
-  units INTEGER NOT NULL,
-  acquisition_date DATE,
-  acquisition_price DECIMAL(15,2),
-  current_value DECIMAL(15,2),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'disposed', 'under_contract')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+- **properties** - Property details with UK-specific fields
+- **tenants** - Tenant information and tenancy details
+- **rent_payments** - Rent payment tracking
+- **compliance_certificates** - All compliance documentation
+- **inspections** - Property inspection records
+- **repairs** - Maintenance and repair tracking
+- **expenses** - Property expense records
+- **agents** - Letting agent information
+- **user_preferences** - User country and type preferences
 
-#### Workflow Templates
-```sql
-CREATE TABLE workflow_templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  description TEXT,
-  category TEXT NOT NULL CHECK (category IN ('acquisition', 'capex', 'lease_renewal', 'disposal', 'lease_up', 'auction_sales')),
-  default_workstreams TEXT[],
-  triggers TEXT[],
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+See `uk_landlord_schema.sql` for complete schema.
 
-#### Workflow Instances
-```sql
-CREATE TABLE workflow_instances (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  property_id UUID REFERENCES properties(id),
-  template_id UUID REFERENCES workflow_templates(id),
-  name TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'paused', 'cancelled')),
-  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  completed_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+## 🎯 Key Workflows
 
-## 🎯 Workflow Categories
+### For Direct Landlords
 
-### Acquisition
-- Due Diligence
-- Financing
-- Legal Review
-- Closing
+1. **Property Setup**
+   - Add property with UK postcode
+   - Enter council tax band
+   - Upload existing certificates
+   - Set up compliance reminders
 
-### CapEx
-- Planning
-- Contractor Selection
-- Construction
-- Quality Assurance
+2. **Tenant Onboarding**
+   - Perform Right to Rent check
+   - Create tenancy agreement
+   - Protect deposit (within 30 days)
+   - Provide "How to Rent" guide
 
-### Lease Renewal
-- Tenant Communication
-- Negotiation
-- Documentation
-- Execution
+3. **Ongoing Management**
+   - Track monthly rent payments
+   - Schedule routine inspections
+   - Log maintenance requests
+   - Monitor compliance renewals
 
-### Lease-Up
-- Marketing
-- Tenant Screening
-- Lease Execution
-- Move-in Coordination
+### For Agent-Using Landlords
 
-### Disposal
-- Market Analysis
-- Listing Preparation
-- Buyer Outreach
-- Closing
+1. **Add Your Agent**
+   - Record agent details
+   - Note services provided
+   - Track commission structure
 
-### Auction Sales
-- Auction Preparation
-- Marketing Campaign
-- Bid Management
-- Sale Execution
+2. **Property Oversight**
+   - Link properties to agents
+   - Monitor rent collection
+   - Review compliance status
+   - Track agent fees
 
-## 🤖 AI Assistant Usage
+3. **Financial Monitoring**
+   - Review monthly statements
+   - Track net returns
+   - Monitor expenses
+   - Evaluate agent performance
 
-The AI assistant can help you with various workflow modifications:
+### For Property Managers
 
-### Adding Workstreams
-```
-"Add a legal review workstream to the acquisition workflow"
-```
+1. **Portfolio Management**
+   - Add multiple landlord properties
+   - Tag properties by owner
+   - Bulk operations support
+   - Multi-property reporting
 
-### Modifying Stages
-```
-"Add a property inspection stage before the financial analysis"
-```
+2. **Tenant Management**
+   - Centralized tenant database
+   - Systematic inspection schedules
+   - Compliance calendar management
+   - Contractor coordination
 
-### Getting Summaries
-```
-"Give me a summary of the current workflow progress"
-```
+3. **Landlord Reporting**
+   - Generate owner statements
+   - Compliance status reports
+   - Financial summaries
+   - Performance analytics
 
-### Removing Components
-```
-"Remove the environmental review stage from the due diligence workstream"
-```
+## 🤖 AI Voice Assistant
+
+PropertyFlow includes an AI-powered voice assistant to help with:
+- Property queries ("Show me all vacant properties")
+- Compliance reminders ("When is the gas safety due?")
+- Tenant information ("Which tenants have overdue rent?")
+- Quick navigation and support
 
 ## 🛠️ Technology Stack
 
@@ -179,27 +213,43 @@ The AI assistant can help you with various workflow modifications:
 - **UI Components**: Headless UI, Heroicons
 - **Data Tables**: TanStack Table
 - **Backend**: Supabase (PostgreSQL)
-- **AI**: OpenAI GPT-4
+- **AI**: OpenAI GPT-4 (optional)
+- **Maps**: Google Maps, Deck.gl, Mapbox (for future features)
 - **Build Tool**: Vite
 
 ## 📁 Project Structure
 
 ```
 src/
-├── components/          # React components
-│   ├── Sidebar.tsx     # Workflow template navigation
-│   ├── PropertiesTable.tsx # Property listing table
-│   ├── PropertyPanel.tsx   # Property details panel
-│   ├── WorkstreamsTab.tsx  # Workstream management
-│   └── ChatAssistantTab.tsx # AI chat interface
-├── lib/                # Utility libraries
-│   ├── supabase.ts     # Supabase client & database functions
-│   ├── ai.ts          # OpenAI integration
-│   └── mockData.ts    # Development mock data
-├── types/              # TypeScript type definitions
-│   └── index.ts       # Core type definitions
-├── App.tsx            # Main application component
-└── main.tsx           # Application entry point
+├── components/         # React components
+│   ├── SimplifiedLandlordApp.tsx       # Main application
+│   ├── SimplifiedDashboard.tsx         # Dashboard overview
+│   ├── ResidentialPropertiesTable.tsx  # Property management
+│   ├── ResidentialTenantsTable.tsx     # Tenant management
+│   ├── ComplianceWorkflows.tsx         # UK compliance tracking
+│   ├── RentTracking.tsx                # Rent collection
+│   ├── ExpenseTracker.tsx              # Expense tracking
+│   ├── InspectionWorkflows.tsx         # Inspections
+│   ├── RepairWorkflows.tsx             # Repairs
+│   ├── QuickStartGuide.tsx             # User guidance
+│   └── ...
+├── services/          # Business logic
+│   ├── SimplifiedPropertyService.ts
+│   ├── SimplifiedTenantService.ts
+│   ├── ExpenseService.ts
+│   └── ...
+├── lib/               # Core libraries
+│   ├── supabase.ts                     # Database client
+│   ├── countries.ts                    # Multi-country config
+│   ├── formatters.ts                   # Country-specific formatting
+│   └── ai.ts                           # AI integration (optional)
+├── types/             # TypeScript types
+│   └── index.ts
+├── utils/             # Utility functions
+│   ├── simplifiedDataTransforms.ts
+│   └── demoDataSeeder.ts
+├── App.tsx           # Application entry
+└── main.tsx          # React bootstrap
 ```
 
 ## 🔧 Development
@@ -213,11 +263,10 @@ src/
 
 ### Code Style
 
-The project uses:
 - TypeScript for type safety
 - ESLint for code linting
-- Prettier for code formatting
 - Tailwind CSS for styling
+- Functional components with hooks
 
 ## 🚀 Deployment
 
@@ -234,6 +283,23 @@ The project uses:
 3. Set publish directory: `dist`
 4. Configure environment variables
 
+### Environment Variables for Production
+
+Ensure these are set in your deployment platform:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_OPENAI_API_KEY` (if using AI features)
+- `VITE_GOOGLE_MAPS_API_KEY` (if using maps)
+
+## 📚 Documentation
+
+- [UK Compliance Guide](./UK_COMPLIANCE_GUIDE.md) - Complete UK landlord compliance requirements
+- [User Types Guide](./USER_TYPES.md) - Direct landlords, agent-using landlords, property managers
+- [Multi-Country Setup](./MULTI_COUNTRY_SETUP.md) - UK, Greece, USA support
+- [HMO Functionality Guide](./HMO_FUNCTIONALITY_GUIDE.md) - HMO management features
+- [Expenses Feature Guide](./EXPENSES_FEATURE_GUIDE.md) - Expense tracking
+- [Troubleshooting](./TROUBLESHOOTING.md) - Common issues and solutions
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -242,14 +308,60 @@ The project uses:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+## ⚖️ Legal Compliance
+
+PropertyFlow is a tool to help you manage your properties and track compliance. You are responsible for:
+- Understanding and following all UK landlord laws
+- Keeping all certificates current
+- Following proper legal procedures
+- Consulting with legal professionals when needed
+
+**Important:** Laws change frequently. Always verify requirements with official government sources and legal professionals.
+
+## 🆘 Support
+
+- **Documentation**: Check the guides above
+- **Issues**: Create a GitHub issue
+- **Email**: support@propertyflow.com
+- **Community**: Join our landlord community forum
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## 🎯 Getting Started Checklist
 
-For support, email support@turnkeyrealestate.com or create an issue in the GitHub repository.
+For new UK landlords:
+
+- [ ] Sign up for PropertyFlow
+- [ ] Select "United Kingdom" as your country
+- [ ] Choose your user type (Direct/Agent-Using/Property Manager)
+- [ ] Add your first property
+- [ ] Upload existing compliance certificates
+- [ ] Set up automated renewal reminders
+- [ ] Add your tenants
+- [ ] Protect tenant deposits (within 30 days)
+- [ ] Review UK Compliance Guide
+- [ ] Set up monthly rent tracking
+
+## 🔮 Roadmap
+
+### Near Term
+- [ ] Enhanced mobile app
+- [ ] Tenant portal
+- [ ] Automated rent collection
+- [ ] Digital tenancy agreements
+- [ ] Enhanced Greece & USA support
+
+### Future
+- [ ] Accounting software integration (Xero, QuickBooks)
+- [ ] Bank feed integration
+- [ ] Advanced reporting and analytics
+- [ ] Portfolio performance metrics
+- [ ] Additional country support (Ireland, Australia, France)
 
 ---
 
-Built with ❤️ for the real estate industry
+**Built with ❤️ for UK landlords**
+
+*Helping landlords stay compliant, organized, and successful.*

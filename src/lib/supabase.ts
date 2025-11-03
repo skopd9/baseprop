@@ -1,19 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { Module, UserModuleAccess } from '../types';
 
-const supabaseUrl =
-  typeof process !== 'undefined' && process.env.VITE_SUPABASE_URL
-    ? process.env.VITE_SUPABASE_URL
-    : typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL
-      ? import.meta.env.VITE_SUPABASE_URL
-      : 'https://your-project.supabase.co';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://nsaakmpvqatypmfuaakw.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zYWFrbXB2cWF0eXBtZnVhYWt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4NTkzMzMsImV4cCI6MjA2NjQzNTMzM30.mHJsTKfQuCecemAwKv_Q2QlyRD86GratjvHjWx5f9Gc';
 
-const supabaseAnonKey =
-  typeof process !== 'undefined' && process.env.VITE_SUPABASE_ANON_KEY
-    ? process.env.VITE_SUPABASE_ANON_KEY
-    : typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY
-      ? import.meta.env.VITE_SUPABASE_ANON_KEY
-      : 'your-anon-key';
+console.log('🔧 Supabase Config:', { 
+  url: supabaseUrl, 
+  keyLength: supabaseAnonKey.length,
+  envUrl: import.meta.env.VITE_SUPABASE_URL,
+  envKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? 'loaded' : 'missing'
+});
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -93,6 +89,79 @@ export const db = {
       .select()
       .single();
     
+    if (error) throw error;
+    return data;
+  },
+
+  // Tenants
+  async getTenants() {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('*')
+      .order('name');
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getTenant(id: string) {
+    const { data, error } = await supabase
+      .from('tenants')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Units
+  async getUnits(propertyId?: string) {
+    let query = supabase
+      .from('units')
+      .select('*')
+      .order('unit_number');
+    
+    if (propertyId) {
+      query = query.eq('property_id', propertyId);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  },
+
+  async getUnit(id: string) {
+    const { data, error } = await supabase
+      .from('units')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Unit-Tenant relationships
+  async getUnitTenants(unitId?: string, tenantId?: string) {
+    let query = supabase
+      .from('unit_tenants')
+      .select(`
+        *,
+        units (*),
+        tenants (*)
+      `)
+      .order('lease_start_date', { ascending: false });
+    
+    if (unitId) {
+      query = query.eq('unit_id', unitId);
+    }
+    
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+    
+    const { data, error } = await query;
     if (error) throw error;
     return data;
   },
@@ -398,12 +467,192 @@ export const moduleService = {
       .select(`
         *,
         properties(name, address),
-        workstreams(*)
+        workstreams!workflow_instance_id(*)
       `)
       .eq('module_id', moduleId)
       .order('created_at', { ascending: false });
     
     if (error) throw error;
     return data || [];
+  },
+
+  // Valuation-specific queries
+  async getValuationWorkflowInstances() {
+    const { data, error } = await supabase
+      .from('workflow_instances')
+      .select(`
+        *,
+        properties(
+          id,
+          asset_register_id,
+          name,
+          address
+        ),
+        workstreams!workflow_instance_id(
+          id,
+          name,
+          status,
+          assignee_id,
+          template_workstream_key,
+          form_data,
+          updated_at,
+          order_index
+        ),
+        workflow_templates!inner(key)
+      `)
+      .eq('workflow_templates.key', 'valuations')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getPropertiesWithValuationStatus() {
+    const { data, error } = await supabase
+      .from('properties')
+      .select(`
+        id,
+        asset_register_id,
+        name,
+        address,
+        status,
+        created_at,
+        updated_at,
+        workflow_instances!property_id(
+          id,
+          status,
+          completion_percentage,
+          created_at,
+          updated_at,
+          current_workstream_id,
+          workstreams!workflow_instance_id(
+            id,
+            name,
+            status,
+            assignee_id,
+            template_workstream_key,
+            form_data,
+            updated_at
+          ),
+          workflow_templates!inner(key)
+        )
+      `)
+      .eq('workflow_instances.workflow_templates.key', 'valuations')
+      .order('asset_register_id');
+    
+    if (error) throw error;
+    return data || [];
+  },
+
+  async updateWorkstreamData(workstreamId: string, formData: any, status?: string) {
+    const updates: any = {
+      form_data: formData,
+      updated_at: new Date().toISOString()
+    };
+
+    if (status) {
+      updates.status = status;
+      if (status === 'completed') {
+        updates.completed_at = new Date().toISOString();
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('workstreams')
+      .update(updates)
+      .eq('id', workstreamId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async assignValuerToWorkstream(workstreamId: string, valuerId: string) {
+    const { data, error } = await supabase
+      .from('workstreams')
+      .update({
+        assignee_id: valuerId,
+        status: 'started',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', workstreamId)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  }
+};
+
+// Persona service functions
+export const personaDb = {
+  async getUserPersona(userEmail: string) {
+    const { data, error } = await supabase
+      .rpc('get_user_persona', { user_email_param: userEmail });
+    
+    if (error) throw error;
+    return data && data.length > 0 ? data[0] : null;
+  },
+
+  async assignPersona(userEmail: string, personaName: string, assignedBy?: string) {
+    const { data, error } = await supabase
+      .rpc('assign_user_persona', {
+        user_email_param: userEmail,
+        persona_name_param: personaName,
+        assigned_by_param: assignedBy
+      });
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getAllPersonas() {
+    const { data, error } = await supabase
+      .from('user_personas')
+      .select('*')
+      .order('name');
+    
+    if (error) throw error;
+    return data;
+  },
+
+  async getPersonaAssignments(userEmail?: string) {
+    let query = supabase
+      .from('user_persona_assignments')
+      .select(`
+        *,
+        persona:persona_id(*)
+      `)
+      .eq('is_active', true)
+      .order('assigned_at', { ascending: false });
+    
+    if (userEmail) {
+      query = query.eq('user_email', userEmail);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  },
+
+  async logPersonaChange(
+    userEmail: string,
+    oldPersonaName: string | null,
+    newPersonaName: string,
+    changedBy: string,
+    reason?: string
+  ) {
+    const { data, error } = await supabase
+      .rpc('log_persona_change', {
+        user_email_param: userEmail,
+        old_persona_name: oldPersonaName,
+        new_persona_name: newPersonaName,
+        changed_by_param: changedBy,
+        reason_param: reason
+      });
+    
+    if (error) throw error;
+    return data;
   }
 };

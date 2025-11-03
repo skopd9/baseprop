@@ -2,7 +2,7 @@ import { Property, WorkflowTemplate, WorkflowInstance, Workstream, WorkflowStage
 
 export const mockProperties: Property[] = [
   {
-    id: '1',
+    id: '550e8400-e29b-41d4-a716-446655440001',
     asset_register_id: '001',
     name: 'Sunset Plaza',
     address: '1234 Sunset Blvd, Los Angeles, CA 90210',
@@ -24,7 +24,7 @@ export const mockProperties: Property[] = [
     updated_at: '2023-01-15T00:00:00Z'
   },
   {
-    id: '2',
+    id: '550e8400-e29b-41d4-a716-446655440002',
     asset_register_id: '002',
     name: 'Riverside Apartments',
     address: '5678 Riverside Dr, Austin, TX 78701',
@@ -46,7 +46,7 @@ export const mockProperties: Property[] = [
     updated_at: '2023-03-20T00:00:00Z'
   },
   {
-    id: '3',
+    id: '550e8400-e29b-41d4-a716-446655440003',
     asset_register_id: '003',
     name: 'Downtown Office Tower',
     address: '999 Main St, Chicago, IL 60601',
@@ -68,7 +68,7 @@ export const mockProperties: Property[] = [
     updated_at: '2022-11-10T00:00:00Z'
   },
   {
-    id: '4',
+    id: '550e8400-e29b-41d4-a716-446655440004',
     asset_register_id: '004',
     name: 'Miami Beach Resort',
     address: '2000 Ocean Drive, Miami Beach, FL 33139',
@@ -90,7 +90,7 @@ export const mockProperties: Property[] = [
     updated_at: '2023-06-15T00:00:00Z'
   },
   {
-    id: '5',
+    id: '550e8400-e29b-41d4-a716-446655440005',
     asset_register_id: '005',
     name: 'Seattle Tech Campus',
     address: '4500 Tech Way, Seattle, WA 98109',
@@ -300,8 +300,8 @@ export const mockWorkflowTemplates: WorkflowTemplate[] = [
 
 export const mockWorkflowInstances: WorkflowInstance[] = [
   {
-    id: '1',
-    property_id: '1',
+    id: '660e8400-e29b-41d4-a716-446655440001',
+    property_id: '550e8400-e29b-41d4-a716-446655440001',
     template_id: '1',
     user_id: 'user-1',
     name: '001 - Group Valuation',

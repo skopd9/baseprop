@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Global compact layout adjustments */
+.compact-layout {
+  font-size: 0.9rem; /* Slightly smaller base font size */
+  line-height: 1.4;
+}
+
+.compact-layout * {
+  box-sizing: border-box;
+}

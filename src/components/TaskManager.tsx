@@ -32,15 +32,16 @@ interface TaskManagerProps {
   onPushToWorkflow: (property: Property, template: WorkflowTemplate, workflowName: string) => Promise<void>;
   onNavigateToProperty?: (property: Property) => void;
   onDataRefresh?: () => Promise<void>;
+  mode?: 'asset' | 'tenant'; // New prop to distinguish between asset and tenant workflows
 }
 
 const getPropertyIcon = (propertyType: string) => {
   switch (propertyType) {
-    case 'horizontal_properties':
+    case 'commercial':
       return <BuildingOffice2Icon className="w-4 h-4 text-blue-600" />;
-    case 'stand_alone_buildings':
+    case 'residential':
       return <HomeIcon className="w-4 h-4 text-green-600" />;
-    case 'land':
+    case 'industrial':
       return <MapIcon className="w-4 h-4 text-amber-600" />;
     default:
       return <BuildingOffice2Icon className="w-4 h-4 text-gray-600" />;
@@ -96,7 +97,8 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   templates,
   onPushToWorkflow,
   onNavigateToProperty,
-  onDataRefresh
+  onDataRefresh,
+  mode = 'asset' // Default to asset mode
 }) => {
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [showAssetRegisterModal, setShowAssetRegisterModal] = useState(false);
@@ -114,24 +116,17 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     setLocalWorkflowInstances(workflowInstances || []);
   }, [workflowInstances]);
 
-  // Get Group Valuations template
-  const valuationsTemplate = templates?.find(t => t.key === 'valuations');
-
-  // Create workflow lookup map for Group Valuations only using local state
-  const valuationWorkflowsByProperty = useMemo(() => {
+  // Create workflow lookup map for all templates using local state
+  const workflowsByProperty = useMemo(() => {
     const map = new Map<string, WorkflowInstance[]>();
-    localWorkflowInstances
-      .filter(workflow => {
-        // Find template by ID or key to match Group Valuations
-        const template = templates?.find(t => t.id === workflow.template_id);
-        return template?.key === 'valuations';
-      })
-      .forEach(workflow => {
+    localWorkflowInstances.forEach(workflow => {
+      if (workflow.property_id) {
         const existing = map.get(workflow.property_id) || [];
         map.set(workflow.property_id, [...existing, workflow]);
-      });
+      }
+    });
     return map;
-  }, [localWorkflowInstances, templates]);
+  }, [localWorkflowInstances]);
 
   const columns = useMemo<ColumnDef<Property>[]>(() => [
     {
@@ -174,9 +169,9 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
         const property = info.row.original;
         const propertyData = (property as any).property_data || {};
         const typeLabels: Record<string, string> = {
-          'horizontal_properties': 'Horizontal Properties',
-          'stand_alone_buildings': 'Stand Alone Buildings',
-          'land': 'Land',
+          'residential': 'Residential',
+          'commercial': 'Commercial',
+          'industrial': 'Industrial',
         };
         return (
           <div>
@@ -208,7 +203,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       header: 'Group Valuations Status',
       cell: info => {
         const property = info.row.original;
-        const propertyWorkflows = valuationWorkflowsByProperty.get(property.id) || [];
+        const propertyWorkflows = workflowsByProperty.get(property.id) || [];
         
         if (propertyWorkflows.length > 0) {
           const latestWorkflow = propertyWorkflows[0]; // Most recent
@@ -227,7 +222,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
       },
       size: 250,
     },
-  ], [valuationWorkflowsByProperty]);
+  ], [workflowsByProperty]);
 
   const table = useReactTable({
     data: properties,
@@ -252,17 +247,17 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
     setSelectedProperty(property);
   };
 
-  const handleStartWorkflow = async () => {
-    if (!selectedProperty || !valuationsTemplate) {
+  const handleStartWorkflow = async (template: WorkflowTemplate) => {
+    if (!selectedProperty || !template) {
       return;
     }
 
     setLoading(true);
     setError(null);
     try {
-      console.log('Starting workflow for property:', selectedProperty.id);
-      const workflowName = `${selectedProperty.asset_register_id} - Group Valuation`;
-      await onPushToWorkflow(selectedProperty, valuationsTemplate, workflowName);
+      console.log('Starting workflow for property:', selectedProperty.id, 'with template:', template.name);
+      const workflowName = `${template.name} - ${selectedProperty.name}`;
+      await onPushToWorkflow(selectedProperty, template, workflowName);
       
       console.log('Workflow created successfully, refreshing data...');
       // Refresh data from parent to get the newly created workflow
@@ -286,16 +281,20 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Header - Outside table like Asset Register */}
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-900">Task Manager</h1>
-        <p className="text-sm text-gray-500">Start and track workflows</p>
+      <div className="p-4">
+        <h1 className="text-xl font-bold text-gray-900">
+          {mode === 'tenant' ? 'Tenant Task Manager' : 'Task Manager'}
+        </h1>
+        <p className="text-sm text-gray-500">
+          {mode === 'tenant' ? 'Start and track tenant workflows' : 'Start and track workflows'}
+        </p>
       </div>
 
       {/* Table Container */}
-      <div className="flex-1 px-6 pb-6">
+      <div className="flex-1 px-4 pb-4">
         <div className="bg-white rounded-lg shadow border border-gray-200">
           {/* Table Header */}
-          <div className="px-4 py-3 border-b border-gray-200">
+          <div className="px-3 py-2 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-medium text-gray-900">Properties</h3>
@@ -311,7 +310,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                   placeholder="Search properties..."
                   value={globalFilter}
                   onChange={(e) => setGlobalFilter(e.target.value)}
-                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
@@ -326,7 +325,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                     {headerGroup.headers.map(header => (
                       <th
                         key={header.id}
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                         style={{ width: header.getSize() }}
                         onClick={header.column.getToggleSortingHandler()}
                       >
@@ -372,7 +371,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                       {row.getVisibleCells().map(cell => (
                         <td
                           key={cell.id}
-                          className="px-4 py-3 whitespace-nowrap"
+                          className="px-3 py-2 whitespace-nowrap"
                           style={{ width: cell.column.getSize() }}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -397,12 +396,18 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
       {/* Property Sidebar Modal */}
       {selectedProperty && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-end z-50">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-end z-50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelectedProperty(null);
+            }
+          }}
+        >
           <div 
-            className="absolute inset-0" 
-            onClick={() => setSelectedProperty(null)}
-          />
-          <div className="w-[700px] h-full bg-white flex flex-col shadow-xl relative z-10">
+            className="w-1/3 min-w-[500px] h-full bg-white flex flex-col shadow-xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Sidebar Header */}
             <div className="p-6 border-b border-gray-200 bg-white">
               <div className="flex items-start justify-between">
@@ -503,10 +508,10 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                   </div>
                 </div>
 
-                {/* Group Valuations Workflow */}
+                {/* Available Workflows */}
                 <div className="bg-white border border-gray-200 rounded-lg">
                   <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-base font-semibold text-gray-900">Group Valuations Workflow</h3>
+                    <h3 className="text-base font-semibold text-gray-900">Available Workflows</h3>
                   </div>
                   <div className="p-6">
                     {error && (
@@ -526,47 +531,79 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                         </div>
                       </div>
                     )}
-                    {(() => {
-                      const propertyWorkflows = valuationWorkflowsByProperty.get(selectedProperty.id) || [];
-                      if (propertyWorkflows.length > 0) {
-                        return propertyWorkflows.map(workflow => (
-                          <div key={workflow.id} className="p-4 bg-gray-50 rounded-lg mb-3 last:mb-0">
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center space-x-3">
-                                {getStatusIcon(workflow.status)}
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900">{workflow.name}</p>
-                                  <p className="text-xs text-gray-500">{workflow.completion_percentage}% complete</p>
+
+                    {templates.length > 0 ? (
+                      <div className="space-y-4">
+                        {templates.map(template => {
+                          const propertyWorkflows = workflowInstances.filter(
+                            workflow => workflow.property_id === selectedProperty.id && 
+                                       workflow.template_id === template.id
+                          );
+                          
+                          const hasActiveWorkflow = propertyWorkflows.length > 0;
+                          
+                          return (
+                            <div key={template.id} className="border border-gray-200 rounded-lg p-4">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-gray-900 mb-1">{template.name}</h4>
+                                  <p className="text-sm text-gray-500 mb-2">{template.description}</p>
+                                  {template.category && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      {template.category.replace('_', ' ')}
+                                    </span>
+                                  )}
                                 </div>
+                                {!hasActiveWorkflow && (
+                                  <button
+                                    onClick={() => handleStartWorkflow(template)}
+                                    disabled={loading}
+                                    className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ml-4"
+                                  >
+                                    <PlusIcon className="w-4 h-4 mr-1" />
+                                    {loading ? 'Starting...' : 'Start'}
+                                  </button>
+                                )}
                               </div>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(workflow.status)}`}>
-                                {workflow.status?.replace('_', ' ') || 'Unknown'}
-                              </span>
+                              
+                              {hasActiveWorkflow && (
+                                <div className="mt-3 space-y-2">
+                                  {propertyWorkflows.map(workflow => (
+                                    <div key={workflow.id} className="p-3 bg-gray-50 rounded-lg">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                          {getStatusIcon(workflow.status)}
+                                          <div>
+                                            <div className="font-medium text-gray-900">{workflow.name}</div>
+                                            <div className="text-sm text-gray-500">
+                                              {workflow.completion_percentage || 0}% complete • Created {formatDate(workflow.created_at)}
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(workflow.status)}`}>
+                                          {workflow.status?.replace('_', ' ') || 'Unknown'}
+                                        </span>
+                                      </div>
+                                      {workflow.started_at && (
+                                        <div className="text-xs text-gray-500 mt-2">
+                                          <span className="font-medium">Started:</span> {formatDate(workflow.started_at)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            {workflow.started_at && (
-                              <div className="text-xs text-gray-500">
-                                <span className="font-medium">Started:</span> {formatDate(workflow.started_at)}
-                              </div>
-                            )}
-                          </div>
-                        ));
-                      } else {
-                        return (
-                          <div className="text-center p-6 bg-gray-50 rounded-lg">
-                            <ClockIcon className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-                            <p className="text-sm text-gray-500 mb-4">No Group Valuations workflow started</p>
-                            <button
-                              onClick={handleStartWorkflow}
-                              disabled={loading}
-                              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                              <PlusIcon className="w-4 h-4 mr-2" />
-                              {loading ? 'Starting...' : 'Start Workflow'}
-                            </button>
-                          </div>
-                        );
-                      }
-                    })()}
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center p-6 bg-gray-50 rounded-lg">
+                        <ClockIcon className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+                        <p className="text-sm text-gray-500">No workflow templates available</p>
+                        <p className="text-xs text-gray-400 mt-1">Run the property management setup script to add workflow templates</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -577,19 +614,26 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
       {/* Asset Register Modal */}
       {showAssetRegisterModal && selectedProperty && (
-        <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-end z-[60]">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-end z-[60]"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAssetRegisterModal(false);
+            }
+          }}
+        >
           <div 
-            className="absolute inset-0" 
-            onClick={() => setShowAssetRegisterModal(false)}
-          />
-          <div className="w-[650px] h-full bg-white flex flex-col shadow-2xl relative z-10">
+            className="w-1/3 min-w-[500px] h-full bg-white flex flex-col shadow-xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <PropertyPanel
               property={selectedProperty}
               workflowInstance={null}
               onClose={() => setShowAssetRegisterModal(false)}
               onWorkflowUpdate={() => {}}
               onPropertyUpdate={(updatedProperty) => {
-                // Handle property updates if needed
+                // Update the selected property so the panel shows the latest data
+                setSelectedProperty(updatedProperty);
                 console.log('Property updated:', updatedProperty);
               }}
             />

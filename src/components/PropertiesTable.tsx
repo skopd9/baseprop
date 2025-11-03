@@ -24,15 +24,16 @@ interface PropertiesTableProps {
   selectedProperty: Property | null;
   onPropertySelect: (property: Property) => void;
   onPropertiesUpdate: (updatedProperty: Property) => void;
+  onAddProperty?: () => void;
 }
 
 const getPropertyIcon = (propertyType: string) => {
   switch (propertyType) {
-    case 'horizontal_properties':
+    case 'commercial':
       return <BuildingOffice2Icon className="w-4 h-4 text-blue-600" />;
-    case 'stand_alone_buildings':
+    case 'residential':
       return <HomeIcon className="w-4 h-4 text-green-600" />;
-    case 'land':
+    case 'industrial':
       return <MapIcon className="w-4 h-4 text-amber-600" />;
     default:
       return <BuildingOffice2Icon className="w-4 h-4 text-gray-600" />;
@@ -63,9 +64,9 @@ const formatCurrency = (amount: number) => {
 
 const propertyTypes = [
   { value: '', label: 'All Types' },
-  { value: 'land', label: 'Land' },
-  { value: 'horizontal_properties', label: 'Horizontal Properties' }, 
-  { value: 'stand_alone_buildings', label: 'Stand Alone Buildings' },
+  { value: 'residential', label: 'Residential' },
+  { value: 'commercial', label: 'Commercial' }, 
+  { value: 'industrial', label: 'Industrial' },
 ];
 
 const statusTypes = [
@@ -76,9 +77,9 @@ const statusTypes = [
 ];
 
 const propertyTypeLabels: Record<string, string> = {
-  'horizontal_properties': 'Horizontal Properties',
-  'stand_alone_buildings': 'Stand Alone Buildings',
-  'land': 'Land',
+  'residential': 'Residential',
+  'commercial': 'Commercial',
+  'industrial': 'Industrial',
 };
 
 export const PropertiesTable: React.FC<PropertiesTableProps> = ({
@@ -87,6 +88,7 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
   selectedProperty,
   onPropertySelect,
   onPropertiesUpdate,
+  onAddProperty,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'asset_register_id', desc: false }
@@ -217,6 +219,25 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
       size: 100,
     },
     {
+      id: 'units',
+      header: 'Units',
+      cell: info => {
+        const property = info.row.original;
+        const propertyData = (property as any).property_data || {};
+        const totalUnits = propertyData.units || 0;
+        
+        return (
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-gray-900">
+              {totalUnits}
+            </span>
+            <span className="text-xs text-gray-500">units</span>
+          </div>
+        );
+      },
+      size: 80,
+    },
+    {
       id: 'workflows',
       header: 'Workflows',
       cell: info => {
@@ -281,7 +302,7 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
   return (
     <div className="bg-white rounded-lg shadow border border-gray-200">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200">
+      <div className="px-3 py-2 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Properties</h3>
@@ -290,6 +311,18 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
             </p>
           </div>
           
+          {onAddProperty && (
+            <button
+              onClick={onAddProperty}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Property
+            </button>
+          )}
+          
           {/* Filters */}
           <div className="flex items-center space-x-4">
             <input
@@ -297,12 +330,12 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
               placeholder="Search properties..."
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <select
               value={(table.getColumn('property_type')?.getFilterValue() as string) ?? ''}
               onChange={(e) => table.getColumn('property_type')?.setFilterValue(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {propertyTypes.map(type => (
                 <option key={type.value} value={type.value}>{type.label}</option>
@@ -311,7 +344,7 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
             <select
               value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
               onChange={(e) => table.getColumn('status')?.setFilterValue(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {statusTypes.map(status => (
                 <option key={status.value} value={status.value}>{status.label}</option>
@@ -330,7 +363,7 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
                 {headerGroup.headers.map(header => (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                     style={{ width: header.getSize() }}
                     onClick={header.column.getToggleSortingHandler()}
                   >
@@ -376,7 +409,7 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
                   {row.getVisibleCells().map(cell => (
                     <td
                       key={cell.id}
-                      className="px-4 py-3 whitespace-nowrap"
+                      className="px-3 py-2 whitespace-nowrap"
                       style={{ width: cell.column.getSize() }}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -390,7 +423,7 @@ export const PropertiesTable: React.FC<PropertiesTableProps> = ({
       </div>
       
       {table.getFilteredRowModel().rows.length === 0 && (
-        <div className="px-4 py-8 text-center">
+        <div className="px-3 py-6 text-center">
           <p className="text-sm text-gray-500">
             No properties found matching the current filters.
           </p>

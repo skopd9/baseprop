@@ -103,11 +103,11 @@ export const SimpleMap: React.FC<SimpleMapProps> = ({
 
   const getMarkerColor = (propertyType: string) => {
     switch (propertyType) {
-      case 'stand_alone_buildings':
+      case 'residential':
         return '#ef4444'; // red
-      case 'horizontal_properties':
+      case 'commercial':
         return '#3b82f6'; // blue  
-      case 'land':
+      case 'industrial':
         return '#10b981'; // green
       default:
         return '#6b7280'; // gray

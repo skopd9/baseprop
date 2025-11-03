@@ -1,177 +1,468 @@
-export interface Module {
+// =====================================================
+// UK Landlord Property Management Types
+// Simplified for small retail landlords
+// =====================================================
+
+import { CountryCode } from '../lib/countries';
+
+// =====================================================
+// USER TYPES
+// =====================================================
+
+export type UserType = 'direct_landlord' | 'agent_using_landlord' | 'property_manager';
+
+export interface UserPreferences {
   id: string;
-  name: string; // 'valuations', 'lease_management', 'acquisition', 'asset_management'
-  display_name: string;
-  description: string;
-  icon: string;
-  color_theme: string;
-  is_active: boolean;
-  sort_order: number;
-  module_config: Record<string, any>;
-  created_at: string;
-  updated_at: string;
+  userEmail: string;
+  countryCode: CountryCode;
+  userType: UserType;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface UserModuleAccess {
+// =====================================================
+// AGENT TYPES
+// =====================================================
+
+export interface Agent {
   id: string;
-  user_id: string;
-  module_id: string;
-  role: 'admin' | 'manager' | 'user' | 'viewer';
-  is_default: boolean;
-  last_accessed_at?: string;
-  created_at: string;
+  name: string;
+  companyName?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  servicesTenantFinding: boolean;
+  servicesRentCollection: boolean;
+  servicesPropertyManagement: boolean;
+  servicesMaintenance: boolean;
+  commissionPercentage?: number;
+  monthlyManagementFee?: number;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =====================================================
+// PROPERTY TYPES
+// =====================================================
+
+export type PropertyType = 'house' | 'flat' | 'hmo' | 'studio' | 'other';
+export type PropertyStatus = 'vacant' | 'occupied' | 'maintenance' | 'sold';
+
+export interface HMOUnit {
+  name: string;
+  area: number; // square meters
+  targetRent: number;
 }
 
 export interface Property {
   id: string;
-  asset_register_id: string; // Human readable ID like '001', '002'
-  name: string;
+  countryCode: CountryCode;
+  
+  // Address
   address: string;
-  property_type: 'land' | 'horizontal_properties' | 'stand_alone_buildings';
-  property_sub_type?: string; // plot, maisonette, retail, office, etc.
+  addressLine2?: string;
+  city?: string;
+  countyState?: string;
+  postcode?: string;
   
-  // Module association
-  module_id?: string;
+  // Property Details
+  propertyType: PropertyType;
+  bedrooms?: number;
+  bathrooms?: number;
+  squareMeters?: number;
   
-  // Location data
-  latitude?: number;
-  longitude?: number;
-  municipality?: string;
-  postal_code?: string;
+  // HMO
+  isHMO: boolean;
+  hmoLicenseNumber?: string;
+  hmoLicenseExpiry?: string;
+  units?: HMOUnit[];
   
-  // Property details
-  square_feet?: number;
-  units?: number;
-  floors?: number;
-  year_built?: number;
+  // UK-Specific
+  councilTaxBand?: string;
+  councilTaxAnnual?: number;
   
   // Financial
-  acquisition_date?: string;
-  acquisition_price?: number;
-  current_value?: number;
+  purchasePrice?: number;
+  purchaseDate?: string;
+  currentValue?: number;
+  monthlyRent?: number;
   
-  status: 'active' | 'disposed' | 'under_contract';
-  created_at: string;
-  updated_at: string;
+  // Agent
+  agentId?: string;
+  agentManaged: boolean;
+  
+  // Status
+  status: PropertyStatus;
+  tenantCount: number;
+  
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface WorkflowStage {
+// =====================================================
+// TENANT TYPES
+// =====================================================
+
+export type TenantStatus = 'active' | 'inactive' | 'notice_given' | 'eviction';
+
+export interface Tenant {
   id: string;
+  propertyId: string;
+  countryCode: CountryCode;
+  
+  // Personal Info
   name: string;
-  description: string;
-  order: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'blocked';
-  required_inputs: string[];
-  outputs: string[];
-  estimated_duration_days: number;
-  assignee?: string;
-  due_date?: string;
-  completed_date?: string;
+  email?: string;
+  phone?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  
+  // UK-Specific
+  rightToRentChecked: boolean;
+  rightToRentCheckDate?: string;
+  rightToRentExpiry?: string;
+  
+  // Tenancy
+  leaseStart?: string;
+  leaseEnd?: string;
+  monthlyRent?: number;
+  rentDueDay: number;
+  
+  // Deposit
+  depositAmount?: number;
+  depositScheme?: string;
+  depositProtectedDate?: string;
+  depositCertificateNumber?: string;
+  
+  // Agent
+  foundViaAgentId?: string;
+  
+  // Status
+  status: TenantStatus;
+  notes?: string;
+  
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface Workstream {
+// =====================================================
+// RENT PAYMENT TYPES
+// =====================================================
+
+export type RentPaymentStatus = 'pending' | 'paid' | 'late' | 'partial' | 'missed';
+
+export interface RentPayment {
   id: string;
-  workflow_instance_id: string;
-  template_workstream_key: string;
-  name: string;
+  tenantId: string;
+  propertyId: string;
+  
+  paymentDate: string;
+  dueDate: string;
+  amountDue: number;
+  amountPaid?: number;
+  
+  status: RentPaymentStatus;
+  paymentMethod?: string;
+  paymentReference?: string;
+  notes?: string;
+  
+  // Payment period fields
+  paymentFrequency?: 'monthly' | 'quarterly' | 'annual';
+  periodStart?: string;
+  periodEnd?: string;
+  isProRated?: boolean;
+  proRateDays?: number;
+  invoiceNumber?: string;
+  invoiceGeneratedAt?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =====================================================
+// COMPLIANCE TYPES
+// =====================================================
+
+export type ComplianceStatus = 'valid' | 'expiring_soon' | 'expired' | 'not_required' | 'pending';
+
+// UK Compliance Types
+export type UKComplianceType = 
+  | 'gas_safety'
+  | 'eicr'
+  | 'epc'
+  | 'deposit_protection'
+  | 'right_to_rent'
+  | 'legionella'
+  | 'smoke_alarms'
+  | 'co_alarms'
+  | 'fire_safety_hmo'
+  | 'hmo_license';
+
+// Greece Compliance Types (Placeholder)
+export type GreeceComplianceType =
+  | 'epc_greece'
+  | 'building_permit'
+  | 'tax_clearance';
+
+// USA Compliance Types (Placeholder)
+export type USAComplianceType =
+  | 'lead_paint'
+  | 'smoke_detectors_us'
+  | 'local_permits';
+
+export type ComplianceType = UKComplianceType | GreeceComplianceType | USAComplianceType;
+
+export interface ComplianceCertificate {
+  id: string;
+  propertyId: string;
+  countryCode: CountryCode;
+  
+  certificateType: ComplianceType;
+  certificateNumber?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  
+  status: ComplianceStatus;
+  
+  contractorName?: string;
+  contractorCompany?: string;
+  contractorPhone?: string;
+  contractorEmail?: string;
+  
+  documentUrl?: string;
+  
+  reminderSent: boolean;
+  reminderDate?: string;
+  
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =====================================================
+// INSPECTION TYPES
+// =====================================================
+
+export type InspectionType = 'routine' | 'move_in' | 'move_out' | 'maintenance' | 'compliance';
+export type InspectionStatus = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+
+export interface Inspection {
+  id: string;
+  propertyId: string;
+  tenantId?: string;
+  
+  type: InspectionType;
+  scheduledDate: string;
+  completedDate?: string;
+  
+  inspectorName?: string;
+  inspectorCompany?: string;
+  
+  status: InspectionStatus;
+  
+  findings?: string;
+  issuesFound?: string[];
+  photosUrls?: string[];
+  
+  requiresFollowup: boolean;
+  followupNotes?: string;
+  
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =====================================================
+// REPAIR TYPES
+// =====================================================
+
+export type RepairCategory = 'plumbing' | 'electrical' | 'heating' | 'structural' | 'appliance' | 'other';
+export type RepairPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type RepairStatus = 'reported' | 'acknowledged' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface Repair {
+  id: string;
+  propertyId: string;
+  tenantId?: string;
+  
+  title: string;
   description?: string;
-  order_index: number;
+  category?: RepairCategory;
   
-  // Field definitions and data
-  fields: WorkflowTemplateField[];
-  form_data: Record<string, any>;
+  priority: RepairPriority;
+  status: RepairStatus;
   
-  // Status and progression
-  status: 'pending' | 'started' | 'in_progress' | 'completed' | 'blocked' | 'skipped';
-  completion_triggers?: Record<string, any>;
-  can_start: boolean;
+  reportedDate: string;
+  scheduledDate?: string;
+  completedDate?: string;
   
-  // Assignment and tracking
-  assignee_id?: string;
-  started_at?: string;
-  completed_at?: string;
-  due_date?: string;
+  contractorName?: string;
+  contractorCompany?: string;
+  contractorPhone?: string;
   
-  created_at: string;
-  updated_at: string;
+  estimatedCost?: number;
+  actualCost?: number;
+  
+  isEmergency: boolean;
+  
+  photosUrls?: string[];
+  invoiceUrl?: string;
+  
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface WorkflowTemplateField {
+// =====================================================
+// EXPENSE TYPES
+// =====================================================
+
+export type ExpenseCategory = 
+  | 'maintenance'
+  | 'insurance'
+  | 'property_tax'
+  | 'mortgage'
+  | 'agent_fees'
+  | 'utilities'
+  | 'other';
+
+export interface Expense {
   id: string;
-  label: string;
-  type: 'text' | 'number' | 'select' | 'textarea' | 'file' | 'formula';
-  options?: string[];
-  formula?: string;
+  propertyId: string;
+  
+  description: string;
+  category: ExpenseCategory;
+  amount: number;
+  expenseDate: string;
+  
+  isTaxDeductible: boolean;
+  
+  paymentMethod?: string;
+  paymentReference?: string;
+  
+  receiptUrl?: string;
+  invoiceUrl?: string;
+  
+  repairId?: string;
+  
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface WorkflowTemplateWorkstream {
-  key: string;
-  name: string;
-  fields?: WorkflowTemplateField[];
-}
+// =====================================================
+// SIMPLIFIED WORKFLOW TYPES (For standard templates)
+// =====================================================
 
-export interface WorkflowTemplate {
+export type WorkflowType = 
+  | 'property_onboarding'
+  | 'tenant_onboarding'
+  | 'tenancy_end'
+  | 'compliance_renewal';
+
+export type WorkflowStatus = 'not_started' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface WorkflowStep {
   id: string;
-  key: string;
   name: string;
   description: string;
-  category?: 'acquisition' | 'capex' | 'lease_renewal' | 'disposal' | 'lease_up' | 'auction_sales' | 'valuation' | 'lease_management' | 'asset_management';
-  stages?: string[];
-  workstreams?: WorkflowTemplateWorkstream[];
-  default_workstreams?: string[];
-  triggers?: string[]; // IDs of workflows this can trigger
-  module_id?: string;
-  is_global?: boolean;
-  created_at: string;
-  updated_at: string;
+  completed: boolean;
+  completedDate?: string;
+  dueDate?: string;
+  notes?: string;
 }
 
-export interface WorkflowInstance {
+export interface SimpleWorkflow {
   id: string;
-  property_id: string;
-  template_id: string;
-  user_id: string;
+  propertyId?: string;
+  tenantId?: string;
+  
+  workflowType: WorkflowType;
+  status: WorkflowStatus;
+  
+  steps: WorkflowStep[];
+  currentStepIndex: number;
+  
+  startedAt?: string;
+  completedAt?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
+// =====================================================
+// DASHBOARD TYPES
+// =====================================================
+
+export interface DashboardStats {
+  totalProperties: number;
+  occupiedProperties: number;
+  vacantProperties: number;
+  totalTenants: number;
+  monthlyRentTotal: number;
+  overdueRentCount: number;
+  upcomingInspections: number;
+  expiringCompliance: number;
+  pendingRepairs: number;
+}
+
+// =====================================================
+// NOTIFICATION TYPES
+// =====================================================
+
+export type NotificationType = 
+  | 'rent_overdue'
+  | 'rent_due_soon'
+  | 'compliance_expiring'
+  | 'compliance_expired'
+  | 'inspection_due'
+  | 'repair_urgent'
+  | 'lease_ending'
+  | 'general';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  propertyId?: string;
+  tenantId?: string;
+  complianceId?: string;
+  read: boolean;
+  createdAt: string;
+}
+
+// =====================================================
+// HELPER TYPES
+// =====================================================
+
+export interface Address {
+  line1: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+export interface ContactInfo {
   name: string;
-  status: 'not_started' | 'started' | 'in_progress' | 'completed' | 'paused' | 'cancelled';
-  
-  // Progress tracking
-  current_workstream_id?: string;
-  completion_percentage: number;
-  
-  // Workstreams data
-  workstreams?: Workstream[];
-  
-  // Dates
-  started_at?: string;
-  completed_at?: string;
-  due_date?: string;
-  
-  // Module association
-  module_id?: string;
-  
-  created_at: string;
-  updated_at: string;
+  email?: string;
+  phone?: string;
+  address?: string;
 }
 
-export interface WorkflowLink {
-  id: string;
-  source_workflow_id: string;
-  target_workflow_id: string;
-  trigger_condition: string; // e.g., "completion", "stage_completed:offer_received"
-  created_at: string;
+export interface DateRange {
+  startDate: string;
+  endDate: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  workflow_instance_id?: string;
+export interface FilterOptions {
+  countryCode?: CountryCode;
+  propertyType?: PropertyType;
+  status?: PropertyStatus | TenantStatus;
+  dateRange?: DateRange;
 }
-
-export interface AIWorkflowUpdate {
-  action: 'add_workstream' | 'remove_workstream' | 'modify_stage' | 'add_stage' | 'remove_stage';
-  target: string; // workstream_id or stage_id
-  changes: any;
-  reasoning: string;
-} 

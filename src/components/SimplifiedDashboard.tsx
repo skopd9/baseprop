@@ -1,0 +1,376 @@
+import React from 'react';
+import { 
+  HomeIcon,
+  UserGroupIcon,
+  CurrencyPoundIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  ClockIcon
+} from '@heroicons/react/24/outline';
+import { SimplifiedProperty, SimplifiedTenant, getOccupancyStatus } from '../utils/simplifiedDataTransforms';
+import { QuickStartGuide } from './QuickStartGuide';
+import { PropertyMap } from './PropertyMap';
+import { ExpensesSummaryWidget } from './ExpensesSummaryWidget';
+
+interface SimplifiedDashboardProps {
+  properties: SimplifiedProperty[];
+  tenants: SimplifiedTenant[];
+  onAddProperty?: () => void;
+  onAddTenant?: () => void;
+  onViewRent?: () => void;
+  onViewInspections?: () => void;
+  onViewExpenses?: () => void;
+  onLoadDemoData?: () => void;
+  isLoadingDemo?: boolean;
+  selectedProperty?: SimplifiedProperty | null;
+  onPropertySelect?: (property: SimplifiedProperty) => void;
+}
+
+export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
+  properties,
+  tenants,
+  onAddProperty,
+  onAddTenant,
+  onViewRent,
+  onViewInspections,
+  onViewExpenses,
+  onLoadDemoData,
+  isLoadingDemo,
+  selectedProperty,
+  onPropertySelect
+}) => {
+  // Calculate statistics from actual data
+  const stats = React.useMemo(() => {
+    // Safety checks: ensure arrays are valid
+    const propertiesArray = Array.isArray(properties) ? properties : [];
+    const tenantsArray = Array.isArray(tenants) ? tenants : [];
+    
+    const totalProperties = propertiesArray.length;
+    const totalTenants = tenantsArray.length;
+    const occupiedProperties = propertiesArray.filter(p => getOccupancyStatus(p, tenantsArray) === 'occupied').length;
+    const vacantProperties = propertiesArray.filter(p => getOccupancyStatus(p, tenantsArray) === 'vacant').length;
+    const soldProperties = propertiesArray.filter(p => p.status === 'sold').length;
+    
+    const totalMonthlyRent = tenantsArray.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
+    const overdueRent = tenantsArray.filter(t => t.rentStatus === 'overdue').length;
+    
+    const leasesExpiringIn3Months = tenantsArray.filter(tenant => {
+      const threeMonthsFromNow = new Date();
+      threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+      return tenant.leaseEnd <= threeMonthsFromNow;
+    }).length;
+
+    const occupancyRate = totalProperties > 0 ? Math.round((occupiedProperties / totalProperties) * 100) : 0;
+
+    return {
+      totalProperties,
+      totalTenants,
+      occupiedProperties,
+      vacantProperties,
+      soldProperties,
+      totalMonthlyRent,
+      overdueRent,
+      leasesExpiringIn3Months,
+      occupancyRate
+    };
+  }, [properties, tenants]);
+
+  // Calculate urgent items with safety checks
+  const urgentItems = [
+    ...(Array.isArray(tenants) ? tenants : []).filter(t => t.rentStatus === 'overdue').map(t => ({
+      type: 'rent',
+      message: `${t.name} - Rent overdue`,
+      property: t.propertyAddress,
+      priority: 'high'
+    })),
+    ...(Array.isArray(tenants) ? tenants : []).filter(t => {
+      const oneMonthFromNow = new Date();
+      oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
+      return t.leaseEnd <= oneMonthFromNow;
+    }).map(t => ({
+      type: 'lease',
+      message: `${t.name} - Lease expires soon`,
+      property: t.propertyAddress,
+      priority: 'medium'
+    })),
+    ...(Array.isArray(properties) ? properties : []).filter(p => getOccupancyStatus(p, Array.isArray(tenants) ? tenants : []) === 'vacant' && p.status === 'under_management').map(p => ({
+      type: 'vacancy',
+      message: `${p.address} - Property vacant`,
+      property: p.address,
+      priority: 'high'
+    }))
+  ];
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Show quick start guide for new users
+  const isNewUser = (!Array.isArray(properties) || properties.length === 0) && (!Array.isArray(tenants) || tenants.length === 0);
+  
+  if (isNewUser) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <HomeIcon className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Property Manager!</h2>
+            <p className="text-gray-600 text-lg">
+              Let's get your property management system set up in just a few steps.
+            </p>
+          </div>
+          
+          <QuickStartGuide
+            properties={properties || []}
+            tenants={tenants || []}
+            onAddProperty={onAddProperty || (() => {})}
+            onAddTenant={onAddTenant || (() => {})}
+            onViewRent={onViewRent || (() => {})}
+            onViewInspections={onViewInspections || (() => {})}
+            onLoadDemoData={onLoadDemoData}
+            isLoadingDemo={isLoadingDemo}
+          />
+          
+          <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">What you can do with Property Manager:</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-start space-x-3">
+                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Property Management</h4>
+                  <p className="text-sm text-gray-600">Track property details, occupancy, and financial performance</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3">
+                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Tenant Relations</h4>
+                  <p className="text-sm text-gray-600">Manage tenant information, leases, and communications</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3">
+                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Rent Collection</h4>
+                  <p className="text-sm text-gray-600">Track payments, set up schedules, and monitor overdue amounts</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3">
+                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-gray-900">Maintenance & Compliance</h4>
+                  <p className="text-sm text-gray-600">Schedule inspections, track repairs, and manage certificates</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Property Dashboard</h1>
+        <p className="text-gray-600 mt-2">Welcome back! Here's what's happening with your properties.</p>
+      </div>
+
+      {/* Key Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Total Properties */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Properties</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalProperties}</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-lg">
+              <HomeIcon className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-green-600">{stats.occupancyRate}% occupied</span>
+          </div>
+        </div>
+
+        {/* Total Tenants */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Tenants</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalTenants}</p>
+            </div>
+            <div className="p-3 bg-green-100 rounded-lg">
+              <UserGroupIcon className="w-6 h-6 text-green-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-gray-600">Across {stats.occupiedProperties} properties</span>
+          </div>
+        </div>
+
+        {/* Monthly Rent */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Monthly Rent</p>
+              <p className="text-3xl font-bold text-gray-900">{formatCurrency(stats.totalMonthlyRent)}</p>
+            </div>
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <CurrencyPoundIcon className="w-6 h-6 text-purple-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            {stats.overdueRent > 0 ? (
+              <span className="text-red-600">{stats.overdueRent} overdue payments</span>
+            ) : (
+              <span className="text-green-600">All payments current</span>
+            )}
+          </div>
+        </div>
+
+        {/* Urgent Items */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Urgent Items</p>
+              <p className="text-3xl font-bold text-gray-900">{urgentItems.length}</p>
+            </div>
+            <div className="p-3 bg-orange-100 rounded-lg">
+              <ExclamationTriangleIcon className="w-6 h-6 text-orange-600" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm">
+            <span className="text-orange-600">Need attention</span>
+          </div>
+        </div>
+      </div>
+
+
+
+      {/* Property Map */}
+      <div className="mb-8">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Property Locations</h2>
+            <div className="text-sm text-gray-600">
+              {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} on map
+            </div>
+          </div>
+          <PropertyMap 
+            properties={properties}
+            selectedProperty={selectedProperty}
+            onPropertySelect={onPropertySelect}
+            height="400px"
+          />
+        </div>
+      </div>
+
+      {/* Three Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Urgent Items List */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Items Needing Attention</h2>
+            <ExclamationTriangleIcon className="w-5 h-5 text-orange-500" />
+          </div>
+          
+          {urgentItems.length > 0 ? (
+            <div className="space-y-3">
+              {urgentItems.slice(0, 5).map((item, index) => (
+                <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                  <div className={`w-2 h-2 rounded-full mt-2 ${
+                    item.priority === 'high' ? 'bg-red-500' : 'bg-yellow-500'
+                  }`}></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{item.message}</p>
+                    <p className="text-xs text-gray-500 truncate">{item.property}</p>
+                  </div>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    item.priority === 'high' 
+                      ? 'bg-red-100 text-red-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {item.priority}
+                  </span>
+                </div>
+              ))}
+              {urgentItems.length > 5 && (
+                <p className="text-sm text-gray-500 text-center pt-2">
+                  And {urgentItems.length - 5} more items...
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <CheckCircleIcon className="w-12 h-12 text-green-500 mx-auto mb-4" />
+              <p className="text-sm text-gray-500">All caught up! No urgent items.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Property Status Overview */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Property Status</h2>
+            <HomeIcon className="w-5 h-5 text-blue-500" />
+          </div>
+          
+          <div className="space-y-4">
+            {/* Occupied Properties */}
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                <span className="text-sm font-medium text-gray-900">Occupied</span>
+              </div>
+              <span className="text-sm font-bold text-green-700">{stats.occupiedProperties}</span>
+            </div>
+
+            {/* Vacant Properties */}
+            {stats.vacantProperties > 0 && (
+              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-900">Vacant</span>
+                </div>
+                <span className="text-sm font-bold text-yellow-700">{stats.vacantProperties}</span>
+              </div>
+            )}
+
+            {/* Sold Properties */}
+            {stats.soldProperties > 0 && (
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-gray-900">Sold</span>
+                </div>
+                <span className="text-sm font-bold text-gray-700">{stats.soldProperties}</span>
+              </div>
+            )}
+
+            {/* Lease Renewals */}
+            {stats.leasesExpiringIn3Months > 0 && (
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <ClockIcon className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-medium text-gray-900">Leases Expiring Soon</span>
+                </div>
+                <span className="text-sm font-bold text-blue-700">{stats.leasesExpiringIn3Months}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Expenses Summary */}
+        <ExpensesSummaryWidget onViewExpenses={onViewExpenses} />
+      </div>
+    </div>
+  );
+};
