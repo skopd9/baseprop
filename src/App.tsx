@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SimplifiedLandlordApp } from './components/SimplifiedLandlordApp';
 import { AuthModal } from './components/AuthModal';
+import { getCountryList } from './lib/countries';
 
 interface AppProps {
   onUserEmailChange?: (email: string) => void;
@@ -38,7 +39,6 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
     onUserEmailChange(email);
     setShowAuthModal(false);
     setIsLoggedIn(true);
-    hideElevenLabsWidget();
   };
 
   // Handle logout
@@ -46,80 +46,6 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
     localStorage.removeItem('userEmail');
     onUserEmailChange('');
     setIsLoggedIn(false);
-    showElevenLabsWidget();
-  };
-
-  // Manage ElevenLabs widget visibility
-  useEffect(() => {
-    if (isLoggedIn) {
-      hideElevenLabsWidget();
-    } else {
-      showElevenLabsWidget();
-    }
-  }, [isLoggedIn]);
-
-  // Function to hide ElevenLabs widget
-  const hideElevenLabsWidget = () => {
-    const widgetContainer = document.getElementById('elevenlabs-widget-container');
-    if (widgetContainer) {
-      widgetContainer.style.display = 'none';
-    }
-  };
-
-  // Function to show ElevenLabs widget
-  const showElevenLabsWidget = () => {
-    const widgetContainer = document.getElementById('elevenlabs-widget-container');
-    if (widgetContainer) {
-      widgetContainer.style.display = 'block';
-    }
-  };
-
-  // Handle voice agent - directly start the conversation
-  const handleTryVoiceAgent = async () => {
-    // Function to try clicking the widget
-    const tryClickWidget = () => {
-      const widget = document.querySelector('elevenlabs-convai') as any;
-      if (!widget) return false;
-
-      try {
-        // Method 1: Look for buttons in shadow DOM or regular DOM
-        const widgetButton = widget.shadowRoot?.querySelector('button') ||
-          widget.querySelector('button') ||
-          widget.querySelector('[role="button"]') ||
-          widget.shadowRoot?.querySelector('[data-testid*="call"]') ||
-          widget.shadowRoot?.querySelector('.convai-trigger-button');
-
-        if (widgetButton) {
-          widgetButton.click();
-          return true;
-        }
-
-        // Method 2: Try clicking the widget itself
-        widget.click();
-        return true;
-      } catch (error) {
-        console.log('Click attempt failed:', error);
-        return false;
-      }
-    };
-
-    // Try immediately first
-    if (tryClickWidget()) return;
-
-    // If that fails, wait a bit for the widget to fully load and try again
-    setTimeout(() => {
-      if (!tryClickWidget()) {
-        // Final fallback: scroll to widget
-        const widget = document.querySelector('elevenlabs-convai');
-        if (widget) {
-          widget.scrollIntoView({ behavior: 'smooth' });
-          // Also try to focus the widget to make it more visible
-          if ('focus' in widget) {
-            (widget as any).focus();
-          }
-        }
-      }
-    }, 500);
   };
 
   // Show loading state while checking authentication
@@ -145,7 +71,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
       {/* Top Navigation */}
       <nav className="flex justify-between items-center p-6 bg-white/80 backdrop-blur-sm border-b border-gray-100">
         <div className="text-2xl font-bold text-gray-900">
-          PropertyFlow
+          Base Prop
         </div>
         <div className="flex items-center gap-6">
           <a href="#features" className="text-gray-600 hover:text-gray-900 font-medium">Features</a>
@@ -184,20 +110,11 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
             >
               Start Managing Properties
             </button>
-            <button
-              onClick={handleTryVoiceAgent}
-              className="px-12 py-4 bg-gradient-to-r from-purple-500 to-blue-600 text-white text-xl font-semibold rounded-2xl hover:from-purple-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center gap-3"
-            >
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C13.1 2 14 2.9 14 4V10C14 11.1 13.1 12 12 12C10.9 12 10 11.1 10 10V4C10 2.9 10.9 2 12 2M19 10V12C19 15.9 15.9 19 12 19C8.1 19 5 15.9 5 12V10H7V12C7 14.8 9.2 17 12 17C14.8 17 17 14.8 17 12V10H19ZM12 20.5C12.3 20.5 12.5 20.8 12.5 21S12.3 21.5 12 21.5H12C8.7 21.5 6 18.8 6 15.5V14H8V15.5C8 17.7 9.8 19.5 12 19.5C14.2 19.5 16 17.7 16 15.5V14H18V15.5C18 18.8 15.3 21.5 12 21.5Z" />
-              </svg>
-              Ask AI Assistant
-            </button>
           </div>
 
           {/* Key Features */}
           <div className="text-gray-600 mb-4">Perfect for managing:</div>
-          <div className="flex flex-wrap justify-center gap-3 mb-12">
+          <div className="flex flex-wrap justify-center gap-3 mb-8">
             <span className="px-4 py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all">
               🏠 Residential Properties
             </span>
@@ -213,6 +130,30 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
             <span className="px-4 py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all">
               📋 Compliance & Inspections
             </span>
+          </div>
+
+          {/* Active Countries */}
+          <div className="mb-8">
+            <div className="text-gray-600 mb-3 text-sm font-medium">Available in:</div>
+            <div className="flex flex-wrap justify-center gap-4">
+              {getCountryList().map((country) => {
+                // Map country codes to flag emojis
+                const flagEmojis: Record<string, string> = {
+                  'UK': '🇬🇧',
+                  'GR': '🇬🇷',
+                  'US': '🇺🇸'
+                };
+                return (
+                  <div
+                    key={country.code}
+                    className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-gray-200 shadow-sm hover:shadow-md transition-all"
+                  >
+                    <span className="text-2xl">{flagEmojis[country.code] || '🌍'}</span>
+                    <span className="text-gray-700 font-medium">{country.name}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Trust Indicator */}
@@ -331,7 +272,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
               "This has transformed how I <span className="text-green-600">manage my properties</span>"
             </h2>
             <p className="text-xl text-gray-600">
-              What landlords are saying about PropertyFlow
+              What landlords are saying about Base Prop
             </p>
           </div>
 
