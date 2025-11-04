@@ -159,12 +159,14 @@ To configure DocuSign integration:
 
 1. Create a DocuSign Developer account at https://developers.docusign.com
 2. Create an integration key in the DocuSign Admin console
-3. Add the following to your .env file:
-   VITE_DOCUSIGN_INTEGRATION_KEY=your_integration_key
-   VITE_DOCUSIGN_ACCOUNT_ID=your_account_id
-   VITE_DOCUSIGN_REDIRECT_URL=${window.location.origin}/docusign-callback
+3. Add the required environment variables to your .env file:
+   - VITE_DOCUSIGN_INTEGRATION_KEY
+   - VITE_DOCUSIGN_ACCOUNT_ID
+   - VITE_DOCUSIGN_REDIRECT_URL
 
 4. Implement OAuth 2.0 authentication flow to get access tokens
+
+See DOCUSIGN_SETUP_GUIDE.md in the project root for detailed instructions.
 
 For now, the system operates in demo mode without actual DocuSign API calls.
     `.trim();

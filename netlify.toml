@@ -9,11 +9,12 @@
   NODE_VERSION = "18"
   # Exclude documentation files from secret scanning (they contain example placeholders)
   SECRETS_SCAN_OMIT_PATHS = "*.md,*.MD"
+  # Enable smart detection to allow client-side API keys (Google Maps, Supabase anon keys, etc.)
+  # These are meant to be public and are protected by domain/referrer restrictions
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "true"
   # Note: VITE_* environment variables are embedded in the client bundle by design.
-  # If these are marked as "secrets" in Netlify UI but are meant to be public
-  # (like Supabase anon key or OAuth client IDs), you should either:
-  # 1. Remove them from Netlify's "Secrets" and add as regular environment variables, OR
-  # 2. Add them to SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES in Netlify UI
+  # Client-side keys like Google Maps API keys (AIza*) and Supabase anon keys are safe
+  # to expose because they're protected by domain restrictions, not secrecy.
 
 [functions]
   directory = "netlify/functions"
