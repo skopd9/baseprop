@@ -10,8 +10,20 @@ export interface EmailNotification {
   html?: string; // Optional HTML content
 }
 
-// Initialize Resend with API key from environment variables
-const resend = new Resend(import.meta.env.VITE_RESEND_API_KEY);
+// Lazy-load Resend client only when API key is available
+let resendClient: Resend | null = null;
+
+function getResendClient(): Resend | null {
+  if (!import.meta.env.VITE_RESEND_API_KEY) {
+    return null;
+  }
+  
+  if (!resendClient) {
+    resendClient = new Resend(import.meta.env.VITE_RESEND_API_KEY);
+  }
+  
+  return resendClient;
+}
 
 // Default sender email (you should update this to your verified domain)
 const DEFAULT_FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'onboarding@resend.dev';
@@ -27,8 +39,11 @@ export class EmailNotificationService {
         timestamp: new Date().toISOString()
       });
 
+      // Try to get Resend client (only if API key is configured)
+      const resend = getResendClient();
+      
       // If Resend API key is configured, send via Resend
-      if (import.meta.env.VITE_RESEND_API_KEY) {
+      if (resend) {
         try {
           const { data, error } = await resend.emails.send({
             from: DEFAULT_FROM_EMAIL,
