@@ -28,6 +28,13 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
     }
   }, [isOpen, currentOrganization]);
 
+  // Refresh data when switching tabs
+  useEffect(() => {
+    if (isOpen && currentOrganization && !isLoading) {
+      loadData();
+    }
+  }, [activeTab]);
+
   const loadData = async () => {
     if (!currentOrganization) return;
 
@@ -146,26 +153,44 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-4 mt-6">
+          <div className="flex justify-between items-center mt-6">
+            <div className="flex gap-4">
+              <button
+                onClick={() => setActiveTab('members')}
+                className={`pb-2 px-1 font-medium transition-colors ${
+                  activeTab === 'members'
+                    ? 'text-green-600 border-b-2 border-green-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Members ({members.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('invitations')}
+                className={`pb-2 px-1 font-medium transition-colors ${
+                  activeTab === 'invitations'
+                    ? 'text-green-600 border-b-2 border-green-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Pending Invitations ({invitations.length})
+              </button>
+            </div>
             <button
-              onClick={() => setActiveTab('members')}
-              className={`pb-2 px-1 font-medium transition-colors ${
-                activeTab === 'members'
-                  ? 'text-green-600 border-b-2 border-green-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              onClick={loadData}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh members and invitations"
             >
-              Members ({members.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('invitations')}
-              className={`pb-2 px-1 font-medium transition-colors ${
-                activeTab === 'invitations'
-                  ? 'text-green-600 border-b-2 border-green-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Pending Invitations ({invitations.length})
+              <svg 
+                className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isLoading ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         </div>
@@ -251,43 +276,60 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
               {members.length === 0 ? (
                 <p className="text-gray-600 text-center py-8">No members yet</p>
               ) : (
-                members.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600 font-semibold">
-                          {member.user_name?.charAt(0).toUpperCase() || member.user_email?.charAt(0).toUpperCase() || '?'}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-900">
-                          {member.user_name || 'Unnamed User'}
+                members.map((member) => {
+                  // Check if member joined in the last 24 hours
+                  const joinedAt = new Date(member.joined_at || member.invited_at);
+                  const now = new Date();
+                  const hoursSinceJoined = (now.getTime() - joinedAt.getTime()) / (1000 * 60 * 60);
+                  const isNewMember = hoursSinceJoined < 24;
+
+                  return (
+                    <div
+                      key={member.id}
+                      className={`flex items-center justify-between p-4 border rounded-lg hover:border-gray-300 transition-colors ${
+                        isNewMember ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <span className="text-green-600 font-semibold">
+                            {member.user_name?.charAt(0).toUpperCase() || member.user_email?.charAt(0).toUpperCase() || '?'}
+                          </span>
                         </div>
-                        <div className="text-sm text-gray-600">{member.user_email || 'No email'}</div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">
+                              {member.user_name || 'Unnamed User'}
+                            </span>
+                            {isNewMember && (
+                              <span className="px-2 py-0.5 bg-green-600 text-white text-xs font-semibold rounded-full">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-600">{member.user_email || 'No email'}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          member.role === 'owner'
+                            ? 'bg-purple-100 text-purple-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {member.role === 'owner' ? 'Owner' : 'Member'}
+                        </span>
+                        {isOwner && member.role !== 'owner' && (
+                          <button
+                            onClick={() => handleRemoveMember(member.user_id, member.user_name || member.user_email || 'this user')}
+                            className="text-red-600 hover:text-red-700 text-sm font-medium"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        member.role === 'owner'
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {member.role === 'owner' ? 'Owner' : 'Member'}
-                      </span>
-                      {isOwner && member.role !== 'owner' && (
-                        <button
-                          onClick={() => handleRemoveMember(member.user_id, member.user_name || member.user_email || 'this user')}
-                          className="text-red-600 hover:text-red-700 text-sm font-medium"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}

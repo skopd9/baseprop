@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 
 interface AcceptInviteProps {
   token: string;
-  onSuccess: () => void;
+  onSuccess: (organizationName: string, role: 'owner' | 'member') => void;
   onError: (message: string) => void;
 }
 
@@ -57,8 +57,8 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       // Accept invitation
       await OrganizationService.acceptInvitation(token, user.id);
       
-      // Success!
-      onSuccess();
+      // Success! Pass organization details for welcome tour
+      onSuccess(invitation.organization_name, invitation.role);
     } catch (err: any) {
       console.error('Error accepting invitation:', err);
       setError(err.message || 'Failed to accept invitation.');

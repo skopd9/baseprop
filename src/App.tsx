@@ -3,6 +3,7 @@ import { SimplifiedLandlordApp } from './components/SimplifiedLandlordApp';
 import { AuthModal } from './components/AuthModal';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { AcceptInvite } from './components/AcceptInvite';
+import { WelcomeToOrganizationModal } from './components/WelcomeToOrganizationModal';
 import { OrganizationProvider } from './contexts/OrganizationContext';
 import { getCountryList } from './lib/countries';
 import { supabase, auth } from './lib/supabase';
@@ -11,7 +12,7 @@ interface AppProps {
   onUserEmailChange?: (email: string) => void;
 }
 
-type AppState = 'loading' | 'unauthenticated' | 'onboarding' | 'authenticated';
+type AppState = 'loading' | 'unauthenticated' | 'onboarding' | 'authenticated' | 'welcome-to-org';
 
 function App({ onUserEmailChange = () => { } }: AppProps) {
   const [appState, setAppState] = useState<AppState>('loading');
@@ -19,12 +20,13 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [welcomeOrgData, setWelcomeOrgData] = useState<{ name: string; role: 'owner' | 'member' } | null>(null);
 
   // Check auth state on mount and check for invite token
   useEffect(() => {
     // Check for invite token in URL
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
+    const token = urlParams.get('invite'); // Fixed: email uses ?invite= parameter
     if (token) {
       setInviteToken(token);
     }
@@ -101,11 +103,18 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
     setAppState('authenticated');
   };
 
-  const handleInviteAccepted = () => {
+  const handleInviteAccepted = (organizationName: string, role: 'owner' | 'member') => {
     // Clear token from URL
     window.history.replaceState({}, '', window.location.pathname);
     setInviteToken(null);
-    // Refresh to load new organization
+    // Show welcome modal with tour
+    setWelcomeOrgData({ name: organizationName, role });
+    setAppState('welcome-to-org');
+  };
+
+  const handleWelcomeTourComplete = () => {
+    // Clear welcome data and go to app
+    setWelcomeOrgData(null);
     setAppState('authenticated');
   };
 
@@ -165,6 +174,26 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
     );
   }
 
+  // Welcome to organization state - show tour after accepting invite
+  if (appState === 'welcome-to-org' && userId && welcomeOrgData) {
+    return (
+      <OrganizationProvider userId={userId}>
+        <SimplifiedLandlordApp 
+          onLogout={handleLogout}
+          showOnboarding={false}
+          userId={userId}
+          userEmail={userEmail}
+        />
+        <WelcomeToOrganizationModal
+          isOpen={true}
+          organizationName={welcomeOrgData.name}
+          role={welcomeOrgData.role}
+          onComplete={handleWelcomeTourComplete}
+        />
+      </OrganizationProvider>
+    );
+  }
+
   // Authenticated state with invite token
   if (appState === 'authenticated' && userId && inviteToken) {
     return (
@@ -195,6 +224,16 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   // Unauthenticated state - Landing Page
   return (
     <div className="bg-gradient-to-br from-blue-50 via-green-50 to-blue-50 min-h-screen flex flex-col">
+      {/* Invitation Banner - Shows when user has invite token */}
+      {inviteToken && (
+        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-3 px-4 text-center text-sm font-medium shadow-md z-50">
+          <span className="inline-flex items-center">
+            <span className="mr-2">📧</span>
+            You have an organization invitation! Please sign in or create an account to accept it.
+          </span>
+        </div>
+      )}
+      
       {/* Alpha Launch Banner */}
       <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 px-4 text-center text-sm font-medium shadow-md z-50">
         <span className="inline-flex items-center">
