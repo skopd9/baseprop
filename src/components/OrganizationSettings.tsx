@@ -20,6 +20,7 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'owner' | 'member'>('member');
   const [isInviting, setIsInviting] = useState(false);
+  const [cancelingInvitationId, setCancelingInvitationId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen && currentOrganization) {
@@ -91,6 +92,27 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
     } catch (err: any) {
       console.error('Error removing member:', err);
       setError(err.message || 'Failed to remove member');
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string, email: string) => {
+    if (!confirm(`Are you sure you want to cancel the invitation for ${email}?`)) {
+      return;
+    }
+
+    setCancelingInvitationId(invitationId);
+    setError('');
+    setSuccess('');
+
+    try {
+      await OrganizationService.cancelInvitation(invitationId);
+      setSuccess(`Invitation for ${email} has been canceled`);
+      await loadData();
+    } catch (err: any) {
+      console.error('Error canceling invitation:', err);
+      setError(err.message || 'Failed to cancel invitation');
+    } finally {
+      setCancelingInvitationId(null);
     }
   };
 
@@ -279,22 +301,33 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
                 invitations.map((invitation) => (
                   <div
                     key={invitation.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
                   >
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium text-gray-900">{invitation.email}</div>
                       <div className="text-sm text-gray-600">
                         Invited {new Date(invitation.created_at).toLocaleDateString()} • 
                         Expires {new Date(invitation.expires_at).toLocaleDateString()}
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      invitation.role === 'owner'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {invitation.role === 'owner' ? 'Owner' : 'Member'}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        invitation.role === 'owner'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {invitation.role === 'owner' ? 'Owner' : 'Member'}
+                      </span>
+                      {isOwner && (
+                        <button
+                          onClick={() => handleCancelInvitation(invitation.id, invitation.email)}
+                          disabled={cancelingInvitationId === invitation.id}
+                          className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {cancelingInvitationId === invitation.id ? 'Canceling...' : 'Cancel'}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))
               )}

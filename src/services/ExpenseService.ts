@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase';
 
 export interface Expense {
   id: string;
+  organizationId: string | null;
+  userId: string | null;
   propertyId: string | null;
   category: string;
   subcategory?: string;
@@ -18,6 +20,8 @@ export interface Expense {
 }
 
 export interface CreateExpenseData {
+  organizationId: string;
+  userId: string;
   propertyId?: string | null;
   category: string;
   subcategory?: string;
@@ -99,6 +103,8 @@ export class ExpenseService {
       const { data, error } = await supabase
         .from('expenses')
         .insert([{
+          organization_id: expenseData.organizationId,
+          user_id: expenseData.userId,
           property_id: expenseData.propertyId || null,
           category: expenseData.category,
           subcategory: expenseData.subcategory || null,
@@ -249,6 +255,8 @@ export class ExpenseService {
   private static transformExpenseFromDB(dbExpense: any): Expense {
     return {
       id: dbExpense.id,
+      organizationId: dbExpense.organization_id,
+      userId: dbExpense.user_id,
       propertyId: dbExpense.property_id,
       category: dbExpense.category,
       subcategory: dbExpense.subcategory,

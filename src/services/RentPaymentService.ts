@@ -51,14 +51,32 @@ export class RentPaymentService {
     }
 
     try {
+      // Suppress console errors during this check
+      const originalError = console.error;
+      console.error = () => {};
+      
       const { error } = await supabase
         .from('rent_payments')
         .select('id')
         .limit(1);
 
+      // Restore console.error
+      console.error = originalError;
+
       // If no error or PGRST116 (no rows), table exists
-      this.tableExists = !error || error.code === 'PGRST116';
-      return this.tableExists;
+      // 42P01 is "undefined_table" error code
+      if (!error || error.code === 'PGRST116') {
+        this.tableExists = true;
+        return true;
+      }
+      
+      if (error.code === '42P01' || error.message?.includes('404')) {
+        this.tableExists = false;
+        return false;
+      }
+      
+      this.tableExists = true; // Assume table exists for other errors
+      return true;
     } catch {
       this.tableExists = false;
       return false;

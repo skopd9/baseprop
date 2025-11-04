@@ -10,6 +10,7 @@ interface OrganizationContextType {
   error: string | null;
   switchOrganization: (orgId: string) => Promise<void>;
   inviteUser: (email: string, role: 'owner' | 'member') => Promise<void>;
+  cancelInvitation: (invitationId: string) => Promise<void>;
   getInvitations: () => Promise<OrganizationInvitation[]>;
   refreshOrganizations: () => Promise<void>;
   createOrganization: (name: string, settings?: Record<string, any>) => Promise<Organization>;
@@ -130,6 +131,24 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
     }
   };
 
+  // Cancel a pending invitation
+  const cancelInvitation = async (invitationId: string) => {
+    if (!currentOrganization) {
+      throw new Error('No organization selected');
+    }
+
+    if (currentUserRole !== 'owner') {
+      throw new Error('Only owners can cancel invitations');
+    }
+
+    try {
+      await OrganizationService.cancelInvitation(invitationId);
+    } catch (err) {
+      console.error('Error canceling invitation:', err);
+      throw err;
+    }
+  };
+
   // Get pending invitations for current organization
   const getInvitations = async (): Promise<OrganizationInvitation[]> => {
     if (!currentOrganization) {
@@ -176,6 +195,7 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
     error,
     switchOrganization,
     inviteUser,
+    cancelInvitation,
     getInvitations,
     refreshOrganizations,
     createOrganization

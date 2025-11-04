@@ -45,11 +45,15 @@ This creates the core property management tables.
 
 **This step is critical** - it creates the authentication and multi-tenant organization support.
 
+**⚠️ IMPORTANT:** Use the FIXED version of the migration to avoid errors.
+
 1. Create a **New Query** in the SQL Editor
-2. Open the file `migrations/add_auth_and_organizations.sql` from your project
+2. Open the file `migrations/add_auth_and_organizations_FIXED.sql` from your project
 3. Copy the entire contents
 4. Paste into the new query window
 5. Click **Run** (or press Cmd/Ctrl + Enter)
+
+**Why the FIXED version?** The original migration has a bug where RLS policies reference tables before they're created. The FIXED version corrects the table creation order.
 
 **What this creates:**
 - ✅ `user_profiles` - Extended user data linked to auth.users

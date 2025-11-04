@@ -10,6 +10,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { ExpenseService, Expense, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '../services/ExpenseService';
 import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
+import { useOrganization } from '../contexts/OrganizationContext';
+import { supabase } from '../lib/supabase';
 
 interface ExpenseTrackerProps {
   properties: SimplifiedProperty[];
@@ -42,6 +44,7 @@ const initialFormData: ExpenseFormData = {
 };
 
 export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) => {
+  const { currentOrganization } = useOrganization();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -100,7 +103,22 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
     setIsSubmitting(true);
 
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('You must be logged in to create an expense.');
+        return;
+      }
+
+      // Check if organization exists
+      if (!currentOrganization) {
+        alert('You must belong to an organization to create expenses.');
+        return;
+      }
+
       const expenseData = {
+        organizationId: currentOrganization.id,
+        userId: user.id,
         propertyId: formData.propertyId || null,
         category: formData.category,
         subcategory: formData.subcategory || undefined,

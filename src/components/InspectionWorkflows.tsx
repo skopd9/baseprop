@@ -167,10 +167,32 @@ export const InspectionWorkflows: React.FC<InspectionWorkflowsProps> = ({
             // Combine date and time
             const scheduledDateTime = new Date(`${bookingForm.scheduledDate}T${bookingForm.scheduledTime}:00`);
 
+            // Get current user and organization
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                alert('You must be logged in to create an inspection.');
+                return;
+            }
+
+            // Get user's organization from organization_members
+            const { data: orgMember } = await supabase
+                .from('organization_members')
+                .select('organization_id')
+                .eq('user_id', user.id)
+                .eq('status', 'active')
+                .single();
+
+            if (!orgMember) {
+                alert('You must belong to an organization to create inspections.');
+                return;
+            }
+
             // Create inspection in database
             const { data: newInspection, error } = await supabase
                 .from('inspections')
                 .insert({
+                    organization_id: orgMember.organization_id,
+                    user_id: user.id,
                     property_id: bookingForm.propertyId,
                     tenant_id: tenantsForProperty[0]?.id || null,
                     inspection_type: bookingForm.type,

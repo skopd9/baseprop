@@ -8,7 +8,6 @@ import {
   ClockIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant, getOccupancyStatus } from '../utils/simplifiedDataTransforms';
-import { QuickStartGuide } from './QuickStartGuide';
 import { PropertyMap } from './PropertyMap';
 import { ExpensesSummaryWidget } from './ExpensesSummaryWidget';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -110,28 +109,6 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
       maximumFractionDigits: 0,
     }).format(amount);
   };
-
-  // Show QuickStartGuide for new users (keep dashboard as-is)
-  const isNewUser = (!Array.isArray(properties) || properties.length === 0) && (!Array.isArray(tenants) || tenants.length === 0);
-  
-  if (isNewUser) {
-    return (
-      <div className="p-6 bg-gray-50 min-h-screen">
-        <div className="max-w-4xl mx-auto">
-          <QuickStartGuide
-            properties={properties || []}
-            tenants={tenants || []}
-            onAddProperty={onAddProperty || (() => {})}
-            onAddTenant={onAddTenant || (() => {})}
-            onViewRent={onViewRent || (() => {})}
-            onViewInspections={onViewInspections || (() => {})}
-            onLoadDemoData={onLoadDemoData}
-            isLoadingDemo={isLoadingDemo}
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">

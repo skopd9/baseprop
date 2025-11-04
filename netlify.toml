@@ -15,6 +15,17 @@
   # 1. Remove them from Netlify's "Secrets" and add as regular environment variables, OR
   # 2. Add them to SECRETS_SCAN_SMART_DETECTION_OMIT_VALUES in Netlify UI
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# Environment variables for Netlify Functions (server-side only)
+# These are NOT exposed to the client
+# Set these in Netlify UI: Site settings → Environment variables
+# Required:
+#   RESEND_API_KEY - Your Resend API key
+#   FROM_EMAIL - Your verified sender email (e.g., noreply@yourdomain.com)
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

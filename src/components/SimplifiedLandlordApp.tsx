@@ -19,6 +19,7 @@ import { ResidentialPropertiesTable } from './ResidentialPropertiesTable';
 import { ResidentialTenantsTable } from './ResidentialTenantsTable';
 import { OrganizationSettings } from './OrganizationSettings';
 import { OnboardingWizard } from './OnboardingWizard';
+import { GetStarted } from './GetStarted';
 import { useOrganization } from '../contexts/OrganizationContext';
 
 import TenancyManagementModal from './TenancyManagementModal';
@@ -35,7 +36,6 @@ import { SimplifiedAddTenantModal } from './SimplifiedAddTenantModal';
 import { PropertyDeleteConfirmationModal } from './PropertyDeleteConfirmationModal';
 import { PropertySoldModal } from './PropertySoldModal';
 import { TenantDeleteConfirmationModal } from './TenantDeleteConfirmationModal';
-import { QuickStartGuide } from './QuickStartGuide';
 
 import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTransforms';
 import { SimplifiedPropertyService } from '../services/SimplifiedPropertyService';
@@ -145,8 +145,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   const [showTenancyWizard, setShowTenancyWizard] = useState(false);
   const [tenantForManagement, setTenantForManagement] = useState<SimplifiedTenant | null>(null);
   
-  // Quick start guide state
-  const [showQuickStartGuide, setShowQuickStartGuide] = useState(false);
+  // Demo data loading state
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
 
   // Load data from database on component mount
@@ -421,20 +420,36 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
 
 
   const renderCurrentView = () => {
+    // If user needs to complete initial onboarding wizard, show it regardless of currentView
+    if (showOnboarding) {
+      return (
+        <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+          <OnboardingWizard
+            userId={userId}
+            userEmail={userEmail}
+            onComplete={() => {
+              if (onOnboardingComplete) {
+                onOnboardingComplete();
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
     switch (currentView) {
       case 'onboarding':
         return (
-          <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
-            <OnboardingWizard
-              userId={userId}
-              userEmail={userEmail}
-              onComplete={() => {
-                if (onOnboardingComplete) {
-                  onOnboardingComplete();
-                }
-              }}
-            />
-          </div>
+          <GetStarted
+            properties={properties}
+            tenants={tenants}
+            onAddProperty={handleAddProperty}
+            onAddTenant={handleAddTenant}
+            onViewRent={() => setCurrentView('rent')}
+            onViewInspections={() => setCurrentView('inspections')}
+            onLoadDemoData={loadDemoData}
+            isLoadingDemo={isLoadingDemo}
+          />
         );
       
       case 'dashboard':
@@ -522,6 +537,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
           <div className="p-6">
             <ComplianceWorkflows
               properties={properties}
+              countryCode={currentOrganization?.settings?.country || 'UK'}
             />
           </div>
         );
@@ -712,16 +728,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                     <Cog6ToothIcon className="w-4 h-4 mr-2 text-gray-500" />
                     Organization Settings
                   </button>
-                  <button
-                    onClick={() => {
-                      setShowQuickStartGuide(true);
-                      setUserMenuOpen(false);
-                    }}
-                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                  >
-                    <QuestionMarkCircleIcon className="w-4 h-4 mr-2 text-blue-500" />
-                    Quick Start Guide
-                  </button>
                   <div className="border-t border-gray-100 my-1"></div>
                   <button
                     onClick={onLogout}
@@ -880,53 +886,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         isOpen={showOrgSettings}
         onClose={() => setShowOrgSettings(false)}
       />
-
-      {/* Quick Start Guide Modal */}
-      {showQuickStartGuide && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">Getting Started</h2>
-              <button
-                onClick={() => setShowQuickStartGuide(false)}
-                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
-            </div>
-            
-            {/* Content */}
-            <div className="p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
-              <QuickStartGuide
-                properties={properties}
-                tenants={tenants}
-                onAddProperty={() => {
-                  setShowQuickStartGuide(false);
-                  setShowAddPropertyModal(true);
-                }}
-                onAddTenant={() => {
-                  setShowQuickStartGuide(false);
-                  setShowAddTenantModal(true);
-                }}
-                onViewRent={() => {
-                  setShowQuickStartGuide(false);
-                  setCurrentView('rent');
-                }}
-                onViewInspections={() => {
-                  setShowQuickStartGuide(false);
-                  setCurrentView('inspections');
-                }}
-                onLoadDemoData={async () => {
-                  setShowQuickStartGuide(false);
-                  await loadDemoData();
-                }}
-                isLoadingDemo={isLoadingDemo}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

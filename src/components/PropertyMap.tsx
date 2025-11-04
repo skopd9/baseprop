@@ -39,13 +39,13 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     || import.meta.env.GOOGLE_MAPS_API_KEY;
 
   // Geocode addresses to get coordinates
-  const geocodeProperties = async (props: SimplifiedProperty[], googleMaps: any): Promise<PropertyWithCoordinates[]> => {
-    if (!apiKey || !googleMaps) {
+  const geocodeProperties = async (props: SimplifiedProperty[], google: any): Promise<PropertyWithCoordinates[]> => {
+    if (!apiKey || !google || !google.maps) {
       return props;
     }
 
     try {
-      const geocoder = new googleMaps.Geocoder();
+      const geocoder = new google.maps.Geocoder();
       
       const geocodedProperties = await Promise.all(
         props.map(async (property) => {
@@ -69,7 +69,12 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
               };
             }
           } catch (error) {
-            console.warn(`Failed to geocode ${property.address}:`, error);
+            // Silently fail geocoding for individual properties
+            // Only log if it's not a ZERO_RESULTS error (which is common for invalid addresses)
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            if (!errorMsg.includes('ZERO_RESULTS')) {
+              console.warn(`Failed to geocode ${property.address}:`, error);
+            }
           }
           
           return property;
@@ -129,10 +134,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         }
         
         // Use existing loader instance if available, otherwise create new one
-        let googleMaps: any;
+        let google: any;
         if (loaderInstanceRef.current) {
           try {
-            googleMaps = await loaderInstanceRef.current.load();
+            google = await loaderInstanceRef.current.load();
           } catch (e) {
             // If existing loader fails, create a new one
             loaderInstanceRef.current = new Loader({
@@ -140,7 +145,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
               version: 'weekly',
               libraries: ['places']
             });
-            googleMaps = await loaderInstanceRef.current.load();
+            google = await loaderInstanceRef.current.load();
           }
         } else {
           loaderInstanceRef.current = new Loader({
@@ -148,11 +153,18 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             version: 'weekly',
             libraries: ['places']
           });
-          googleMaps = await loaderInstanceRef.current.load();
+          google = await loaderInstanceRef.current.load();
         }
         
+        // Verify Google Maps API is properly loaded
+        if (!google || !google.maps || !google.maps.Map) {
+          throw new Error('Google Maps API failed to load properly');
+        }
+
+        const googleMaps = google.maps;
+        
         // Geocode properties after loading Google Maps
-        const geocodedProps = await geocodeProperties(properties, googleMaps);
+        const geocodedProps = await geocodeProperties(properties, google);
         setPropertiesWithCoords(geocodedProps);
 
         if (!mapRef.current) return;

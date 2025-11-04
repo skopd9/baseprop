@@ -5,11 +5,13 @@
 **If you're getting an "organization relationship" error when logging in**, you need to run BOTH migrations:
 
 1. Base schema: `uk_landlord_schema.sql`
-2. **Organizations & Auth**: `migrations/add_auth_and_organizations.sql`
+2. **Organizations & Auth**: `migrations/add_auth_and_organizations_FIXED.sql` ⚠️ Use FIXED version!
 
 👉 **See `COMPLETE_DATABASE_SETUP.md` for the full step-by-step guide with both migrations.**
 
-👉 **See `FIX_ORGANIZATION_ERROR.md` for a quick fix if you're getting the organization error.**
+👉 **See `QUICK_FIX_CHECKLIST.md` for a 5-minute fix if you're getting the organization error.**
+
+**What's the FIXED version?** The original migration had a bug where RLS policies were created before the tables they reference. The FIXED version corrects this.
 
 ---
 
@@ -71,6 +73,23 @@ You should see 3 properties:
 - UK property in Manchester
 - Greece property in Athens  
 - USA property in Austin
+
+### ⚠️ Step 5: Run Organizations Migration (REQUIRED)
+
+**Critical:** After running the base schema, you MUST also run the organizations migration:
+
+1. Create a **New Query** in SQL Editor
+2. Open file: `migrations/add_auth_and_organizations_FIXED.sql`
+3. Copy all contents
+4. Paste and click **Run**
+
+This creates the authentication and multi-tenant organization support that the application requires.
+
+**Without this step, you'll get "organization relationship" errors when logging in.**
+
+**Note:** Use the FIXED version - it corrects a table ordering bug in the original migration where RLS policies referenced tables before they were created.
+
+See `COMPLETE_DATABASE_SETUP.md` for detailed instructions.
 
 ## What Changed in the Database
 

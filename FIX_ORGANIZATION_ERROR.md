@@ -2,13 +2,21 @@
 
 ## The Problem
 
-When logging in, you're seeing this error:
+You may be seeing one or both of these errors:
 
+**Error 1 (Browser Console):**
 ```
 Failed to load resource: the server responded with a status of 400
 Error getting user organizations: Failed to fetch organizations: 
 Could not find a relationship between 'organization_members' and 'organizations' in the schema cache
 ```
+
+**Error 2 (Supabase SQL Editor):**
+```
+ERROR: 42P01: relation "organization_members" does not exist
+```
+
+These errors are related - Error 2 happens when running the migration, Error 1 happens when the tables don't exist.
 
 ## The Cause
 
@@ -34,7 +42,7 @@ But the `organization_members` table doesn't exist yet, or if it does, it's miss
 
 ## The Solution
 
-You need to run the organizations migration that creates all the auth and organization tables.
+You need to run the FIXED organizations migration that creates all the auth and organization tables with correct table ordering.
 
 ### Quick Fix (3 minutes)
 
@@ -43,11 +51,13 @@ You need to run the organizations migration that creates all the auth and organi
    - Select your project
    - Click **SQL Editor** in sidebar
 
-2. **Run the Organizations Migration**
-   - Open file: `migrations/add_auth_and_organizations.sql`
+2. **Run the FIXED Organizations Migration**
+   - Open file: `migrations/add_auth_and_organizations_FIXED.sql`
    - Copy all contents
    - Paste into SQL Editor
    - Click **Run**
+   
+   **Why FIXED?** The original migration has a bug where it creates RLS policies before the tables they reference exist. The FIXED version creates all tables first, then adds policies.
 
 3. **Verify It Worked**
    Run this query to check:

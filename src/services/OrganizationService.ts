@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { EmailNotificationService } from './EmailNotificationService';
 
 export interface Organization {
   id: string;
@@ -152,8 +153,9 @@ export class OrganizationService {
         .from('organization_members')
         .select(`
           *,
-          user_profiles!user_id (
-            full_name
+          user_profiles (
+            full_name,
+            email
           )
         `)
         .eq('organization_id', orgId)
@@ -162,23 +164,14 @@ export class OrganizationService {
 
       if (error) throw error;
 
-      // Fetch user emails from auth.users (requires service role or custom function)
-      const membersWithEmails = await Promise.all((data || []).map(async (member) => {
-        try {
-          // Get user email from auth metadata if available
-          const { data: userData } = await supabase.auth.admin.getUserById(member.user_id);
-          return {
-            ...member,
-            user_email: userData?.user?.email,
-            user_name: (member as any).user_profiles?.full_name
-          };
-        } catch {
-          return {
-            ...member,
-            user_name: (member as any).user_profiles?.full_name
-          };
-        }
-      }));
+      // Map the data with user info from user_profiles
+      const membersWithEmails = (data || []).map((member) => {
+        return {
+          ...member,
+          user_email: (member as any).user_profiles?.email,
+          user_name: (member as any).user_profiles?.full_name
+        };
+      });
 
       return membersWithEmails;
     } catch (error) {
@@ -197,17 +190,34 @@ export class OrganizationService {
     invitedBy: string
   ): Promise<OrganizationInvitation> {
     try {
-      // Check if user is already a member
-      const { data: existingMember } = await supabase
-        .from('organization_members')
-        .select('id')
+      // Check if there's already a pending invitation for this email
+      const { data: existingInvites } = await supabase
+        .from('organization_invitations')
+        .select('id, status')
         .eq('organization_id', orgId)
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('email', email)
+        .eq('status', 'pending');
+
+      if (existingInvites && existingInvites.length > 0) {
+        throw new Error('An invitation has already been sent to this email');
+      }
+
+      // Get organization details
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', orgId)
         .single();
 
-      if (existingMember) {
-        throw new Error('User is already a member of this organization');
-      }
+      // Get inviter details
+      const { data: inviterData } = await supabase
+        .from('user_profiles')
+        .select('full_name, email')
+        .eq('id', invitedBy)
+        .single();
+
+      const organizationName = orgData?.name || 'Unknown Organization';
+      const inviterName = inviterData?.full_name || inviterData?.email || 'Team Admin';
 
       // Create invitation
       const { data, error } = await supabase
@@ -223,8 +233,28 @@ export class OrganizationService {
 
       if (error) throw error;
 
-      // TODO: Send invitation email with token
-      // This should be handled by a Supabase Edge Function or backend service
+      // Send invitation email
+      console.log('📧 Sending organization invitation email...');
+      try {
+        const emailResult = await EmailNotificationService.sendOrganizationInvitationEmail(
+          email,
+          organizationName,
+          inviterName,
+          role,
+          data.token,
+          '7 days'
+        );
+
+        if (emailResult.success) {
+          console.log('✅ Invitation email sent successfully!');
+        } else {
+          console.warn('⚠️ Invitation created but email failed to send:', emailResult.error);
+          // Don't throw error - invitation is still created
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending invitation email:', emailError);
+        // Don't throw error - invitation is still created, user can copy link manually
+      }
       
       return data;
     } catch (error) {
@@ -301,6 +331,27 @@ export class OrganizationService {
         throw new Error('Email does not match invitation');
       }
 
+      // Check if user is already a member
+      const { data: existingMember } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', invitation.organization_id)
+        .eq('user_id', userId)
+        .single();
+
+      if (existingMember) {
+        // User is already a member, just mark invitation as accepted
+        await supabase
+          .from('organization_invitations')
+          .update({
+            status: 'accepted',
+            updated_at: new Date().toISOString()
+          })
+          .eq('token', token);
+        
+        return; // Already a member, nothing more to do
+      }
+
       // Add user to organization
       const { error: memberError } = await supabase
         .from('organization_members')
@@ -327,6 +378,24 @@ export class OrganizationService {
       if (inviteError) throw inviteError;
     } catch (error) {
       console.error('Error accepting invitation:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel a pending invitation
+   */
+  static async cancelInvitation(invitationId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('organization_invitations')
+        .delete()
+        .eq('id', invitationId)
+        .eq('status', 'pending'); // Only allow canceling pending invitations
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error canceling invitation:', error);
       throw error;
     }
   }

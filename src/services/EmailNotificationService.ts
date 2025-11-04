@@ -1,13 +1,22 @@
 import { supabase } from '../lib/supabase';
 import { Resend } from 'resend';
+import { rateLimitService } from './RateLimitService';
 
 export interface EmailNotification {
   to: string;
   subject: string;
   message: string;
-  type: 'inspection_booking' | 'inspection_reminder' | 'inspection_completion' | 'inspection_cancellation' | 'magic_link' | 'general';
+  type: 'inspection_booking' | 'inspection_reminder' | 'inspection_completion' | 'inspection_cancellation' | 'magic_link' | 'organization_invitation' | 'general';
   metadata?: Record<string, any>;
   html?: string; // Optional HTML content
+}
+
+export interface EmailSendResult {
+  success: boolean;
+  error?: string;
+  rateLimited?: boolean;
+  retryAfter?: number;
+  remainingToday?: number;
 }
 
 // Lazy-load Resend client only when API key is available
@@ -29,10 +38,10 @@ function getResendClient(): Resend | null {
 const DEFAULT_FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'onboarding@resend.dev';
 
 export class EmailNotificationService {
-  // Send email notification using Resend API
-  static async sendEmail(notification: EmailNotification): Promise<boolean> {
+  // Send email notification using Resend API with rate limiting
+  static async sendEmail(notification: EmailNotification): Promise<EmailSendResult> {
     try {
-      console.log('📧 Sending email notification:', {
+      console.log('📧 Attempting to send email notification:', {
         to: notification.to,
         subject: notification.subject,
         type: notification.type,
@@ -44,6 +53,26 @@ export class EmailNotificationService {
       
       // If Resend API key is configured, send via Resend
       if (resend) {
+        // Check rate limit before attempting to send
+        const rateLimitCheck = rateLimitService.canSendEmail();
+        if (!rateLimitCheck.allowed) {
+          const stats = rateLimitService.getUsageStats();
+          console.warn('⚠️ Rate limit exceeded:', rateLimitCheck.reason);
+          
+          // Show user-friendly notification
+          this.showRateLimitNotification(rateLimitCheck, stats);
+          
+          await this.logNotification(notification, 'rate_limited');
+          
+          return {
+            success: false,
+            error: rateLimitCheck.reason,
+            rateLimited: true,
+            retryAfter: rateLimitCheck.retryAfter,
+            remainingToday: stats.remainingToday
+          };
+        }
+
         try {
           const { data, error } = await resend.emails.send({
             from: DEFAULT_FROM_EMAIL,
@@ -54,21 +83,68 @@ export class EmailNotificationService {
           });
 
           if (error) {
-            console.error('Resend API error:', error);
+            console.error('❌ Resend API error:', error);
+            
+            // Check if this is a rate limit error from Resend's API
+            if (rateLimitService.constructor.isRateLimitError(error)) {
+              const stats = rateLimitService.getUsageStats();
+              const errorMsg = this.getResendRateLimitMessage(error);
+              
+              this.showRateLimitNotification({ allowed: false, reason: errorMsg }, stats);
+              await this.logNotification(notification, 'rate_limited');
+              
+              return {
+                success: false,
+                error: errorMsg,
+                rateLimited: true,
+                remainingToday: stats.remainingToday
+              };
+            }
+            
             throw error;
           }
 
           console.log('✅ Email sent successfully via Resend:', data);
           
+          // Record successful send for rate limiting
+          rateLimitService.recordEmailSent();
+          
           // Log the notification to database for tracking
           await this.logNotification(notification, 'sent', data?.id);
           
-          return true;
-        } catch (resendError) {
+          // Show usage stats after successful send
+          const stats = rateLimitService.getUsageStats();
+          console.log('📊 Email usage today:', `${stats.today}/${stats.limits.maxEmailsPerDay} (${stats.remainingToday} remaining)`);
+          
+          return {
+            success: true,
+            remainingToday: stats.remainingToday
+          };
+        } catch (resendError: any) {
           console.error('Error sending via Resend:', resendError);
-          // Fall back to mock mode if Resend fails
+          
+          // Check if this is a rate limit error
+          if (rateLimitService.constructor.isRateLimitError(resendError)) {
+            const stats = rateLimitService.getUsageStats();
+            const errorMsg = this.getResendRateLimitMessage(resendError);
+            
+            this.showRateLimitNotification({ allowed: false, reason: errorMsg }, stats);
+            await this.logNotification(notification, 'rate_limited');
+            
+            return {
+              success: false,
+              error: errorMsg,
+              rateLimited: true,
+              remainingToday: stats.remainingToday
+            };
+          }
+          
+          // Other errors
           await this.logNotification(notification, 'failed');
-          return false;
+          return {
+            success: false,
+            error: resendError.message || 'Unknown error occurred'
+          };
         }
       } else {
         // Development/mock mode - no Resend API key configured
@@ -85,13 +161,36 @@ export class EmailNotificationService {
           this.showDevNotification(notification);
         }
 
-        return true;
+        return { success: true };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending email notification:', error);
       await this.logNotification(notification, 'failed');
-      return false;
+      return {
+        success: false,
+        error: error.message || 'Failed to send email'
+      };
     }
+  }
+
+  /**
+   * Get user-friendly message for Resend rate limit errors
+   */
+  private static getResendRateLimitMessage(error: any): string {
+    const errorMsg = error.message?.toLowerCase() || '';
+    
+    // Sandbox mode (3 emails limit)
+    if (errorMsg.includes('sandbox') || errorMsg.includes('verify')) {
+      return '🚨 SANDBOX MODE: You can only send 3 emails total. Please verify your domain in Resend to unlock full limits (100 emails/day). Visit: https://resend.com/domains';
+    }
+    
+    // Daily limit
+    if (errorMsg.includes('daily') || errorMsg.includes('day')) {
+      return '📧 Daily limit reached (100 emails). Resets at midnight UTC. Consider upgrading: https://resend.com/pricing';
+    }
+    
+    // General rate limit
+    return '⏱️ Rate limit exceeded. Please wait a few minutes before sending more emails.';
   }
 
   // Convert plain text to simple HTML
@@ -333,7 +432,7 @@ export class EmailNotificationService {
     inspectionType: string,
     scheduledDate: Date,
     notes?: string
-  ): Promise<boolean> {
+  ): Promise<EmailSendResult> {
     const subject = `Property Inspection Scheduled - ${propertyAddress}`;
     
     const formattedDate = scheduledDate.toLocaleDateString('en-GB', {
@@ -419,7 +518,7 @@ This is an automated notification. Please do not reply to this email.
     inspectionType: string,
     scheduledDate: Date,
     cancellationReason?: string
-  ): Promise<boolean> {
+  ): Promise<EmailSendResult> {
     const subject = `Inspection Cancelled - ${propertyAddress}`;
     
     const formattedDate = scheduledDate.toLocaleDateString('en-GB', {
@@ -489,12 +588,157 @@ This is an automated notification. Please do not reply to this email.
     });
   }
 
+  // Create HTML template for organization invitation
+  private static createOrganizationInvitationHtml(
+    invitedEmail: string,
+    organizationName: string,
+    inviterName: string,
+    role: 'owner' | 'member',
+    acceptLink: string,
+    expiresIn: string = '7 days'
+  ): string {
+    const roleDescription = role === 'owner' 
+      ? 'full administrative access to manage properties, tenants, and team members'
+      : 'access to view and manage properties and tenants';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
+          <div style="background-color: white; border-radius: 8px; padding: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div style="background-color: #6366f1; color: white; padding: 20px; border-radius: 8px 8px 0 0; margin: -30px -30px 20px -30px; text-align: center;">
+              <h1 style="margin: 0; font-size: 24px;">🎉 You've Been Invited!</h1>
+            </div>
+            
+            <p style="font-size: 16px; margin-bottom: 20px;">Hello!</p>
+            
+            <p style="margin-bottom: 20px;"><strong>${inviterName}</strong> has invited you to join their organization on <strong>Base Prop</strong>.</p>
+            
+            <div style="background-color: #f0f9ff; border-left: 4px solid #6366f1; padding: 15px; margin: 20px 0; border-radius: 4px;">
+              <h2 style="margin-top: 0; color: #6366f1; font-size: 18px;">Organization Details</h2>
+              <ul style="list-style: none; padding: 0; margin: 10px 0;">
+                <li style="margin-bottom: 8px;"><strong>🏢 Organization:</strong> ${organizationName}</li>
+                <li style="margin-bottom: 8px;"><strong>👤 Your Role:</strong> ${role.charAt(0).toUpperCase() + role.slice(1)}</li>
+                <li style="margin-bottom: 8px;"><strong>📧 Invited Email:</strong> ${invitedEmail}</li>
+              </ul>
+            </div>
+            
+            <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
+              <p style="margin: 0; font-size: 14px; color: #92400e;">
+                💡 <strong>What you'll be able to do:</strong><br>
+                As a <strong>${role}</strong>, you'll have ${roleDescription}.
+              </p>
+            </div>
+            
+            <div style="text-align: center; margin: 35px 0;">
+              <a href="${acceptLink}" style="display: inline-block; background-color: #6366f1; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.25);">
+                Accept Invitation
+              </a>
+            </div>
+            
+            <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 25px 0; border-radius: 4px;">
+              <p style="margin: 0; font-size: 14px; color: #7f1d1d;">
+                ⏰ <strong>This invitation will expire in ${expiresIn}.</strong> Make sure to accept it before then!
+              </p>
+            </div>
+            
+            <h3 style="color: #6366f1; font-size: 16px; margin-top: 25px;">What is Base Prop?</h3>
+            <p style="font-size: 14px; color: #64748b; margin-bottom: 10px;">
+              Base Prop is a comprehensive property management platform that helps landlords and property managers streamline their operations, manage tenants, track repairs, handle compliance, and much more.
+            </p>
+            
+            <h3 style="color: #6366f1; font-size: 16px; margin-top: 25px;">Next Steps</h3>
+            <ol style="padding-left: 20px; font-size: 14px; color: #64748b;">
+              <li style="margin-bottom: 8px;">Click the "Accept Invitation" button above</li>
+              <li style="margin-bottom: 8px;">Sign in or create your free account</li>
+              <li style="margin-bottom: 8px;">Start collaborating with your team!</li>
+            </ol>
+            
+            <h3 style="color: #6366f1; font-size: 16px; margin-top: 25px;">Having trouble?</h3>
+            <p style="font-size: 14px; color: #64748b; margin-bottom: 10px;">If the button doesn't work, copy and paste this link into your browser:</p>
+            <div style="background-color: #f8fafc; padding: 12px; border-radius: 4px; word-break: break-all; font-size: 12px; color: #475569; border: 1px solid #e2e8f0;">
+              ${acceptLink}
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+            
+            <p style="font-size: 12px; color: #6b7280; text-align: center; margin: 0;">
+              You received this invitation because <strong>${inviterName}</strong> invited <strong>${invitedEmail}</strong> to join <strong>${organizationName}</strong> on Base Prop.
+              <br><br>
+              If you weren't expecting this invitation or have concerns, you can safely ignore this email or contact the sender directly.
+              <br><br>
+              © ${new Date().getFullYear()} Base Prop. All rights reserved.
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  // Send organization invitation email via Netlify Function
+  static async sendOrganizationInvitationEmail(
+    invitedEmail: string,
+    organizationName: string,
+    inviterName: string,
+    role: 'owner' | 'member',
+    invitationToken: string,
+    expiresIn: string = '7 days'
+  ): Promise<EmailSendResult> {
+    try {
+      const baseUrl = window.location.origin;
+      
+      console.log('📧 Sending invitation email via Netlify Function...');
+
+      // Call Netlify Function to send email (avoids CORS issues)
+      const response = await fetch('/.netlify/functions/send-invitation-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          invitedEmail,
+          organizationName,
+          inviterName,
+          role,
+          invitationToken,
+          baseUrl,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        console.error('❌ Failed to send invitation email:', result.error);
+        return {
+          success: false,
+          error: result.error || 'Failed to send email'
+        };
+      }
+
+      console.log('✅ Invitation email sent successfully!', result.messageId);
+      
+      return {
+        success: true
+      };
+    } catch (error: any) {
+      console.error('❌ Error sending invitation email:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to send email'
+      };
+    }
+  }
+
   // Send magic link email for authentication
   static async sendMagicLinkEmail(
     email: string,
     magicLink: string,
     expiresIn: string = '1 hour'
-  ): Promise<boolean> {
+  ): Promise<EmailSendResult> {
     const subject = '🔐 Sign in to Base Prop - Magic Link';
     
     const message = `
@@ -537,7 +781,7 @@ Account: ${email}
     propertyAddress: string,
     inspectionType: string,
     scheduledDate: Date
-  ): Promise<boolean> {
+  ): Promise<EmailSendResult> {
     const subject = `Reminder: Property Inspection Tomorrow - ${propertyAddress}`;
     
     const message = `
@@ -575,10 +819,59 @@ Property Management Team
     });
   }
 
-  // Log notification to database for tracking
+  /**
+   * Show rate limit notification to user
+   */
+  private static showRateLimitNotification(
+    rateLimitCheck: { allowed: boolean; reason?: string },
+    stats: any
+  ): void {
+    const notificationEl = document.createElement('div');
+    notificationEl.className = 'fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50 max-w-md animate-slide-in';
+    notificationEl.innerHTML = `
+      <div class="flex items-start space-x-3">
+        <div class="flex-shrink-0">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-bold mb-1">⚠️ Email Rate Limit Exceeded</p>
+          <p class="text-xs mb-2">${rateLimitCheck.reason}</p>
+          <div class="bg-red-600 bg-opacity-50 rounded p-2 text-xs mb-2">
+            <p class="font-semibold">Today's Usage:</p>
+            <p>${stats.today}/${stats.limits.maxEmailsPerDay} emails sent</p>
+            <p>${stats.remainingToday} remaining</p>
+          </div>
+          <p class="text-xs opacity-90">
+            💡 <strong>Solutions:</strong><br>
+            • Wait and try again later<br>
+            • Verify your domain to unlock full limits<br>
+            • Upgrade your Resend plan
+          </p>
+        </div>
+        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-red-200">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(notificationEl);
+
+    // Auto-remove after 10 seconds
+    setTimeout(() => {
+      if (notificationEl.parentNode) {
+        notificationEl.parentNode.removeChild(notificationEl);
+      }
+    }, 10000);
+  }
+
+  // Log notification to database for tracking (optional - table may not exist)
   private static async logNotification(
     notification: EmailNotification, 
-    status: 'sent' | 'failed' | 'mock' = 'sent',
+    status: 'sent' | 'failed' | 'mock' | 'rate_limited' = 'sent',
     externalId?: string
   ): Promise<void> {
     try {
@@ -598,10 +891,14 @@ Property Management Team
         });
 
       if (error) {
-        console.error('Error logging notification:', error);
+        // Silently fail if table doesn't exist - logging is optional
+        if (error.code !== 'PGRST204' && error.code !== '42P01') {
+          console.error('Error logging notification:', error);
+        }
       }
     } catch (error) {
-      console.error('Error in logNotification:', error);
+      // Silently fail - logging is optional
+      console.debug('Email notification logging skipped (table may not exist)');
     }
   }
 

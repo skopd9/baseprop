@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   WrenchScrewdriverIcon,
   ExclamationTriangleIcon,
@@ -10,6 +10,7 @@ import {
   PhoneIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTransforms';
+import { RepairService, Repair as RepairServiceType } from '../services/RepairService';
 
 interface RepairWorkflowsProps {
   properties: SimplifiedProperty[];
@@ -17,81 +18,21 @@ interface RepairWorkflowsProps {
   onLogRepair?: (repair: any) => void;
 }
 
-interface Repair {
-  id: string;
-  propertyId: string;
-  propertyAddress: string;
-  tenantId?: string;
-  tenantName?: string;
-  description: string;
-  urgency: 'low' | 'medium' | 'high' | 'emergency';
-  status: 'pending' | 'in_progress' | 'completed';
-  reportedDate: Date;
-  scheduledDate?: Date;
-  completedDate?: Date;
-  contractor?: string;
-  contractorPhone?: string;
-  estimatedCost?: number;
-  actualCost?: number;
-  photos?: string[];
-  notes?: string;
-}
+// Map status for UI display
+type UIStatus = 'pending' | 'in_progress' | 'completed';
+type DBStatus = 'reported' | 'acknowledged' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
-// Mock repair data
-const mockRepairs: Repair[] = [
-  {
-    id: 'repair-001',
-    propertyId: 'prop-001',
-    propertyAddress: '123 Oak Street, Manchester M1 2AB',
-    tenantId: 'tenant-003',
-    tenantName: 'Emma Williams',
-    description: 'Leaking tap in kitchen',
-    urgency: 'medium',
-    status: 'pending',
-    reportedDate: new Date('2024-02-10'),
-    estimatedCost: 150
-  },
-  {
-    id: 'repair-002',
-    propertyId: 'prop-004',
-    propertyAddress: '12 Garden Lane, Liverpool L8 5RT',
-    tenantId: 'tenant-009',
-    tenantName: 'Alex Martinez',
-    description: 'Broken window in bedroom',
-    urgency: 'high',
-    status: 'in_progress',
-    reportedDate: new Date('2024-02-08'),
-    scheduledDate: new Date('2024-02-15'),
-    contractor: 'ABC Glass Services',
-    contractorPhone: '0151 123 4567',
-    estimatedCost: 280,
-  },
-  {
-    id: 'repair-003',
-    propertyId: 'prop-006',
-    propertyAddress: '34 Mill Road, Sheffield S1 2HX',
-    tenantId: 'tenant-012',
-    tenantName: 'Harry Jackson',
-    description: 'Boiler not heating properly',
-    urgency: 'emergency',
-    status: 'completed',
-    reportedDate: new Date('2024-01-25'),
-    scheduledDate: new Date('2024-01-26'),
-    completedDate: new Date('2024-01-26'),
-    contractor: 'Sheffield Heating Ltd',
-    contractorPhone: '0114 987 6543',
-    estimatedCost: 450,
-    actualCost: 420,
-    notes: 'Replaced faulty thermostat. System working normally.'
-  }
-];
+interface Repair extends Omit<RepairServiceType, 'status'> {
+  status: UIStatus;
+}
 
 export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
   properties,
   tenants,
   onLogRepair
 }) => {
-  const [repairs, setRepairs] = useState<Repair[]>(mockRepairs);
+  const [repairs, setRepairs] = useState<Repair[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showRepairForm, setShowRepairForm] = useState(false);
   const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
   const [repairForm, setRepairForm] = useState({
@@ -102,6 +43,44 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
     estimatedCost: '',
     notes: ''
   });
+
+  // Load repairs on mount
+  useEffect(() => {
+    loadRepairs();
+  }, []);
+
+  const loadRepairs = async () => {
+    setIsLoading(true);
+    try {
+      const repairsData = await RepairService.getRepairs();
+      // Transform repairs to match UI expectations
+      const transformedRepairs = repairsData.map(mapDBRepairToUI);
+      setRepairs(transformedRepairs);
+    } catch (error) {
+      console.error('Error loading repairs:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Map database status to UI status
+  const mapDBRepairToUI = (dbRepair: RepairServiceType): Repair => {
+    let uiStatus: UIStatus = 'pending';
+    
+    if (dbRepair.status === 'completed') {
+      uiStatus = 'completed';
+    } else if (dbRepair.status === 'in_progress') {
+      uiStatus = 'in_progress';
+    } else {
+      // 'reported', 'acknowledged', 'scheduled' -> 'pending'
+      uiStatus = 'pending';
+    }
+
+    return {
+      ...dbRepair,
+      status: uiStatus
+    };
+  };
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
@@ -148,39 +127,47 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
     }).format(date);
   };
 
-  const handleLogRepair = (e: React.FormEvent) => {
+  const handleLogRepair = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const selectedProperty = properties.find(p => p.id === repairForm.propertyId);
-    const selectedTenant = tenants.find(t => t.id === repairForm.tenantId);
-    
-    const newRepair: Repair = {
-      id: `repair-${Date.now()}`,
-      propertyId: repairForm.propertyId,
-      propertyAddress: selectedProperty?.address || '',
-      tenantId: repairForm.tenantId || undefined,
-      tenantName: selectedTenant?.name || undefined,
-      description: repairForm.description,
-      urgency: repairForm.urgency,
-      status: 'pending',
-      reportedDate: new Date(),
-      estimatedCost: repairForm.estimatedCost ? parseFloat(repairForm.estimatedCost) : undefined,
-      notes: repairForm.notes || undefined
-    };
+    try {
+      // Map urgency to priority for database
+      const priority = repairForm.urgency === 'emergency' ? 'urgent' : repairForm.urgency;
+      
+      const newRepair = await RepairService.createRepair({
+        propertyId: repairForm.propertyId,
+        tenantId: repairForm.tenantId || undefined,
+        title: repairForm.description,
+        description: repairForm.description,
+        priority: priority as 'low' | 'medium' | 'high' | 'urgent',
+        status: 'reported',
+        reportedDate: new Date(),
+        estimatedCost: repairForm.estimatedCost ? parseFloat(repairForm.estimatedCost) : undefined,
+        isEmergency: repairForm.urgency === 'emergency',
+        notes: repairForm.notes || undefined
+      });
 
-    setRepairs([...repairs, newRepair]);
-    setShowRepairForm(false);
-    setRepairForm({
-      propertyId: '',
-      tenantId: '',
-      description: '',
-      urgency: 'medium',
-      estimatedCost: '',
-      notes: ''
-    });
+      if (newRepair) {
+        // Add to local state
+        const uiRepair = mapDBRepairToUI(newRepair);
+        setRepairs([uiRepair, ...repairs]);
+        
+        setShowRepairForm(false);
+        setRepairForm({
+          propertyId: '',
+          tenantId: '',
+          description: '',
+          urgency: 'medium',
+          estimatedCost: '',
+          notes: ''
+        });
 
-    if (onLogRepair) {
-      onLogRepair(newRepair);
+        if (onLogRepair) {
+          onLogRepair(newRepair);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating repair:', error);
     }
   };
 
@@ -267,8 +254,29 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
           <h3 className="text-lg font-medium text-gray-900">All Repairs</h3>
         </div>
         
-        <div className="divide-y divide-gray-200">
-          {repairs.map((repair) => (
+        {isLoading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+            <p className="mt-4 text-gray-500">Loading repairs...</p>
+          </div>
+        ) : repairs.length === 0 ? (
+          <div className="p-12 text-center">
+            <WrenchScrewdriverIcon className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No repairs logged</h3>
+            <p className="mt-1 text-sm text-gray-500">Get started by logging your first repair.</p>
+            <div className="mt-6">
+              <button
+                onClick={() => setShowRepairForm(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700"
+              >
+                <WrenchScrewdriverIcon className="w-4 h-4 mr-2" />
+                Log Repair
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {repairs.map((repair) => (
             <div key={repair.id} className="p-6 hover:bg-gray-50">
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">
@@ -281,7 +289,7 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2 mb-2">
                       <p className="text-sm font-medium text-gray-900">
-                        {repair.description}
+                        {repair.title || repair.description}
                       </p>
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getUrgencyColor(repair.urgency)}`}>
                         {repair.urgency}
@@ -374,7 +382,8 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Repair Form Modal */}
