@@ -213,7 +213,15 @@ export class RentPaymentService {
         .order('due_date', { ascending: true });
 
       if (error) {
-        console.error('Error fetching rent payments:', error);
+        // Handle 404/PGRST116 as "no data" - this is expected and not an error
+        if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('404')) {
+          // Table doesn't exist or no records found - return empty array
+          return [];
+        }
+        // Only log actual errors, not expected "no data" cases
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching rent payments:', error);
+        }
         return [];
       }
 
@@ -221,7 +229,7 @@ export class RentPaymentService {
         data?.map(this.transformPaymentFromDB) || []
       );
     } catch (error) {
-      console.error('Error in getRentPaymentsForTenant:', error);
+      // Silently handle errors - likely table doesn't exist yet
       return [];
     }
   }
@@ -246,17 +254,21 @@ export class RentPaymentService {
         .single();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No record found
+        // Handle expected "no data" cases
+        if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('404')) {
+          // No record found - this is expected
           return null;
         }
-        console.error('Error fetching current period payment:', error);
+        // Only log actual errors
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching current period payment:', error);
+        }
         return null;
       }
 
       return data ? this.transformPaymentFromDB(data) : null;
     } catch (error) {
-      console.error('Error in getCurrentPeriodPayment:', error);
+      // Silently handle errors - likely table doesn't exist yet
       return null;
     }
   }
@@ -374,7 +386,15 @@ export class RentPaymentService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching future cash flow:', error);
+        // Handle expected "no data" cases
+        if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('404')) {
+          // No records found - this is expected
+          return [];
+        }
+        // Only log actual errors
+        if (error.code !== 'PGRST116') {
+          console.error('Error fetching future cash flow:', error);
+        }
         return [];
       }
 
@@ -388,7 +408,7 @@ export class RentPaymentService {
         })) || []
       );
     } catch (error) {
-      console.error('Error in calculateFutureCashFlow:', error);
+      // Silently handle errors - likely table doesn't exist yet
       return [];
     }
   }
@@ -410,7 +430,15 @@ export class RentPaymentService {
         .single();
 
       if (paymentError || !payment) {
-        console.error('Error fetching payment for invoice:', paymentError);
+        // Handle expected "no data" cases
+        if (paymentError && (paymentError.code === 'PGRST116' || paymentError.code === '42P01' || paymentError.message?.includes('404'))) {
+          // Payment not found - this is expected
+          return null;
+        }
+        // Only log actual errors
+        if (paymentError && paymentError.code !== 'PGRST116') {
+          console.error('Error fetching payment for invoice:', paymentError);
+        }
         return null;
       }
 

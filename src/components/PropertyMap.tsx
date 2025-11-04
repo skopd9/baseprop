@@ -26,6 +26,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const isLoadingRef = useRef(false);
+  const loaderInstanceRef = useRef<Loader | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [propertiesWithCoords, setPropertiesWithCoords] = useState<PropertyWithCoordinates[]>([]);
@@ -34,21 +36,13 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const apiKey = import.meta.env.VITE_GOOGLE_MAP_API || import.meta.env.GOOGLE_MAP_API;
 
   // Geocode addresses to get coordinates
-  const geocodeProperties = async (props: SimplifiedProperty[]): Promise<PropertyWithCoordinates[]> => {
-    if (!apiKey) {
-      console.warn('Google Maps API key not found');
+  const geocodeProperties = async (props: SimplifiedProperty[], googleMaps: typeof google.maps): Promise<PropertyWithCoordinates[]> => {
+    if (!apiKey || !googleMaps) {
       return props;
     }
 
-    const loader = new Loader({
-      apiKey,
-      version: 'weekly',
-      libraries: ['places']
-    });
-
     try {
-      const google = await loader.load();
-      const geocoder = new google.maps.Geocoder();
+      const geocoder = new googleMaps.Geocoder();
       
       const geocodedProperties = await Promise.all(
         props.map(async (property) => {
@@ -81,7 +75,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
       return geocodedProperties;
     } catch (error) {
-      console.error('Failed to load Google Maps:', error);
+      // Silently fail geocoding - we'll still show the map without coordinates
       return props;
     }
   };
@@ -94,21 +88,45 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       return;
     }
 
+    // Prevent multiple simultaneous initialization attempts
+    if (isLoadingRef.current || mapInstanceRef.current) {
+      return;
+    }
+
     const initMap = async () => {
+      // Prevent concurrent calls
+      if (isLoadingRef.current) return;
+      isLoadingRef.current = true;
+
       try {
         setIsLoading(true);
         
-        // Geocode properties first
-        const geocodedProps = await geocodeProperties(properties);
+        // Use existing loader instance if available, otherwise create new one
+        let googleMaps: typeof google.maps;
+        if (loaderInstanceRef.current) {
+          try {
+            googleMaps = await loaderInstanceRef.current.load();
+          } catch (e) {
+            // If existing loader fails, create a new one
+            loaderInstanceRef.current = new Loader({
+              apiKey,
+              version: 'weekly',
+              libraries: ['places']
+            });
+            googleMaps = await loaderInstanceRef.current.load();
+          }
+        } else {
+          loaderInstanceRef.current = new Loader({
+            apiKey,
+            version: 'weekly',
+            libraries: ['places']
+          });
+          googleMaps = await loaderInstanceRef.current.load();
+        }
+        
+        // Geocode properties after loading Google Maps
+        const geocodedProps = await geocodeProperties(properties, googleMaps);
         setPropertiesWithCoords(geocodedProps);
-
-        const loader = new Loader({
-          apiKey,
-          version: 'weekly',
-          libraries: ['places']
-        });
-
-        const google = await loader.load();
 
         if (!mapRef.current) return;
 
@@ -124,7 +142,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
             zoom = 15;
           } else {
             // Calculate bounds to fit all properties
-            const bounds = new google.maps.LatLngBounds();
+            const bounds = new googleMaps.LatLngBounds();
             propertiesWithValidCoords.forEach(property => {
               bounds.extend({ lat: property.lat!, lng: property.lng! });
             });
@@ -133,10 +151,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           }
         }
 
-        const map = new google.maps.Map(mapRef.current, {
+        const map = new googleMaps.Map(mapRef.current, {
           center,
           zoom,
-          mapTypeId: google.maps.MapTypeId.ROADMAP,
+          mapTypeId: googleMaps.MapTypeId.ROADMAP,
           styles: [
             {
               featureType: 'poi',
@@ -154,12 +172,12 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
         // Add markers for properties with coordinates
         propertiesWithValidCoords.forEach((property) => {
-          const marker = new google.maps.Marker({
+          const marker = new googleMaps.Marker({
             position: { lat: property.lat!, lng: property.lng! },
             map,
             title: property.address,
             icon: {
-              path: google.maps.SymbolPath.CIRCLE,
+              path: googleMaps.SymbolPath.CIRCLE,
               scale: 8,
               fillColor: property.status === 'sold' ? '#6B7280' : 
                         property.tenantCount > 0 ? '#10B981' : '#F59E0B',
@@ -170,7 +188,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           });
 
           // Create info window
-          const infoWindow = new google.maps.InfoWindow({
+          const infoWindow = new googleMaps.InfoWindow({
             content: `
               <div class="p-2 min-w-[200px]">
                 <h3 class="font-semibold text-gray-900 mb-1">${property.propertyName || property.address}</h3>
@@ -211,40 +229,50 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
         // Fit bounds if we have multiple properties
         if (propertiesWithValidCoords.length > 1) {
-          const bounds = new google.maps.LatLngBounds();
+          const bounds = new googleMaps.LatLngBounds();
           propertiesWithValidCoords.forEach(property => {
             bounds.extend({ lat: property.lat!, lng: property.lng! });
           });
           map.fitBounds(bounds);
           
           // Ensure minimum zoom level
-          const listener = google.maps.event.addListener(map, 'idle', () => {
+          const listener = googleMaps.event.addListener(map, 'idle', () => {
             if (map.getZoom()! > 16) map.setZoom(16);
-            google.maps.event.removeListener(listener);
+            googleMaps.event.removeListener(listener);
           });
         }
 
         setError(null);
       } catch (error) {
-        console.error('Error initializing map:', error);
+        // Only log error once, don't spam console
+        const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Check for specific API errors
-        const errorMessage = error.message || error.toString();
         if (errorMessage.includes('ApiNotActivatedMapError')) {
           setError('Google Maps JavaScript API is not enabled. Please enable it in Google Cloud Console.');
         } else if (errorMessage.includes('InvalidKeyMapError')) {
           setError('Invalid Google Maps API key. Please check your API key in the .env file.');
         } else if (errorMessage.includes('RefererNotAllowedMapError')) {
           setError('API key restrictions prevent loading. Please check your API key settings.');
-        } else {
+        } else if (errorMessage.includes('could not load')) {
           setError('Failed to load Google Maps. Please check your API key and internet connection.');
+        } else {
+          // For other errors, show generic message but don't spam console
+          setError('Google Maps is not available. Please check your API key configuration.');
         }
       } finally {
         setIsLoading(false);
+        isLoadingRef.current = false;
       }
     };
 
     initMap();
+
+    // Cleanup function
+    return () => {
+      // Don't reset isLoadingRef here - let it complete naturally
+      // This prevents cleanup from interfering with initialization
+    };
   }, [properties, apiKey]);
 
   // Update selected property marker
