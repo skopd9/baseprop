@@ -18,7 +18,7 @@ export class SimplifiedTenantService {
     monthlyRent?: number;
     depositAmount?: number;
     rentDueDay?: number; // Day of month rent is due (default: 1)
-  }): Promise<SimplifiedTenant | null> {
+  }, organizationId?: string): Promise<SimplifiedTenant | null> {
     try {
       // Create tenant name with room info if it's an HMO
       const tenantName = tenantData.unitNumber 
@@ -26,34 +26,41 @@ export class SimplifiedTenantService {
         : tenantData.name;
 
       // Insert into database using actual schema
+      const insertData: any = {
+        tenant_type: 'individual',
+        name: tenantName,
+        phone: tenantData.phone,
+        email: tenantData.email,
+        status: 'active',
+        property_id: tenantData.propertyId,
+        lease_start: tenantData.leaseStart?.toISOString().split('T')[0] || null,
+        lease_end: tenantData.leaseEnd?.toISOString().split('T')[0] || null,
+        monthly_rent: tenantData.monthlyRent || null,
+        rent_due_day: tenantData.rentDueDay || 1, // Default to 1st of month
+        deposit_amount: tenantData.depositAmount || null,
+        tenant_data: {
+          property_id: tenantData.propertyId,
+          unit_number: tenantData.unitNumber,
+          room_id: tenantData.roomId,
+          room_name: tenantData.roomName,
+          lease_start_date: tenantData.leaseStart?.toISOString().split('T')[0],
+          lease_end_date: tenantData.leaseEnd?.toISOString().split('T')[0],
+          monthly_rent: tenantData.monthlyRent,
+          deposit_amount: tenantData.depositAmount,
+          rent_status: tenantData.leaseStart ? 'current' : 'pending',
+          onboarding_status: 'not_started',
+          is_simplified_demo: true,
+        }
+      };
+
+      // Add organization_id if provided
+      if (organizationId) {
+        insertData.organization_id = organizationId;
+      }
+
       const { data, error } = await supabase
         .from('tenants')
-        .insert({
-          tenant_type: 'individual',
-          name: tenantName,
-          phone: tenantData.phone,
-          email: tenantData.email,
-          status: 'active',
-          property_id: tenantData.propertyId,
-          lease_start: tenantData.leaseStart?.toISOString().split('T')[0] || null,
-          lease_end: tenantData.leaseEnd?.toISOString().split('T')[0] || null,
-          monthly_rent: tenantData.monthlyRent || null,
-          rent_due_day: tenantData.rentDueDay || 1, // Default to 1st of month
-          deposit_amount: tenantData.depositAmount || null,
-          tenant_data: {
-            property_id: tenantData.propertyId,
-            unit_number: tenantData.unitNumber,
-            room_id: tenantData.roomId,
-            room_name: tenantData.roomName,
-            lease_start_date: tenantData.leaseStart?.toISOString().split('T')[0],
-            lease_end_date: tenantData.leaseEnd?.toISOString().split('T')[0],
-            monthly_rent: tenantData.monthlyRent,
-            deposit_amount: tenantData.depositAmount,
-            rent_status: tenantData.leaseStart ? 'current' : 'pending',
-            onboarding_status: 'not_started',
-            is_simplified_demo: true,
-          }
-        })
+        .insert(insertData)
         .select()
         .single();
 

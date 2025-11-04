@@ -24,16 +24,29 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   className = ''
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const mapInstanceRef = useRef<any>(null); // Use any to avoid type errors before Google Maps loads
+  const markersRef = useRef<any[]>([]); // Use any to avoid type errors before Google Maps loads
   const isLoadingRef = useRef(false);
   const loaderInstanceRef = useRef<Loader | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start false to allow immediate render
   const [error, setError] = useState<string | null>(null);
   const [propertiesWithCoords, setPropertiesWithCoords] = useState<PropertyWithCoordinates[]>([]);
 
-  // Get Google Maps API key from environment
-  const apiKey = import.meta.env.VITE_GOOGLE_MAP_API || import.meta.env.GOOGLE_MAP_API;
+  // Get Google Maps API key from environment (check multiple possible names)
+  const apiKey = import.meta.env.VITE_GOOGLE_MAP_API 
+    || import.meta.env.VITE_GOOGLE_MAPS_API_KEY 
+    || import.meta.env.GOOGLE_MAP_API
+    || import.meta.env.GOOGLE_MAPS_API_KEY;
+
+  // Debug: Log API key status
+  console.log('API Key check:', {
+    VITE_GOOGLE_MAP_API: import.meta.env.VITE_GOOGLE_MAP_API,
+    VITE_GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    GOOGLE_MAP_API: import.meta.env.GOOGLE_MAP_API,
+    GOOGLE_MAPS_API_KEY: import.meta.env.GOOGLE_MAPS_API_KEY,
+    finalApiKey: apiKey,
+    apiKeyLength: apiKey?.length
+  });
 
   // Geocode addresses to get coordinates
   const geocodeProperties = async (props: SimplifiedProperty[], googleMaps: any): Promise<PropertyWithCoordinates[]> => {
@@ -47,7 +60,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       const geocodedProperties = await Promise.all(
         props.map(async (property) => {
           try {
-            const result = await new Promise<google.maps.GeocoderResult[]>((resolve, reject) => {
+            const result = await new Promise<any[]>((resolve, reject) => {
               geocoder.geocode({ address: property.address }, (results, status) => {
                 if (status === 'OK' && results) {
                   resolve(results);
@@ -82,9 +95,11 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
   // Initialize map
   useEffect(() => {
+    // Always allow component to render first
+    setIsLoading(false);
+    
     if (!apiKey) {
-      setError('Google Maps API key not configured. Please add VITE_GOOGLE_MAP_API to your .env file.');
-      setIsLoading(false);
+      setError('Google Maps API key not configured. Please add VITE_GOOGLE_MAP_API or VITE_GOOGLE_MAPS_API_KEY to your environment variables.');
       return;
     }
 
@@ -101,16 +116,18 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       try {
         setIsLoading(true);
 
-        // Wait for mapRef to be available
-        if (!mapRef.current) {
-          // Retry after a short delay
+        // Wait for mapRef to be available with multiple retries
+        let retries = 0;
+        while (!mapRef.current && retries < 10) {
           await new Promise(resolve => setTimeout(resolve, 100));
-          if (!mapRef.current) {
-            isLoadingRef.current = false;
-            setIsLoading(false);
-            setError('Map container not available');
-            return;
-          }
+          retries++;
+        }
+        
+        if (!mapRef.current) {
+          isLoadingRef.current = false;
+          setIsLoading(false);
+          // Don't set error - just return silently to allow page to render
+          return;
         }
         
         // Use existing loader instance if available, otherwise create new one
@@ -260,9 +277,13 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         setIsLoading(false);
         isLoadingRef.current = false;
         
+        // Log detailed error information for debugging
+        console.error('Google Maps initialization error:', error);
+        
         // Only log error once, don't spam console
         try {
           const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error('Error message:', errorMessage);
           
           // Check for specific API errors
           if (errorMessage.includes('ApiNotActivatedMapError')) {
@@ -274,12 +295,12 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           } else if (errorMessage.includes('could not load')) {
             setError('Failed to load Google Maps. Please check your API key and internet connection.');
           } else {
-            // For other errors, show generic message but don't spam console
-            setError('Google Maps is not available. Please check your API key configuration.');
+            // For other errors, show more specific error message with details
+            setError(`Google Maps error: ${errorMessage}`);
           }
         } catch (setErrorErr) {
           // Fallback if setError itself fails - silently fail to prevent app crash
-          // Don't log here to avoid infinite loops
+          console.error('Error setting error:', setErrorErr);
         }
       } finally {
         setIsLoading(false);

@@ -39,6 +39,32 @@ export interface Invoice {
 }
 
 export class RentPaymentService {
+  private static tableExists: boolean | null = null;
+
+  /**
+   * Check if rent_payments table exists
+   */
+  private static async checkTableExists(): Promise<boolean> {
+    // Cache the result to avoid repeated checks
+    if (this.tableExists !== null) {
+      return this.tableExists;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('rent_payments')
+        .select('id')
+        .limit(1);
+
+      // If no error or PGRST116 (no rows), table exists
+      this.tableExists = !error || error.code === 'PGRST116';
+      return this.tableExists;
+    } catch {
+      this.tableExists = false;
+      return false;
+    }
+  }
+
   /**
    * Calculate pro-rated rent amount for partial month
    */
@@ -205,17 +231,24 @@ export class RentPaymentService {
    * Get all rent payments for a tenant
    */
   static async getRentPaymentsForTenant(tenantId: string): Promise<RentPayment[]> {
+    // Check if table exists before making the query
+    const tableExists = await this.checkTableExists();
+    if (!tableExists) {
+      return [];
+    }
+
     try {
       const { data, error } = await supabase
         .from('rent_payments')
         .select('*')
         .eq('tenant_id', tenantId)
-        .order('due_date', { ascending: true });
+        .order('due_date', { ascending: true});
 
       if (error) {
         // Handle 404/PGRST116 as "no data" - this is expected and not an error
         if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('404')) {
           // Table doesn't exist or no records found - return empty array
+          this.tableExists = false; // Update cache
           return [];
         }
         // Only log actual errors, not expected "no data" cases
@@ -230,6 +263,7 @@ export class RentPaymentService {
       );
     } catch (error) {
       // Silently handle errors - likely table doesn't exist yet
+      this.tableExists = false; // Update cache
       return [];
     }
   }
@@ -238,11 +272,18 @@ export class RentPaymentService {
    * Get payment for current period
    */
   static async getCurrentPeriodPayment(tenantId: string): Promise<RentPayment | null> {
+    // Check if table exists before making the query
+    const tableExists = await this.checkTableExists();
+    if (!tableExists) {
+      return null;
+    }
+
     try {
       const today = new Date();
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
+      // Use maybeSingle() instead of single() to avoid errors when no record exists
       const { data, error } = await supabase
         .from('rent_payments')
         .select('*')
@@ -251,12 +292,13 @@ export class RentPaymentService {
         .lte('period_end', endOfMonth.toISOString().split('T')[0])
         .order('due_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error) {
         // Handle expected "no data" cases
         if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('404')) {
           // No record found - this is expected
+          this.tableExists = false; // Update cache
           return null;
         }
         // Only log actual errors
@@ -269,6 +311,7 @@ export class RentPaymentService {
       return data ? this.transformPaymentFromDB(data) : null;
     } catch (error) {
       // Silently handle errors - likely table doesn't exist yet
+      this.tableExists = false; // Update cache
       return null;
     }
   }
@@ -427,7 +470,7 @@ export class RentPaymentService {
           properties!inner(id, address)
         `)
         .eq('id', paymentId)
-        .single();
+        .maybeSingle();
 
       if (paymentError || !payment) {
         // Handle expected "no data" cases

@@ -11,11 +11,15 @@ import {
   XMarkIcon,
   ArrowRightOnRectangleIcon,
   ChevronDownIcon,
-  QuestionMarkCircleIcon
+  QuestionMarkCircleIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedDashboard } from './SimplifiedDashboard';
 import { ResidentialPropertiesTable } from './ResidentialPropertiesTable';
 import { ResidentialTenantsTable } from './ResidentialTenantsTable';
+import { OrganizationSettings } from './OrganizationSettings';
+import { OnboardingWizard } from './OnboardingWizard';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 import TenancyManagementModal from './TenancyManagementModal';
 import { InspectionWorkflows } from './InspectionWorkflows';
@@ -38,7 +42,7 @@ import { SimplifiedPropertyService } from '../services/SimplifiedPropertyService
 import { SimplifiedTenantService } from '../services/SimplifiedTenantService';
 import { DemoDataSeeder } from '../utils/demoDataSeeder';
 
-type ViewType = 'dashboard' | 'properties' | 'tenants' | 'inspections' | 'repairs' | 'compliance' | 'rent' | 'expenses';
+type ViewType = 'dashboard' | 'properties' | 'tenants' | 'inspections' | 'repairs' | 'compliance' | 'rent' | 'expenses' | 'onboarding';
 
 interface NavigationItem {
   id: ViewType;
@@ -100,16 +104,29 @@ const navigationItems: NavigationItem[] = [
 
 interface SimplifiedLandlordAppProps {
   onLogout: () => void;
+  showOnboarding?: boolean;
+  userId?: string;
+  userEmail?: string;
+  onOnboardingComplete?: () => void;
 }
 
-export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ onLogout }) => {
-  const [currentView, setCurrentView] = useState<ViewType>('dashboard');
+export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ 
+  onLogout,
+  showOnboarding = false,
+  userId = '',
+  userEmail = '',
+  onOnboardingComplete
+}) => {
+  const { currentOrganization, userOrganizations, switchOrganization } = useOrganization();
+  // Start on onboarding tab if user needs to complete onboarding
+  const [currentView, setCurrentView] = useState<ViewType>(showOnboarding ? 'onboarding' : 'dashboard');
   const [properties, setProperties] = useState<SimplifiedProperty[]>([]);
   const [tenants, setTenants] = useState<SimplifiedTenant[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<SimplifiedProperty | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<SimplifiedTenant | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showOrgSettings, setShowOrgSettings] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -136,9 +153,10 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
   useEffect(() => {
     const loadData = async () => {
       try {
+        const orgId = currentOrganization?.id;
         const [propertiesData, tenantsData] = await Promise.all([
-          SimplifiedPropertyService.getSimplifiedProperties(),
-          SimplifiedTenantService.getSimplifiedTenants(),
+          SimplifiedPropertyService.getSimplifiedProperties(orgId),
+          SimplifiedTenantService.getSimplifiedTenants(orgId),
         ]);
 
         // Load data from database (no mock data seeding)
@@ -152,8 +170,10 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
       }
     };
 
-    loadData();
-  }, []);
+    if (currentOrganization) {
+      loadData();
+    }
+  }, [currentOrganization]);
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -402,6 +422,21 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
 
   const renderCurrentView = () => {
     switch (currentView) {
+      case 'onboarding':
+        return (
+          <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+            <OnboardingWizard
+              userId={userId}
+              userEmail={userEmail}
+              onComplete={() => {
+                if (onOnboardingComplete) {
+                  onOnboardingComplete();
+                }
+              }}
+            />
+          </div>
+        );
+      
       case 'dashboard':
         return (
           <SimplifiedDashboard
@@ -563,6 +598,31 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
 
         <nav className="mt-6 px-3">
           <div className="space-y-1">
+            {/* Onboarding tab - only shown when showOnboarding is true */}
+            {showOnboarding && (
+              <button
+                onClick={() => {
+                  if (showPropertyEditModal) {
+                    setShowPropertyEditModal(false);
+                    setSelectedProperty(null);
+                  }
+                  setCurrentView('onboarding');
+                  setSidebarOpen(false);
+                }}
+                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  currentView === 'onboarding'
+                    ? 'bg-green-100 text-green-700 border-r-2 border-green-700'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <QuestionMarkCircleIcon className={`mr-3 h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'}`} />
+                <div className="text-left">
+                  <div className="font-medium">Get Started</div>
+                  <div className="text-xs text-gray-500">Complete setup</div>
+                </div>
+              </button>
+            )}
+            
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
@@ -598,17 +658,34 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
 
         {/* User Profile Section at Bottom */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
+          {/* Organization Selector (if multiple orgs) */}
+          {userOrganizations.length > 1 && (
+            <div className="mb-3">
+              <select
+                value={currentOrganization?.id || ''}
+                onChange={(e) => switchOrganization(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {userOrganizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 flex-1 min-w-0">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold shadow-sm">
-                {localStorage.getItem('userEmail')?.charAt(0).toUpperCase() || 'U'}
+                {currentOrganization?.name.charAt(0).toUpperCase() || 'O'}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {localStorage.getItem('userEmail')?.split('@')[0] || 'User'}
+                  {currentOrganization?.name || 'Loading...'}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
-                  {localStorage.getItem('userEmail') || 'user@example.com'}
+                  {userOrganizations.length} {userOrganizations.length === 1 ? 'workspace' : 'workspaces'}
                 </p>
               </div>
             </div>
@@ -622,9 +699,22 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
               
               {/* Dropdown Menu */}
               {userMenuOpen && (
-                <div className="absolute bottom-full right-0 mb-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                   <button
-                    onClick={() => setShowQuickStartGuide(true)}
+                    onClick={() => {
+                      setShowOrgSettings(true);
+                      setUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Cog6ToothIcon className="w-4 h-4 mr-2 text-gray-500" />
+                    Organization Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowQuickStartGuide(true);
+                      setUserMenuOpen(false);
+                    }}
                     className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <QuestionMarkCircleIcon className="w-4 h-4 mr-2 text-blue-500" />
@@ -675,47 +765,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
 
         {/* Main content area */}
         <main className="flex-1 overflow-auto">
-          {/* Welcome banner for new users */}
-          {properties.length === 0 && tenants.length === 0 && (
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-6 m-6 rounded-lg shadow-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold mb-2">Ready to get started?</h2>
-                  <p className="text-blue-100 mb-4">
-                    Add your first property or explore with sample data to see how the system works.
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      onClick={() => {
-                        setCurrentView('properties');
-                        handleAddProperty();
-                      }}
-                      className="bg-white text-blue-600 px-4 py-2 rounded-md font-medium hover:bg-blue-50 transition-colors"
-                    >
-                      Add Property
-                    </button>
-                    <button
-                      onClick={loadDemoData}
-                      disabled={isLoadingDemo}
-                      className="bg-blue-700 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-800 transition-colors disabled:opacity-50"
-                    >
-                      {isLoadingDemo ? 'Loading...' : 'Try Demo Data'}
-                    </button>
-                    <button
-                      onClick={() => setShowQuickStartGuide(true)}
-                      className="border border-white text-white px-4 py-2 rounded-md font-medium hover:bg-white hover:bg-opacity-10 transition-colors"
-                    >
-                      Quick Start Guide
-                    </button>
-                  </div>
-                </div>
-                <div className="hidden md:block">
-                  <HomeIcon className="w-16 h-16 text-blue-200" />
-                </div>
-              </div>
-            </div>
-          )}
-          
           {renderCurrentView()}
         </main>
       </div>
@@ -801,6 +850,12 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({ on
         isVisible={!!successMessage}
         message={successMessage || ''}
         onClose={() => setSuccessMessage(null)}
+      />
+
+      {/* Organization Settings Modal */}
+      <OrganizationSettings
+        isOpen={showOrgSettings}
+        onClose={() => setShowOrgSettings(false)}
       />
 
       {/* Quick Start Guide Modal */}

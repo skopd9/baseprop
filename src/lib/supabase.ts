@@ -10,6 +10,45 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// =====================================================
+// Authentication Service Functions
+// =====================================================
+export const auth = {
+  // Send magic link to email
+  async signInWithMagicLink(email: string) {
+    return await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}`
+      }
+    });
+  },
+
+  // Sign out current user
+  async signOut() {
+    return await supabase.auth.signOut();
+  },
+
+  // Get current user
+  async getCurrentUser() {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    return user;
+  },
+
+  // Get current session
+  async getSession() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return session;
+  },
+
+  // Listen to auth state changes
+  onAuthStateChange(callback: (event: string, session: any) => void) {
+    return supabase.auth.onAuthStateChange(callback);
+  }
+};
+
 // Database service functions
 export const db = {
   // Properties

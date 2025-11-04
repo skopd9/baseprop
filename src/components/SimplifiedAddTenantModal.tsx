@@ -57,12 +57,12 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
       const isAvailable = propertyTenants.length < maxTenants;
       
       // Debug logging
-      console.log(`Property ${property.address}: ${propertyTenants.length}/${maxTenants} tenants, available: ${isAvailable}`);
+      // Debug logging removed to reduce console noise
       
       return isAvailable;
     });
     
-    console.log(`Total properties: ${properties.length}, Available: ${filtered.length}`);
+    // Debug logging removed to reduce console noise
     return filtered;
   }, [properties, existingTenants]);
 

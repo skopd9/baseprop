@@ -23,3 +23,4 @@ CREATE INDEX IF NOT EXISTS idx_rent_payments_tenant_period ON rent_payments(tena
 CREATE INDEX IF NOT EXISTS idx_rent_payments_due_date ON rent_payments(due_date);
 CREATE INDEX IF NOT EXISTS idx_rent_payments_status ON rent_payments(status);
 
+

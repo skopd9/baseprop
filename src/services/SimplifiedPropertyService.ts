@@ -4,12 +4,19 @@ import { RentPaymentService } from './RentPaymentService';
 
 export class SimplifiedPropertyService {
   // Get all simplified properties from database
-  static async getSimplifiedProperties(): Promise<SimplifiedProperty[]> {
+  static async getSimplifiedProperties(organizationId?: string): Promise<SimplifiedProperty[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('properties')
         .select('*')
         .order('created_at', { ascending: false});
+
+      // Filter by organization if provided
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching simplified properties:', error);
@@ -20,14 +27,38 @@ export class SimplifiedPropertyService {
 
       // Get tenant counts for all properties
       const propertyIds = data.map(p => p.id);
-      const { data: tenantCounts, error: tenantError } = await supabase
-        .from('tenants')
-        .select('property_id')
-        .eq('status', 'active')
-        .in('property_id', propertyIds);
+      let tenantCounts: any[] = [];
+      
+      // Try to get tenant counts - handle case where property_id column might not exist
+      // Use a more defensive approach: try tenant_data first, then property_id
+      try {
+        // First try to get all tenants and extract property_id from tenant_data
+        const { data: allTenants, error: tenantError } = await supabase
+          .from('tenants')
+          .select('tenant_data, id')
+          .eq('status', 'active');
 
-      if (tenantError) {
-        console.error('Error fetching tenant counts:', tenantError);
+        if (!tenantError && allTenants) {
+          // Extract property_id from tenant_data JSONB field
+          tenantCounts = allTenants
+            .map(t => ({ property_id: t.tenant_data?.property_id }))
+            .filter(t => t.property_id && propertyIds.includes(t.property_id));
+        } else if (tenantError) {
+          // If that fails, try direct property_id column (for newer schema)
+          const { data: tenantData, error: directError } = await supabase
+            .from('tenants')
+            .select('property_id')
+            .eq('status', 'active')
+            .in('property_id', propertyIds);
+
+          if (!directError && tenantData) {
+            tenantCounts = tenantData || [];
+          }
+          // Silently ignore errors - tenant counts are optional
+        }
+      } catch (error) {
+        // Silently handle errors - tenant counts are optional
+        // App will work without tenant counts
       }
 
       // Create a map of property ID to tenant count
@@ -52,9 +83,9 @@ export class SimplifiedPropertyService {
   }
 
   // Get all simplified tenants from database
-  static async getSimplifiedTenants(): Promise<SimplifiedTenant[]> {
+  static async getSimplifiedTenants(organizationId?: string): Promise<SimplifiedTenant[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tenants')
         .select(`
           *,
@@ -66,6 +97,13 @@ export class SimplifiedPropertyService {
         `)
         .or('tenant_data->>is_simplified_demo.eq.true,properties.property_data->>is_simplified_demo.eq.true')
         .order('name');
+
+      // Filter by organization if provided
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching simplified tenants:', error);
@@ -89,7 +127,7 @@ export class SimplifiedPropertyService {
     purchasePrice?: number;
     units?: Array<{ name: string; area?: number }>;
     unitDetails?: Array<{ name: string; area: number; targetRent: number }>;
-  }): Promise<SimplifiedProperty | null> {
+  }, organizationId?: string): Promise<SimplifiedProperty | null> {
     try {
       // Generate a unique asset register ID
       const assetRegisterId = `SIMP-${Date.now().toString().slice(-6)}`;
@@ -110,15 +148,22 @@ export class SimplifiedPropertyService {
       };
 
       // Insert into database
+      const insertData: any = {
+        asset_register_id: assetRegisterId,
+        name: `Property at ${propertyData.address}`,
+        address: propertyData.address,
+        status: 'active',
+        property_data: dbPropertyData,
+      };
+
+      // Add organization_id if provided
+      if (organizationId) {
+        insertData.organization_id = organizationId;
+      }
+
       const { data, error } = await supabase
         .from('properties')
-        .insert({
-          asset_register_id: assetRegisterId,
-          name: `Property at ${propertyData.address}`,
-          address: propertyData.address,
-          status: 'active',
-          property_data: dbPropertyData,
-        })
+        .insert(insertData)
         .select()
         .single();
 

@@ -111,21 +111,13 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
     }).format(amount);
   };
 
-  // Show quick start guide for new users
+  // Show QuickStartGuide for new users (keep dashboard as-is)
   const isNewUser = (!Array.isArray(properties) || properties.length === 0) && (!Array.isArray(tenants) || tenants.length === 0);
   
   if (isNewUser) {
     return (
       <div className="p-6 bg-gray-50 min-h-screen">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-8">
-            <HomeIcon className="w-16 h-16 text-blue-500 mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Property Manager!</h2>
-            <p className="text-gray-600 text-lg">
-              Let's get your property management system set up in just a few steps.
-            </p>
-          </div>
-          
           <QuickStartGuide
             properties={properties || []}
             tenants={tenants || []}
@@ -136,40 +128,6 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
             onLoadDemoData={onLoadDemoData}
             isLoadingDemo={isLoadingDemo}
           />
-          
-          <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">What you can do with Property Manager:</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start space-x-3">
-                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Property Management</h4>
-                  <p className="text-sm text-gray-600">Track property details, occupancy, and financial performance</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Tenant Relations</h4>
-                  <p className="text-sm text-gray-600">Manage tenant information, leases, and communications</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Rent Collection</h4>
-                  <p className="text-sm text-gray-600">Track payments, set up schedules, and monitor overdue amounts</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3">
-                <CheckCircleIcon className="w-5 h-5 text-green-500 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-gray-900">Maintenance & Compliance</h4>
-                  <p className="text-sm text-gray-600">Schedule inspections, track repairs, and manage certificates</p>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     );
