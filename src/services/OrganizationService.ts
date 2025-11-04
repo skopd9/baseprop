@@ -383,17 +383,52 @@ export class OrganizationService {
   }
 
   /**
-   * Cancel a pending invitation
+   * Cancel a pending invitation and clean up orphaned user accounts
    */
   static async cancelInvitation(invitationId: string): Promise<void> {
     try {
-      const { error } = await supabase
+      // First, get the invitation details to know the email
+      const { data: invitation, error: fetchError } = await supabase
+        .from('organization_invitations')
+        .select('email')
+        .eq('id', invitationId)
+        .eq('status', 'pending')
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!invitation) {
+        throw new Error('Invitation not found or already processed');
+      }
+
+      const invitedEmail = invitation.email;
+
+      // Delete the invitation
+      const { error: deleteError } = await supabase
         .from('organization_invitations')
         .delete()
         .eq('id', invitationId)
-        .eq('status', 'pending'); // Only allow canceling pending invitations
+        .eq('status', 'pending');
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      // Clean up orphaned user account if one exists
+      // Use database function to safely delete users with no organization memberships
+      try {
+        const { data: wasDeleted, error: cleanupError } = await supabase
+          .rpc('delete_orphaned_user', { user_email: invitedEmail });
+
+        if (cleanupError) {
+          console.error('Error during orphaned user cleanup:', cleanupError);
+          // Don't throw - invitation is already canceled, this is just best-effort cleanup
+        } else if (wasDeleted) {
+          console.log(`✓ Successfully cleaned up orphaned user account for: ${invitedEmail}`);
+        } else {
+          console.log(`No orphaned user cleanup needed for: ${invitedEmail}`);
+        }
+      } catch (cleanupError) {
+        console.error('Unexpected error during user cleanup:', cleanupError);
+        // Don't throw - invitation is already canceled
+      }
     } catch (error) {
       console.error('Error canceling invitation:', error);
       throw error;

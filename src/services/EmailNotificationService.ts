@@ -690,7 +690,36 @@ This is an automated notification. Please do not reply to this email.
   ): Promise<EmailSendResult> {
     try {
       const baseUrl = window.location.origin;
+      const acceptLink = `${baseUrl}/?invite=${invitationToken}`;
       
+      // Check if we're in local development (Netlify Function may not be available)
+      const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      if (isLocalDev) {
+        console.log('🔧 LOCAL DEV MODE - Invitation email details:');
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('📧 To:', invitedEmail);
+        console.log('🏢 Organization:', organizationName);
+        console.log('👤 Invited by:', inviterName);
+        console.log('🎭 Role:', role);
+        console.log('🔗 Accept Link:', acceptLink);
+        console.log('⏰ Expires:', expiresIn);
+        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        console.log('');
+        console.log('💡 Copy this link to test the invitation:');
+        console.log(acceptLink);
+        console.log('');
+        console.log('📌 To send real emails in development, run: netlify dev');
+        console.log('📌 To send real emails in production, deploy to Netlify');
+        
+        // Show visual notification in dev mode
+        this.showInvitationDevNotification(invitedEmail, acceptLink);
+        
+        return {
+          success: true
+        };
+      }
+
       console.log('📧 Sending invitation email via Netlify Function...');
 
       // Call Netlify Function to send email (avoids CORS issues)
@@ -731,6 +760,61 @@ This is an automated notification. Please do not reply to this email.
         error: error.message || 'Failed to send email'
       };
     }
+  }
+
+  // Show invitation notification in dev mode with copy link button
+  private static showInvitationDevNotification(email: string, inviteLink: string): void {
+    const notificationEl = document.createElement('div');
+    notificationEl.className = 'fixed top-4 right-4 bg-indigo-600 text-white p-6 rounded-lg shadow-2xl z-50 max-w-md animate-slide-in';
+    notificationEl.innerHTML = `
+      <div class="space-y-3">
+        <div class="flex items-start space-x-3">
+          <div class="flex-shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-bold mb-1">📧 Invitation Created (Dev Mode)</p>
+            <p class="text-xs opacity-90 mb-2">To: ${email}</p>
+            <p class="text-xs opacity-75 mb-3">In production, this would send an email via Resend.</p>
+          </div>
+          <button onclick="this.closest('div').parentElement.parentElement.remove()" class="text-white hover:text-indigo-200 flex-shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="bg-indigo-700 rounded p-3">
+          <p class="text-xs font-semibold mb-2">🔗 Invitation Link:</p>
+          <div class="bg-indigo-800 rounded p-2 text-xs break-all font-mono mb-2">
+            ${inviteLink}
+          </div>
+          <button 
+            onclick="navigator.clipboard.writeText('${inviteLink}').then(() => { 
+              this.textContent = '✅ Copied!'; 
+              setTimeout(() => this.textContent = '📋 Copy Link', 2000);
+            })"
+            class="w-full bg-white text-indigo-600 px-3 py-2 rounded text-xs font-semibold hover:bg-indigo-50 transition-colors">
+            📋 Copy Link
+          </button>
+        </div>
+        
+        <div class="text-xs opacity-75 pt-2 border-t border-indigo-500">
+          💡 <strong>Tip:</strong> Deploy to Netlify or run <code class="bg-indigo-700 px-1 rounded">netlify dev</code> to send real emails
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(notificationEl);
+
+    // Auto-remove after 30 seconds
+    setTimeout(() => {
+      if (notificationEl.parentNode) {
+        notificationEl.parentNode.removeChild(notificationEl);
+      }
+    }, 30000);
   }
 
   // Send magic link email for authentication
