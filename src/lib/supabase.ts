@@ -15,13 +15,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // =====================================================
 export const auth = {
   // Send magic link to email
+  // Note: To use custom email template, configure Supabase SMTP with Resend
+  // See: MAGIC_LINK_CUSTOM_EMAIL_SETUP.md
   async signInWithMagicLink(email: string) {
     // Use production URL for magic links, fallback to current origin for local dev
     const redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     return await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: redirectUrl
+        emailRedirectTo: redirectUrl,
+        shouldCreateUser: true
       }
     });
   },

@@ -29,6 +29,14 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
     const token = urlParams.get('invite'); // Fixed: email uses ?invite= parameter
     if (token) {
       setInviteToken(token);
+      // Store in localStorage to survive magic link redirect
+      localStorage.setItem('pendingInviteToken', token);
+    } else {
+      // Check if we have a stored invite token from before auth
+      const storedToken = localStorage.getItem('pendingInviteToken');
+      if (storedToken) {
+        setInviteToken(storedToken);
+      }
     }
 
     checkAuthState();
@@ -70,6 +78,14 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
     setUserEmail(email);
     onUserEmailChange(email);
 
+    // PRIORITY: If user has a pending invitation, skip onboarding check and go straight to invitation acceptance
+    const storedToken = localStorage.getItem('pendingInviteToken');
+    if (storedToken || inviteToken) {
+      console.log('User has pending invitation, skipping onboarding check');
+      setAppState('authenticated');
+      return;
+    }
+
     // Check if user has completed onboarding
     try {
       const { data: profile, error } = await supabase
@@ -104,8 +120,9 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   };
 
   const handleInviteAccepted = (organizationName: string, role: 'owner' | 'member') => {
-    // Clear token from URL
+    // Clear token from URL and localStorage
     window.history.replaceState({}, '', window.location.pathname);
+    localStorage.removeItem('pendingInviteToken');
     setInviteToken(null);
     // Show welcome modal with tour
     setWelcomeOrgData({ name: organizationName, role });
@@ -121,6 +138,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   const handleInviteError = (message: string) => {
     console.error('Invite error:', message);
     window.history.replaceState({}, '', window.location.pathname);
+    localStorage.removeItem('pendingInviteToken');
     setInviteToken(null);
   };
 

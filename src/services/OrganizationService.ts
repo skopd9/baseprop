@@ -352,6 +352,27 @@ export class OrganizationService {
         return; // Already a member, nothing more to do
       }
 
+      // Ensure user profile exists (for new users accepting invitations)
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: userId,
+          email: user?.email,
+          has_completed_onboarding: true, // Mark as completed since they're joining existing org
+          onboarding_data: {
+            joined_via_invitation: true,
+            invitation_accepted_at: new Date().toISOString()
+          }
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        });
+
+      if (profileError) {
+        console.error('Error creating user profile:', profileError);
+        // Don't throw - profile creation is not critical for invitation acceptance
+      }
+
       // Add user to organization
       const { error: memberError } = await supabase
         .from('organization_members')
