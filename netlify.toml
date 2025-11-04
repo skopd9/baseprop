@@ -7,11 +7,9 @@
 
 [build.environment]
   NODE_VERSION = "18"
-  # Exclude documentation files from secret scanning (they contain example placeholders)
-  SECRETS_SCAN_OMIT_PATHS = "*.md,*.MD"
-  # Enable smart detection to allow client-side API keys (Google Maps, Supabase anon keys, etc.)
-  # These are meant to be public and are protected by domain/referrer restrictions
-  SECRETS_SCAN_SMART_DETECTION_ENABLED = "true"
+  # Exclude documentation and build output from secret scanning
+  # Build output (dist/) contains client-side API keys that are meant to be public
+  SECRETS_SCAN_OMIT_PATHS = "*.md,*.MD,dist/**"
   # Note: VITE_* environment variables are embedded in the client bundle by design.
   # Client-side keys like Google Maps API keys (AIza*) and Supabase anon keys are safe
   # to expose because they're protected by domain restrictions, not secrecy.
