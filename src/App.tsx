@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SimplifiedLandlordApp } from './components/SimplifiedLandlordApp';
 import { AuthModal } from './components/AuthModal';
-import { OnboardingWizard } from './components/OnboardingWizard';
 import { AcceptInvite } from './components/AcceptInvite';
 import { WelcomeToOrganizationModal } from './components/WelcomeToOrganizationModal';
 import { OrganizationProvider } from './contexts/OrganizationContext';
@@ -21,6 +20,8 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   const [userEmail, setUserEmail] = useState<string>('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [welcomeOrgData, setWelcomeOrgData] = useState<{ name: string; role: 'owner' | 'member' } | null>(null);
+  // Key to force OrganizationProvider to reload when invitation is accepted
+  const [orgProviderKey, setOrgProviderKey] = useState(0);
 
   // Check auth state on mount and check for invite token
   useEffect(() => {
@@ -132,6 +133,8 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   const handleWelcomeTourComplete = () => {
     // Clear welcome data and go to app
     setWelcomeOrgData(null);
+    // Force OrganizationProvider to reload by changing its key
+    setOrgProviderKey(prev => prev + 1);
     setAppState('authenticated');
   };
 
@@ -180,7 +183,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   // User goes directly to the app with an Onboarding tab
   if (appState === 'onboarding' && userId) {
     return (
-      <OrganizationProvider userId={userId}>
+      <OrganizationProvider key={orgProviderKey} userId={userId}>
         <SimplifiedLandlordApp 
           onLogout={handleLogout}
           showOnboarding={true}
@@ -195,7 +198,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   // Welcome to organization state - show tour after accepting invite
   if (appState === 'welcome-to-org' && userId && welcomeOrgData) {
     return (
-      <OrganizationProvider userId={userId}>
+      <OrganizationProvider key={orgProviderKey} userId={userId}>
         <SimplifiedLandlordApp 
           onLogout={handleLogout}
           showOnboarding={false}
@@ -215,7 +218,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   // Authenticated state with invite token
   if (appState === 'authenticated' && userId && inviteToken) {
     return (
-      <OrganizationProvider userId={userId}>
+      <OrganizationProvider key={orgProviderKey} userId={userId}>
         <AcceptInvite
           token={inviteToken}
           onSuccess={handleInviteAccepted}
@@ -228,7 +231,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   // Authenticated state
   if (appState === 'authenticated' && userId) {
     return (
-      <OrganizationProvider userId={userId}>
+      <OrganizationProvider key={orgProviderKey} userId={userId}>
         <SimplifiedLandlordApp 
           onLogout={handleLogout}
           showOnboarding={false}
