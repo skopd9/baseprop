@@ -96,16 +96,31 @@ export class OrganizationService {
         .eq('user_id', userId)
         .eq('status', 'active');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error getting user organizations (Supabase error):', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Failed to fetch organizations: ${error.message}`);
+      }
 
-      return (data || []).map(item => ({
-        ...item.organizations,
-        role: item.role,
-        joined_at: item.joined_at
-      })) as any;
+      // Map the data to the expected format
+      const organizations = (data || [])
+        .filter(item => item.organizations) // Filter out any null organizations
+        .map(item => ({
+          ...item.organizations,
+          role: item.role,
+          joined_at: item.joined_at
+        })) as any;
+
+      return organizations;
     } catch (error) {
-      console.error('Error getting user organizations:', error);
-      throw error;
+      // Ensure proper error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('Error getting user organizations:', errorMessage);
+      throw new Error(errorMessage);
     }
   }
 

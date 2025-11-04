@@ -5,6 +5,16 @@ import './index.css';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+// Load test utility in development mode
+if (import.meta.env.DEV) {
+  import('./utils/testResendEmail').then(module => {
+    (window as any).testResendEmail = module.sendTestEmail;
+    (window as any).testMagicLinkEmail = module.sendTestMagicLinkEmail;
+    console.log('📧 Resend test utility loaded.');
+    console.log('💡 Usage: testResendEmail("your-email@example.com") or testMagicLinkEmail("your-email@example.com")');
+  });
+}
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error('Root element not found');

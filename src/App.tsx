@@ -308,15 +308,164 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
         <div className="absolute top-1/2 left-10 w-16 h-16 bg-green-300 rounded-full opacity-30 animate-bounce"></div>
       </div>
 
-      {/* Features Section - Keeping it minimal for now */}
+      {/* Features Section */}
       <div className="bg-white py-20 px-4" id="features">
-        <div className="max-w-6xl mx-auto text-center">
-          <h2 className="text-4xl font-bold text-gray-900 mb-6">
-            Everything you need to manage properties
-          </h2>
-          <p className="text-xl text-gray-600">
-            Streamline your property management workflow in one place
-          </p>
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+              Everything you need to <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">manage properties</span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              From tenant onboarding to maintenance tracking, we've got you covered.
+            </p>
+          </div>
+
+          {/* Feature Grid */}
+          <div className="grid md:grid-cols-3 gap-12 mb-20">
+            {/* Property Management */}
+            <div className="text-center">
+              <div className="relative bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 mb-8 overflow-hidden">
+                <div className="w-full h-64 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">🏠</div>
+                    <div className="space-y-2">
+                      <div className="bg-green-100 rounded-lg p-2 text-sm">123 Oak Street - Occupied</div>
+                      <div className="bg-blue-100 rounded-lg p-2 text-sm">456 Pine Ave - Vacant</div>
+                      <div className="bg-gray-100 rounded-lg p-2 text-sm">789 Elm Road - Maintenance</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Property Portfolio</h3>
+              <p className="text-gray-600 mb-6">
+                Keep track of all your properties, their status, occupancy rates, and key details in one organized dashboard.
+              </p>
+            </div>
+
+            {/* Tenant Management */}
+            <div className="text-center">
+              <div className="relative bg-gradient-to-br from-blue-50 to-green-50 rounded-3xl p-8 mb-8 overflow-hidden">
+                <div className="w-full h-64 bg-white rounded-2xl shadow-lg flex items-center justify-center mb-4">
+                  <div className="text-center space-y-3">
+                    <div className="text-6xl mb-4">👥</div>
+                    <div className="flex items-center space-x-2 text-sm bg-green-50 p-2 rounded">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span>John Smith - Rent Paid</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm bg-yellow-50 p-2 rounded">
+                      <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                      <span>Sarah Johnson - Due Soon</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm bg-red-50 p-2 rounded">
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span>Mike Davis - Overdue</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Tenant Management</h3>
+              <p className="text-gray-600 mb-6">
+                Manage tenant information, track lease agreements, monitor rent payments, and handle tenant communications.
+              </p>
+            </div>
+
+            {/* Maintenance & Compliance */}
+            <div className="text-center">
+              <div className="relative bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 mb-8 overflow-hidden">
+                <div className="w-full h-64 bg-white rounded-2xl shadow-lg p-6">
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">🔧</div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between items-center">
+                        <span>Gas Safety Check</span>
+                        <span className="text-green-600">✓ Valid</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>EPC Certificate</span>
+                        <span className="text-yellow-600">⚠ Expires Soon</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span>Boiler Service</span>
+                        <span className="text-red-600">⚠ Overdue</span>
+                      </div>
+                      <button className="w-full mt-4 bg-green-600 text-white py-2 rounded-lg text-sm">
+                        Schedule Inspection
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Maintenance & Compliance</h3>
+              <p className="text-gray-600 mb-6">
+                Stay on top of property maintenance, safety certificates, and compliance requirements with automated reminders.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Testimonials Section */}
+      <div className="bg-gradient-to-br from-blue-50 to-green-50 py-20 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+              "This has transformed how I <span className="text-green-600">manage my properties</span>"
+            </h2>
+            <p className="text-xl text-gray-600">
+              What landlords are saying about Base Prop
+            </p>
+          </div>
+
+          {/* Testimonials Grid */}
+          <div className="grid md:grid-cols-3 gap-6 mb-16">
+            <div className="bg-white p-6 rounded-2xl shadow-lg">
+              <p className="text-gray-700 mb-4">"Finally, a property management system that's actually simple to use. I can track everything from rent to repairs in one place."</p>
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-green-600 font-bold">JM</span>
+                </div>
+                <div>
+                  <div className="font-semibold">James Mitchell</div>
+                  <div className="text-gray-500 text-sm">Portfolio: 8 Properties</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-lg">
+              <p className="text-gray-700 mb-4">"The tenant management features are excellent. I love how I can track rent payments and send automated reminders."</p>
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-blue-600 font-bold">LT</span>
+                </div>
+                <div>
+                  <div className="font-semibold">Lisa Thompson</div>
+                  <div className="text-gray-500 text-sm">Portfolio: 15 Properties</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-lg">
+              <p className="text-gray-700 mb-4">"The compliance tracking is a game-changer. Never miss another gas safety check or EPC renewal again!"</p>
+              <div className="flex items-center">
+                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                  <span className="text-purple-600 font-bold">RW</span>
+                </div>
+                <div>
+                  <div className="font-semibold">Robert Wilson</div>
+                  <div className="text-gray-500 text-sm">Portfolio: 25 Properties</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <button
+              onClick={handleLogin}
+              className="px-8 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-all duration-300"
+            >
+              Start Managing Your Properties →
+            </button>
+          </div>
         </div>
       </div>
 
@@ -329,9 +478,33 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
           <p className="text-xl text-gray-600 mb-12">
             Start free, upgrade when you're ready
           </p>
+
           <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 max-w-md mx-auto">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Free Forever</h3>
             <div className="text-5xl font-bold text-green-600 mb-4">£0</div>
+            <p className="text-gray-600 mb-6">Perfect for getting started</p>
+            <ul className="text-left space-y-3 mb-8">
+              <li className="flex items-center text-gray-700">
+                <span className="text-green-600 mr-2">✓</span>
+                Up to 5 properties
+              </li>
+              <li className="flex items-center text-gray-700">
+                <span className="text-green-600 mr-2">✓</span>
+                Unlimited tenants
+              </li>
+              <li className="flex items-center text-gray-700">
+                <span className="text-green-600 mr-2">✓</span>
+                Rent tracking
+              </li>
+              <li className="flex items-center text-gray-700">
+                <span className="text-green-600 mr-2">✓</span>
+                Basic maintenance tracking
+              </li>
+              <li className="flex items-center text-gray-700">
+                <span className="text-green-600 mr-2">✓</span>
+                Email support
+              </li>
+            </ul>
             <button
               onClick={handleLogin}
               className="w-full px-8 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-all duration-300"
@@ -339,21 +512,12 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
               Get Started Free
             </button>
           </div>
+
+          <p className="text-gray-500 text-sm mt-8">
+            Need more properties? Contact us for custom pricing.
+          </p>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-4 px-6 mt-auto">
-        <div className="flex flex-col md:flex-row items-center justify-between text-sm text-gray-600 max-w-7xl mx-auto">
-          <div className="mb-2 md:mb-0">
-            <p className="font-medium text-gray-900">Base Prop</p>
-            <p className="text-xs text-gray-500 mt-1">© {new Date().getFullYear()} All rights reserved</p>
-          </div>
-          <div className="flex items-center space-x-4 text-xs">
-            <span>Version 1.0 Alpha</span>
-          </div>
-        </div>
-      </footer>
 
       {/* Auth Modal */}
       <AuthModal

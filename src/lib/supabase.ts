@@ -16,10 +16,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export const auth = {
   // Send magic link to email
   async signInWithMagicLink(email: string) {
+    // Use production URL for magic links, fallback to current origin for local dev
+    const redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     return await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}`
+        emailRedirectTo: redirectUrl
       }
     });
   },

@@ -117,7 +117,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   userEmail = '',
   onOnboardingComplete
 }) => {
-  const { currentOrganization, userOrganizations, switchOrganization } = useOrganization();
+  const { currentOrganization, userOrganizations, switchOrganization, error: orgError, isLoading: orgLoading } = useOrganization();
   // Start on onboarding tab if user needs to complete onboarding
   const [currentView, setCurrentView] = useState<ViewType>(showOnboarding ? 'onboarding' : 'dashboard');
   const [properties, setProperties] = useState<SimplifiedProperty[]>([]);
@@ -598,30 +598,28 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
 
         <nav className="mt-6 px-3">
           <div className="space-y-1">
-            {/* Onboarding tab - only shown when showOnboarding is true */}
-            {showOnboarding && (
-              <button
-                onClick={() => {
-                  if (showPropertyEditModal) {
-                    setShowPropertyEditModal(false);
-                    setSelectedProperty(null);
-                  }
-                  setCurrentView('onboarding');
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  currentView === 'onboarding'
-                    ? 'bg-green-100 text-green-700 border-r-2 border-green-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <QuestionMarkCircleIcon className={`mr-3 h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'}`} />
-                <div className="text-left">
-                  <div className="font-medium">Get Started</div>
-                  <div className="text-xs text-gray-500">Complete setup</div>
-                </div>
-              </button>
-            )}
+            {/* Onboarding tab - always visible */}
+            <button
+              onClick={() => {
+                if (showPropertyEditModal) {
+                  setShowPropertyEditModal(false);
+                  setSelectedProperty(null);
+                }
+                setCurrentView('onboarding');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                currentView === 'onboarding'
+                  ? 'bg-green-100 text-green-700 border-r-2 border-green-700'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <QuestionMarkCircleIcon className={`mr-3 h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'}`} />
+              <div className="text-left">
+                <div className="font-medium">Get Started</div>
+                <div className="text-xs text-gray-500">Complete setup</div>
+              </div>
+            </button>
             
             {navigationItems.map((item) => {
               const Icon = item.icon;
@@ -682,10 +680,14 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {currentOrganization?.name || 'Loading...'}
+                  {orgLoading ? 'Loading...' : currentOrganization?.name || (orgError ? 'Error loading' : 'No organization')}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
-                  {userOrganizations.length} {userOrganizations.length === 1 ? 'workspace' : 'workspaces'}
+                  {orgError ? (
+                    <span className="text-red-600" title={orgError}>Error loading organizations</span>
+                  ) : (
+                    `${userOrganizations.length} ${userOrganizations.length === 1 ? 'workspace' : 'workspaces'}`
+                  )}
                 </p>
               </div>
             </div>
@@ -762,6 +764,27 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
             <span className="text-gray-900 font-medium">{currentNavItem?.name}</span>
           </div>
         </div>
+
+        {/* Organization Error Banner */}
+        {orgError && (
+          <div className="bg-red-50 border-l-4 border-red-500 px-6 py-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-sm font-medium text-red-800">
+                  Error Loading Organizations
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{orgError}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main content area */}
         <main className="flex-1 overflow-auto">

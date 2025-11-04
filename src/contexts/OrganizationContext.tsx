@@ -51,7 +51,10 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
 
   // Load user's organizations
   const loadOrganizations = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -80,8 +83,13 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
         setCurrentUserRole(null);
       }
     } catch (err) {
-      console.error('Error loading organizations:', err);
-      setError('Failed to load organizations');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load organizations';
+      console.error('Error loading organizations:', errorMessage);
+      setError(errorMessage);
+      // Don't throw - allow the app to continue with no organizations
+      setUserOrganizations([]);
+      setCurrentOrganization(null);
+      setCurrentUserRole(null);
     } finally {
       setIsLoading(false);
     }

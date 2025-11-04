@@ -108,6 +108,14 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       return;
     }
 
+    // Set up global error handler for Google Maps authentication failures
+    (window as any).gm_authFailure = () => {
+      console.error('Google Maps Authentication Failure');
+      setError('Google Maps authentication failed. Please check your API key and restrictions in Google Cloud Console.');
+      setIsLoading(false);
+      isLoadingRef.current = false;
+    };
+
     const initMap = async () => {
       // Prevent concurrent calls
       if (isLoadingRef.current) return;
@@ -283,20 +291,32 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         // Only log error once, don't spam console
         try {
           const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorString = JSON.stringify(error, null, 2);
           console.error('Error message:', errorMessage);
+          console.error('Full error:', errorString);
           
-          // Check for specific API errors
-          if (errorMessage.includes('ApiNotActivatedMapError')) {
-            setError('Google Maps JavaScript API is not enabled. Please enable it in Google Cloud Console.');
-          } else if (errorMessage.includes('InvalidKeyMapError')) {
-            setError('Invalid Google Maps API key. Please check your API key in the .env file.');
-          } else if (errorMessage.includes('RefererNotAllowedMapError')) {
-            setError('API key restrictions prevent loading. Please check your API key settings.');
+          // Check for specific API errors (more comprehensive list)
+          if (errorMessage.includes('ApiNotActivatedMapError') || 
+              errorMessage.includes('Google Maps JavaScript API has not been activated')) {
+            setError('Google Maps JavaScript API is not enabled. Please enable "Maps JavaScript API" in Google Cloud Console.');
+          } else if (errorMessage.includes('InvalidKeyMapError') || 
+                     errorMessage.includes('InvalidKey')) {
+            setError('Invalid Google Maps API key. Please verify your API key in Google Cloud Console matches your .env file.');
+          } else if (errorMessage.includes('RefererNotAllowedMapError') || 
+                     errorMessage.includes('RefererNotAllowed')) {
+            setError('API key restrictions prevent loading from this domain. Please update your API key restrictions in Google Cloud Console to allow "localhost" and your production domain.');
+          } else if (errorMessage.includes('ApiTargetBlockedMapError')) {
+            setError('This API project is blocked. Please check your billing status in Google Cloud Console.');
+          } else if (errorMessage.includes('GeocodingDisabled') || 
+                     errorMessage.includes('REQUEST_DENIED')) {
+            setError('Geocoding API is not enabled or has restrictions. Please enable "Geocoding API" in Google Cloud Console.');
+          } else if (errorMessage.includes('OVER_QUERY_LIMIT')) {
+            setError('Google Maps API quota exceeded. Please check your usage and billing in Google Cloud Console.');
           } else if (errorMessage.includes('could not load')) {
-            setError('Failed to load Google Maps. Please check your API key and internet connection.');
+            setError('Failed to load Google Maps. Please check your API key configuration and internet connection.');
           } else {
             // For other errors, show more specific error message with details
-            setError(`Google Maps error: ${errorMessage}`);
+            setError(`Google Maps error: ${errorMessage}. Check browser console for more details.`);
           }
         } catch (setErrorErr) {
           // Fallback if setError itself fails - silently fail to prevent app crash
