@@ -11,6 +11,7 @@ import { SimplifiedProperty, SimplifiedTenant, getOccupancyStatus } from '../uti
 import { QuickStartGuide } from './QuickStartGuide';
 import { PropertyMap } from './PropertyMap';
 import { ExpensesSummaryWidget } from './ExpensesSummaryWidget';
+import { ErrorBoundary } from './ErrorBoundary';
 
 interface SimplifiedDashboardProps {
   properties: SimplifiedProperty[];
@@ -264,12 +265,14 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
               {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} on map
             </div>
           </div>
-          <PropertyMap 
-            properties={properties}
-            selectedProperty={selectedProperty}
-            onPropertySelect={onPropertySelect}
-            height="400px"
-          />
+          <ErrorBoundary>
+            <PropertyMap 
+              properties={properties}
+              selectedProperty={selectedProperty}
+              onPropertySelect={onPropertySelect}
+              height="400px"
+            />
+          </ErrorBoundary>
         </div>
       </div>
 

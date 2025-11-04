@@ -17,7 +17,7 @@ interface PropertyWithCoordinates extends SimplifiedProperty {
 }
 
 export const PropertyMap: React.FC<PropertyMapProps> = ({
-  properties,
+  properties = [],
   selectedProperty,
   onPropertySelect,
   height = '400px',
@@ -36,7 +36,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const apiKey = import.meta.env.VITE_GOOGLE_MAP_API || import.meta.env.GOOGLE_MAP_API;
 
   // Geocode addresses to get coordinates
-  const geocodeProperties = async (props: SimplifiedProperty[], googleMaps: typeof google.maps): Promise<PropertyWithCoordinates[]> => {
+  const geocodeProperties = async (props: SimplifiedProperty[], googleMaps: any): Promise<PropertyWithCoordinates[]> => {
     if (!apiKey || !googleMaps) {
       return props;
     }
@@ -89,7 +89,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     }
 
     // Prevent multiple simultaneous initialization attempts
-    if (isLoadingRef.current || mapInstanceRef.current) {
+    if (isLoadingRef.current) {
       return;
     }
 
@@ -100,9 +100,21 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
       try {
         setIsLoading(true);
+
+        // Wait for mapRef to be available
+        if (!mapRef.current) {
+          // Retry after a short delay
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (!mapRef.current) {
+            isLoadingRef.current = false;
+            setIsLoading(false);
+            setError('Map container not available');
+            return;
+          }
+        }
         
         // Use existing loader instance if available, otherwise create new one
-        let googleMaps: typeof google.maps;
+        let googleMaps: any;
         if (loaderInstanceRef.current) {
           try {
             googleMaps = await loaderInstanceRef.current.load();
@@ -244,21 +256,30 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
         setError(null);
       } catch (error) {
-        // Only log error once, don't spam console
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        // Ensure we always set loading to false, even on error
+        setIsLoading(false);
+        isLoadingRef.current = false;
         
-        // Check for specific API errors
-        if (errorMessage.includes('ApiNotActivatedMapError')) {
-          setError('Google Maps JavaScript API is not enabled. Please enable it in Google Cloud Console.');
-        } else if (errorMessage.includes('InvalidKeyMapError')) {
-          setError('Invalid Google Maps API key. Please check your API key in the .env file.');
-        } else if (errorMessage.includes('RefererNotAllowedMapError')) {
-          setError('API key restrictions prevent loading. Please check your API key settings.');
-        } else if (errorMessage.includes('could not load')) {
-          setError('Failed to load Google Maps. Please check your API key and internet connection.');
-        } else {
-          // For other errors, show generic message but don't spam console
-          setError('Google Maps is not available. Please check your API key configuration.');
+        // Only log error once, don't spam console
+        try {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          // Check for specific API errors
+          if (errorMessage.includes('ApiNotActivatedMapError')) {
+            setError('Google Maps JavaScript API is not enabled. Please enable it in Google Cloud Console.');
+          } else if (errorMessage.includes('InvalidKeyMapError')) {
+            setError('Invalid Google Maps API key. Please check your API key in the .env file.');
+          } else if (errorMessage.includes('RefererNotAllowedMapError')) {
+            setError('API key restrictions prevent loading. Please check your API key settings.');
+          } else if (errorMessage.includes('could not load')) {
+            setError('Failed to load Google Maps. Please check your API key and internet connection.');
+          } else {
+            // For other errors, show generic message but don't spam console
+            setError('Google Maps is not available. Please check your API key configuration.');
+          }
+        } catch (setErrorErr) {
+          // Fallback if setError itself fails - silently fail to prevent app crash
+          // Don't log here to avoid infinite loops
         }
       } finally {
         setIsLoading(false);
