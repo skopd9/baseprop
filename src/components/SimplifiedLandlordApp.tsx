@@ -12,12 +12,14 @@ import {
   ArrowRightOnRectangleIcon,
   ChevronDownIcon,
   QuestionMarkCircleIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedDashboard } from './SimplifiedDashboard';
 import { ResidentialPropertiesTable } from './ResidentialPropertiesTable';
 import { ResidentialTenantsTable } from './ResidentialTenantsTable';
 import { OrganizationSettings } from './OrganizationSettings';
+import { UserSettings } from './UserSettings';
 import { OnboardingWizard } from './OnboardingWizard';
 import { GetStarted } from './GetStarted';
 import { useOrganization } from '../contexts/OrganizationContext';
@@ -127,6 +129,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showOrgSettings, setShowOrgSettings] = useState(false);
+  const [showUserSettings, setShowUserSettings] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -470,36 +473,40 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         );
       case 'properties':
         return (
-          <div className="p-6">
-            <ResidentialPropertiesTable
-              properties={properties}
-              tenants={tenants}
-              selectedProperty={selectedProperty}
-              onPropertySelect={handlePropertySelect}
-              onAddProperty={handleAddProperty}
-              onDeleteProperty={handleDeleteProperty}
-              onMarkAsSold={handleMarkAsSold}
-            />
+          <div className="p-4 sm:p-6">
+            <div className="overflow-x-auto">
+              <ResidentialPropertiesTable
+                properties={properties}
+                tenants={tenants}
+                selectedProperty={selectedProperty}
+                onPropertySelect={handlePropertySelect}
+                onAddProperty={handleAddProperty}
+                onDeleteProperty={handleDeleteProperty}
+                onMarkAsSold={handleMarkAsSold}
+              />
+            </div>
           </div>
         );
       case 'tenants':
         return (
-          <div className="p-6">
-            <ResidentialTenantsTable
-              tenants={tenants}
-              properties={properties}
-              selectedTenant={selectedTenant}
-              onTenantSelect={setSelectedTenant}
-              onAddTenant={handleAddTenant}
-              onDeleteTenant={handleDeleteTenant}
-              onTenantUpdate={handleTenantUpdate}
-            />
+          <div className="p-4 sm:p-6">
+            <div className="overflow-x-auto">
+              <ResidentialTenantsTable
+                tenants={tenants}
+                properties={properties}
+                selectedTenant={selectedTenant}
+                onTenantSelect={setSelectedTenant}
+                onAddTenant={handleAddTenant}
+                onDeleteTenant={handleDeleteTenant}
+                onTenantUpdate={handleTenantUpdate}
+              />
+            </div>
           </div>
         );
 
       case 'rent':
         return (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <RentTracking
               properties={properties}
               tenants={tenants}
@@ -508,7 +515,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         );
       case 'expenses':
         return (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <ExpenseTracker
               properties={properties}
             />
@@ -516,7 +523,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         );
       case 'inspections':
         return (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <InspectionWorkflows
               properties={properties}
               tenants={tenants}
@@ -525,7 +532,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         );
       case 'repairs':
         return (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <RepairWorkflows
               properties={properties}
               tenants={tenants}
@@ -534,7 +541,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         );
       case 'compliance':
         return (
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <ComplianceWorkflows
               properties={properties}
               countryCode={currentOrganization?.settings?.country || 'UK'}
@@ -720,6 +727,16 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                 <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                   <button
                     onClick={() => {
+                      setShowUserSettings(true);
+                      setUserMenuOpen(false);
+                    }}
+                    className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <UserIcon className="w-4 h-4 mr-2 text-gray-500" />
+                    User Settings
+                  </button>
+                  <button
+                    onClick={() => {
                       setShowOrgSettings(true);
                       setUserMenuOpen(false);
                     }}
@@ -885,6 +902,12 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       <OrganizationSettings
         isOpen={showOrgSettings}
         onClose={() => setShowOrgSettings(false)}
+      />
+
+      {/* User Settings Modal */}
+      <UserSettings
+        isOpen={showUserSettings}
+        onClose={() => setShowUserSettings(false)}
       />
     </div>
   );

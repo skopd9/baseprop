@@ -37,63 +37,9 @@ interface ComplianceItem {
   isHMO?: boolean;
 }
 
-// Mock compliance data (UK examples)
-const mockCompliance: ComplianceItem[] = [
-  {
-    id: 'comp-001',
-    propertyId: 'prop-001',
-    propertyAddress: '123 Oak Street, Manchester M1 2AB',
-    type: 'gas_safety',
-    status: 'valid',
-    issueDate: new Date('2023-08-15'),
-    expiryDate: new Date('2024-08-15'),
-    certificateNumber: 'GS-2023-001234',
-    contractor: 'Manchester Gas Services'
-  },
-  {
-    id: 'comp-002',
-    propertyId: 'prop-001',
-    propertyAddress: '123 Oak Street, Manchester M1 2AB',
-    type: 'eicr',
-    status: 'expiring_soon',
-    issueDate: new Date('2019-03-10'),
-    expiryDate: new Date('2024-03-10'),
-    certificateNumber: 'EIC-2019-005678',
-    contractor: 'City Electrical Testing'
-  },
-  {
-    id: 'comp-003',
-    propertyId: 'prop-001',
-    propertyAddress: '123 Oak Street, Manchester M1 2AB',
-    type: 'epc',
-    status: 'valid',
-    issueDate: new Date('2023-05-12'),
-    expiryDate: new Date('2033-05-12'),
-    certificateNumber: 'EPC-2023-112233',
-    contractor: 'Leeds Energy Assessors'
-  },
-  {
-    id: 'comp-004',
-    propertyId: 'prop-001',
-    propertyAddress: '123 Oak Street, Manchester M1 2AB',
-    type: 'right_to_rent',
-    status: 'valid',
-    issueDate: new Date('2023-07-01'),
-    certificateNumber: 'RTR-2023-445566',
-    notes: 'Checked via Home Office service'
-  },
-  {
-    id: 'comp-005',
-    propertyId: 'prop-002',
-    propertyAddress: '45 Victoria Road, Birmingham B15 3TG',
-    type: 'gas_safety',
-    status: 'expired',
-    issueDate: new Date('2022-11-20'),
-    expiryDate: new Date('2023-11-20'),
-    certificateNumber: 'GS-2022-009876',
-    contractor: 'Birmingham Heating Ltd'
-  }
-];
+// Compliance data will be loaded from the database in the future
+// For now, start with an empty array
+const mockCompliance: ComplianceItem[] = [];
 
 export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
   properties,

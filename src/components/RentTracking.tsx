@@ -187,61 +187,61 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
   const totalPaid = paidRecords.reduce((sum, record) => sum + (record.paidAmount || 0), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Rent Tracking</h2>
-          <p className="text-gray-600">Track tenant rent payments for {formatDate(new Date())}</p>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Rent Tracking</h2>
+          <p className="text-sm sm:text-base text-gray-600">Track tenant rent payments for {formatDate(new Date())}</p>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4 sm:p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <CurrencyPoundIcon className="w-6 h-6 text-blue-600" />
+            <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+              <CurrencyPoundIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Expected</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalRent)}</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Total Expected</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalRent)}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4 sm:p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircleIcon className="w-6 h-6 text-green-600" />
+            <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+              <CheckCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Paid</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalPaid)}</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Paid</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalPaid)}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4 sm:p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <XCircleIcon className="w-6 h-6 text-red-600" />
+            <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
+              <XCircleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Outstanding</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalRent - totalPaid)}</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Outstanding</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{formatCurrency(totalRent - totalPaid)}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4 sm:p-6">
           <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <ClockIcon className="w-6 h-6 text-yellow-600" />
+            <div className="p-2 bg-yellow-100 rounded-lg flex-shrink-0">
+              <ClockIcon className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" />
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Tenants Paid</p>
-              <p className="text-2xl font-bold text-gray-900">{paidRecords.length}/{rentRecords.length}</p>
+            <div className="ml-3 sm:ml-4 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Tenants Paid</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">{paidRecords.length}/{rentRecords.length}</p>
             </div>
           </div>
         </div>
@@ -249,45 +249,45 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
 
       {/* Rent Records Table */}
       <div className="bg-white rounded-lg shadow border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Rent Payments</h3>
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+          <h3 className="text-base sm:text-lg font-medium text-gray-900">Rent Payments</h3>
         </div>
         
         {isLoading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading payment records...</p>
+          <div className="p-6 sm:p-8 text-center">
+            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto mb-3 sm:mb-4"></div>
+            <p className="text-sm sm:text-base text-gray-600">Loading payment records...</p>
           </div>
         ) : rentRecords.length === 0 ? (
-          <div className="p-8 text-center">
-            <UserIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Payment Records</h3>
-            <p className="text-gray-600">Payment records will appear here when tenants are added with lease details.</p>
+          <div className="p-6 sm:p-8 text-center">
+            <UserIcon className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+            <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No Payment Records</h3>
+            <p className="text-sm sm:text-base text-gray-600">Payment records will appear here when tenants are added with lease details.</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
             {rentRecords.map((record) => (
-              <div key={record.id} className="p-6 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
+              <div key={record.id} className="p-4 sm:p-6 hover:bg-gray-50">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start space-x-3 sm:space-x-4 flex-1 min-w-0">
                     <div className="flex-shrink-0">
-                      <div className={`p-2 rounded-lg ${
+                      <div className={`p-1.5 sm:p-2 rounded-lg ${
                         record.isPaid ? 'bg-green-100' : 'bg-gray-100'
                       }`}>
                         {record.isPaid ? (
-                          <CheckCircleIcon className="w-5 h-5 text-green-600" />
+                          <CheckCircleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                         ) : (
-                          <CurrencyPoundIcon className="w-5 h-5 text-gray-600" />
+                          <CurrencyPoundIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
                         )}
                       </div>
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <p className="text-sm font-medium text-gray-900">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <p className="text-sm sm:text-base font-medium text-gray-900 truncate">
                           {record.tenantName}
                         </p>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        <span className={`inline-flex items-center px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium whitespace-nowrap ${
                           record.isPaid 
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-red-100 text-red-800'
@@ -296,29 +296,29 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
                         </span>
                       </div>
                       
-                      <div className="space-y-1 text-sm text-gray-500">
+                      <div className="space-y-1 text-xs sm:text-sm text-gray-500">
                         <div className="flex items-center space-x-1">
-                          <HomeIcon className="w-4 h-4" />
+                          <HomeIcon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
                           <span className="truncate">{record.propertyAddress}</span>
                         </div>
                         
-                        <div className="flex items-center space-x-4">
-                          <span>Due: {formatDate(record.dueDate)}</span>
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                          <span className="whitespace-nowrap">Due: {formatDate(record.dueDate)}</span>
                           {record.paidDate && (
-                            <span>Paid: {formatDate(record.paidDate)}</span>
+                            <span className="whitespace-nowrap">Paid: {formatDate(record.paidDate)}</span>
                           )}
                         </div>
                         
                         {record.notes && (
-                          <p className="text-gray-600 mt-1">{record.notes}</p>
+                          <p className="text-gray-600 mt-1 line-clamp-2">{record.notes}</p>
                         )}
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                      <p className="text-lg font-medium text-gray-900">
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-shrink-0">
+                    <div className="text-left sm:text-right">
+                      <p className="text-base sm:text-lg font-medium text-gray-900">
                         {formatCurrency(record.amountDue)}
                       </p>
                       {record.isProRated && (
@@ -327,24 +327,24 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
                         </p>
                       )}
                       {record.isPaid && record.paidAmount !== record.amountDue && (
-                        <p className="text-sm text-gray-500">
+                        <p className="text-xs sm:text-sm text-gray-500">
                           Paid: {formatCurrency(record.paidAmount || 0)}
                         </p>
                       )}
                     </div>
                     
-                    <div className="flex space-x-2">
+                    <div className="flex flex-shrink-0">
                       {record.isPaid ? (
                         <button
                           onClick={() => handleMarkAsUnpaid(record)}
-                          className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
+                          className="inline-flex items-center px-2 sm:px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 whitespace-nowrap"
                         >
                           Mark Unpaid
                         </button>
                       ) : (
                         <button
                           onClick={() => handleMarkAsPaid(record)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700"
+                          className="inline-flex items-center px-2 sm:px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700 whitespace-nowrap"
                         >
                           Mark Paid
                         </button>
@@ -360,8 +360,8 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
 
       {/* Payment Modal */}
       {showPaymentModal && selectedRecord && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-md">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Record Payment</h3>
             
             <div className="space-y-4">

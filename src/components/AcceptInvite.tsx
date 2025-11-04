@@ -13,6 +13,8 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
   const [isLoading, setIsLoading] = useState(true);
   const [isAccepting, setIsAccepting] = useState(false);
   const [error, setError] = useState('');
+  const [showNameForm, setShowNameForm] = useState(false);
+  const [fullName, setFullName] = useState('');
 
   useEffect(() => {
     loadInvitation();
@@ -38,8 +40,51 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
     }
   };
 
-  const handleAccept = async () => {
+  const handleAcceptClick = async () => {
     if (!invitation) return;
+
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setError('You must be signed in to accept an invitation.');
+        return;
+      }
+
+      // Check if user has a name set
+      const { data: profileData } = await supabase
+        .from('user_profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+
+      // If user doesn't have a name or it's just their email prefix, ask for their name
+      const emailPrefix = user.email?.split('@')[0] || '';
+      const hasValidName = profileData?.full_name && 
+                          profileData.full_name.trim() !== '' && 
+                          profileData.full_name !== emailPrefix;
+
+      if (!hasValidName) {
+        // Show name collection form
+        setShowNameForm(true);
+        setFullName(profileData?.full_name || emailPrefix || '');
+      } else {
+        // User has a valid name, proceed directly
+        await acceptInvitationWithName(profileData.full_name);
+      }
+    } catch (err: any) {
+      console.error('Error in handleAcceptClick:', err);
+      setError(err.message || 'Failed to process invitation.');
+    }
+  };
+
+  const acceptInvitationWithName = async (name: string) => {
+    if (!invitation) return;
+    if (!name.trim()) {
+      setError('Please enter your full name');
+      return;
+    }
 
     setIsAccepting(true);
     setError('');
@@ -54,11 +99,11 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
         return;
       }
 
-      // Accept invitation
-      await OrganizationService.acceptInvitation(token, user.id);
+      // Accept invitation with the provided name
+      await OrganizationService.acceptInvitation(token, user.id, name.trim());
       
       // Success! Pass organization details for welcome tour
-      onSuccess(invitation.organization_name, invitation.role);
+      onSuccess(invitation.organization_name || 'the organization', invitation.role);
     } catch (err: any) {
       console.error('Error accepting invitation:', err);
       setError(err.message || 'Failed to accept invitation.');
@@ -87,7 +132,75 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl max-w-md w-full p-8">
-        {error && !invitation ? (
+        {showNameForm ? (
+          // Name collection form
+          <div>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                What's your name?
+              </h2>
+              <p className="text-gray-600">
+                Help your team recognize you in <span className="font-semibold">{invitation?.organization_name}</span>
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-red-600 text-sm">{error}</p>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="e.g., John Smith"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                maxLength={100}
+                disabled={isAccepting}
+                autoFocus
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && fullName.trim()) {
+                    acceptInvitationWithName(fullName);
+                  }
+                }}
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                This name will be visible to other members on the team
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => acceptInvitationWithName(fullName)}
+                disabled={isAccepting || !fullName.trim()}
+                className="w-full bg-green-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isAccepting ? 'Accepting...' : 'Continue'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowNameForm(false);
+                  setFullName('');
+                  setError('');
+                }}
+                disabled={isAccepting}
+                className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        ) : error && !invitation ? (
           // Error state
           <div className="text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -146,7 +259,7 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
 
             <div className="space-y-3">
               <button
-                onClick={handleAccept}
+                onClick={handleAcceptClick}
                 disabled={isAccepting}
                 className="w-full bg-green-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >

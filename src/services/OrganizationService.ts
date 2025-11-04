@@ -317,7 +317,7 @@ export class OrganizationService {
   /**
    * Accept an invitation
    */
-  static async acceptInvitation(token: string, userId: string): Promise<void> {
+  static async acceptInvitation(token: string, userId: string, fullName?: string): Promise<void> {
     try {
       // Get invitation
       const invitation = await this.getInvitationByToken(token);
@@ -353,11 +353,16 @@ export class OrganizationService {
       }
 
       // Ensure user profile exists (for new users accepting invitations)
+      // Use provided name or extract a default from email
+      const defaultName = user?.email ? user.email.split('@')[0] : 'User';
+      const userName = fullName && fullName.trim() ? fullName.trim() : defaultName;
+      
       const { error: profileError } = await supabase
         .from('user_profiles')
         .upsert({
           id: userId,
           email: user?.email,
+          full_name: userName,
           has_completed_onboarding: true, // Mark as completed since they're joining existing org
           onboarding_data: {
             joined_via_invitation: true,

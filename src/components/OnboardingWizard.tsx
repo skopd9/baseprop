@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { getCountryList, CountryCode } from '../lib/countries';
 import { SimplifiedAddPropertyModal } from './SimplifiedAddPropertyModal';
-import { DemoDataSeeder } from '../utils/demoDataSeeder';
 
 interface OnboardingWizardProps {
   userId: string;
@@ -57,7 +56,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ userId, user
     }));
   };
 
-  const completeOnboarding = async (startingOption: 'add_property' | 'sample_data' | 'empty') => {
+  const completeOnboarding = async (startingOption: 'add_property' | 'empty') => {
     setIsLoading(true);
     setError('');
 
@@ -113,10 +112,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ userId, user
       if (memberError) throw memberError;
 
       // 4. Handle starting option
-      if (startingOption === 'sample_data') {
-        // Seed demo data with organization_id
-        await DemoDataSeeder.seedDemoData(org.id, formData.country);
-      } else if (startingOption === 'add_property') {
+      if (startingOption === 'add_property') {
         // Store org ID and show add property modal
         localStorage.setItem('currentOrganizationId', org.id);
         setShowAddPropertyModal(true);
@@ -406,18 +402,6 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ userId, user
                 <div>
                   <div className="font-semibold text-gray-900">Add my first property</div>
                   <div className="text-sm text-gray-600">Start by adding a property to your portfolio</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => completeOnboarding('sample_data')}
-                disabled={isLoading}
-                className="w-full flex items-start p-4 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left disabled:opacity-50"
-              >
-                <span className="text-2xl mr-3">📋</span>
-                <div>
-                  <div className="font-semibold text-gray-900">Import sample data</div>
-                  <div className="text-sm text-gray-600">Explore with demo properties and tenants</div>
                 </div>
               </button>
 

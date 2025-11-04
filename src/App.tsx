@@ -261,16 +261,16 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
       </div>
 
       {/* Top Navigation */}
-      <nav className="flex justify-between items-center p-6 bg-white/80 backdrop-blur-sm border-b border-gray-100">
-        <div className="text-2xl font-bold text-gray-900">
+      <nav className="flex justify-between items-center p-4 sm:p-6 bg-white/80 backdrop-blur-sm border-b border-gray-100">
+        <div className="text-xl sm:text-2xl font-bold text-gray-900">
           Base Prop
         </div>
-        <div className="flex items-center gap-6">
-          <a href="#features" className="text-gray-600 hover:text-gray-900 font-medium">Features</a>
-          <a href="#pricing" className="text-gray-600 hover:text-gray-900 font-medium">Pricing</a>
+        <div className="flex items-center gap-3 sm:gap-6">
+          <a href="#features" className="hidden sm:block text-gray-600 hover:text-gray-900 font-medium">Features</a>
+          <a href="#pricing" className="hidden sm:block text-gray-600 hover:text-gray-900 font-medium">Pricing</a>
           <button
             onClick={handleLogin}
-            className="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-all duration-300"
+            className="px-4 sm:px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-all duration-300 text-sm sm:text-base"
           >
             Get Started
           </button>
@@ -278,10 +278,10 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
       </nav>
 
       {/* Hero Section */}
-      <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
-        <div className="text-center max-w-5xl mx-auto relative z-10">
+      <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+        <div className="text-center max-w-5xl mx-auto relative z-10 w-full">
           {/* Main Headline */}
-          <h1 className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight">
             Manage your rental
             <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">
@@ -290,36 +290,36 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
           </h1>
 
           {/* Subtitle */}
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg sm:text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed px-4">
             The simple property management system for landlords. Track tenants, collect rent, schedule inspections, and stay compliant - all in one place.
           </p>
 
           {/* Primary CTA */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8 px-4">
             <button
               onClick={handleLogin}
-              className="px-12 py-4 bg-green-600 text-white text-xl font-semibold rounded-2xl hover:bg-green-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
+              className="w-full sm:w-auto px-8 sm:px-12 py-3 sm:py-4 bg-green-600 text-white text-lg sm:text-xl font-semibold rounded-2xl hover:bg-green-700 transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               Start Managing Properties
             </button>
           </div>
 
           {/* Key Features */}
-          <div className="text-gray-600 mb-4">Perfect for managing:</div>
-          <div className="flex flex-wrap justify-center gap-3 mb-8">
-            <span className="px-4 py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all">
+          <div className="text-gray-600 mb-4 text-sm sm:text-base">Perfect for managing:</div>
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-8 px-4">
+            <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all text-xs sm:text-sm">
               🏠 Residential Properties
             </span>
-            <span className="px-4 py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all">
+            <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all text-xs sm:text-sm">
               👥 Tenant Management
             </span>
-            <span className="px-4 py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all">
+            <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all text-xs sm:text-sm">
               💰 Rent Collection
             </span>
-            <span className="px-4 py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all">
+            <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all text-xs sm:text-sm">
               🔧 Maintenance Tracking
             </span>
-            <span className="px-4 py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all">
+            <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white rounded-full border border-gray-200 text-gray-700 hover:border-green-300 cursor-pointer transition-all text-xs sm:text-sm">
               📋 Compliance & Inspections
             </span>
           </div>
@@ -360,19 +360,19 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
       </div>
 
       {/* Features Section */}
-      <div className="bg-white py-20 px-4" id="features">
+      <div className="bg-white py-12 sm:py-20 px-4 sm:px-6 lg:px-8" id="features">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-6xl font-bold text-gray-900 mb-4 sm:mb-6 px-4">
               Everything you need to <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-blue-600">manage properties</span>
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-base sm:text-xl text-gray-600 max-w-2xl mx-auto px-4">
               From tenant onboarding to maintenance tracking, we've got you covered.
             </p>
           </div>
 
           {/* Feature Grid */}
-          <div className="grid md:grid-cols-3 gap-12 mb-20">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 sm:gap-12 mb-12 sm:mb-20">
             {/* Property Management */}
             <div className="text-center">
               <div className="relative bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 mb-8 overflow-hidden">
@@ -456,19 +456,19 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
       </div>
 
       {/* Testimonials Section */}
-      <div className="bg-gradient-to-br from-blue-50 to-green-50 py-20 px-4">
+      <div className="bg-gradient-to-br from-blue-50 to-green-50 py-12 sm:py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 px-4">
               "This has transformed how I <span className="text-green-600">manage my properties</span>"
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-base sm:text-xl text-gray-600 px-4">
               What landlords are saying about Base Prop
             </p>
           </div>
 
           {/* Testimonials Grid */}
-          <div className="grid md:grid-cols-3 gap-6 mb-16">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-12 sm:mb-16">
             <div className="bg-white p-6 rounded-2xl shadow-lg">
               <p className="text-gray-700 mb-4">"Finally, a property management system that's actually simple to use. I can track everything from rent to repairs in one place."</p>
               <div className="flex items-center">
@@ -521,16 +521,16 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
       </div>
 
       {/* Simple Pricing Section */}
-      <div className="bg-white py-20 px-4" id="pricing">
+      <div className="bg-white py-12 sm:py-20 px-4 sm:px-6 lg:px-8" id="pricing">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 px-4">
             Simple, transparent pricing
           </h2>
-          <p className="text-xl text-gray-600 mb-12">
+          <p className="text-base sm:text-xl text-gray-600 mb-8 sm:mb-12 px-4">
             Start free, upgrade when you're ready
           </p>
 
-          <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-8 max-w-md mx-auto">
+          <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-3xl p-6 sm:p-8 max-w-md mx-auto">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Free Forever</h3>
             <div className="text-5xl font-bold text-green-600 mb-4">£0</div>
             <p className="text-gray-600 mb-6">Perfect for getting started</p>

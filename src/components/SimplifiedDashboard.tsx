@@ -111,203 +111,202 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Property Dashboard</h1>
-        <p className="text-gray-600 mt-2">Welcome back! Here's what's happening with your properties.</p>
-      </div>
-
-      {/* Key Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Total Properties */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Properties</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalProperties}</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <HomeIcon className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-green-600">{stats.occupancyRate}% occupied</span>
-          </div>
+    <div className="bg-gray-50 min-h-screen">
+      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Property Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Welcome back! Here's what's happening with your properties.</p>
         </div>
 
-        {/* Total Tenants */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Tenants</p>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalTenants}</p>
+        {/* Key Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          {/* Total Properties */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Properties</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.totalProperties}</p>
+              </div>
+              <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+                <HomeIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+              </div>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <UserGroupIcon className="w-6 h-6 text-green-600" />
+            <div className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm">
+              <span className="text-green-600">{stats.occupancyRate}% occupied</span>
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-gray-600">Across {stats.occupiedProperties} properties</span>
-          </div>
-        </div>
 
-        {/* Monthly Rent */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Monthly Rent</p>
-              <p className="text-3xl font-bold text-gray-900">{formatCurrency(stats.totalMonthlyRent)}</p>
+          {/* Total Tenants */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Tenants</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.totalTenants}</p>
+              </div>
+              <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+                <UserGroupIcon className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+              </div>
             </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <CurrencyPoundIcon className="w-6 h-6 text-purple-600" />
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            {stats.overdueRent > 0 ? (
-              <span className="text-red-600">{stats.overdueRent} overdue payments</span>
-            ) : (
-              <span className="text-green-600">All payments current</span>
-            )}
-          </div>
-        </div>
-
-        {/* Urgent Items */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Urgent Items</p>
-              <p className="text-3xl font-bold text-gray-900">{urgentItems.length}</p>
-            </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <ExclamationTriangleIcon className="w-6 h-6 text-orange-600" />
+            <div className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm">
+              <span className="text-gray-600">Across {stats.occupiedProperties} properties</span>
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-orange-600">Need attention</span>
-          </div>
-        </div>
-      </div>
 
-
-
-      {/* Property Map */}
-      <div className="mb-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Property Locations</h2>
-            <div className="text-sm text-gray-600">
-              {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} on map
+          {/* Monthly Rent */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Monthly Rent</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{formatCurrency(stats.totalMonthlyRent)}</p>
+              </div>
+              <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+                <CurrencyPoundIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+              </div>
             </div>
-          </div>
-          <ErrorBoundary>
-            <PropertyMap 
-              properties={properties}
-              selectedProperty={selectedProperty}
-              onPropertySelect={onPropertySelect}
-              height="400px"
-            />
-          </ErrorBoundary>
-        </div>
-      </div>
-
-      {/* Three Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Urgent Items List */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Items Needing Attention</h2>
-            <ExclamationTriangleIcon className="w-5 h-5 text-orange-500" />
-          </div>
-          
-          {urgentItems.length > 0 ? (
-            <div className="space-y-3">
-              {urgentItems.slice(0, 5).map((item, index) => (
-                <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${
-                    item.priority === 'high' ? 'bg-red-500' : 'bg-yellow-500'
-                  }`}></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{item.message}</p>
-                    <p className="text-xs text-gray-500 truncate">{item.property}</p>
-                  </div>
-                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                    item.priority === 'high' 
-                      ? 'bg-red-100 text-red-800' 
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {item.priority}
-                  </span>
-                </div>
-              ))}
-              {urgentItems.length > 5 && (
-                <p className="text-sm text-gray-500 text-center pt-2">
-                  And {urgentItems.length - 5} more items...
-                </p>
+            <div className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm">
+              {stats.overdueRent > 0 ? (
+                <span className="text-red-600">{stats.overdueRent} overdue payments</span>
+              ) : (
+                <span className="text-green-600">All payments current</span>
               )}
             </div>
-          ) : (
-            <div className="text-center py-8">
-              <CheckCircleIcon className="w-12 h-12 text-green-500 mx-auto mb-4" />
-              <p className="text-sm text-gray-500">All caught up! No urgent items.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Property Status Overview */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Property Status</h2>
-            <HomeIcon className="w-5 h-5 text-blue-500" />
           </div>
-          
-          <div className="space-y-4">
-            {/* Occupied Properties */}
-            <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-900">Occupied</span>
+
+          {/* Urgent Items */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Urgent Items</p>
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{urgentItems.length}</p>
               </div>
-              <span className="text-sm font-bold text-green-700">{stats.occupiedProperties}</span>
+              <div className="p-2 sm:p-3 bg-orange-100 rounded-lg">
+                <ExclamationTriangleIcon className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+              </div>
             </div>
-
-            {/* Vacant Properties */}
-            {stats.vacantProperties > 0 && (
-              <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-gray-900">Vacant</span>
-                </div>
-                <span className="text-sm font-bold text-yellow-700">{stats.vacantProperties}</span>
-              </div>
-            )}
-
-            {/* Sold Properties */}
-            {stats.soldProperties > 0 && (
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-gray-500 rounded-full"></div>
-                  <span className="text-sm font-medium text-gray-900">Sold</span>
-                </div>
-                <span className="text-sm font-bold text-gray-700">{stats.soldProperties}</span>
-              </div>
-            )}
-
-            {/* Lease Renewals */}
-            {stats.leasesExpiringIn3Months > 0 && (
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <ClockIcon className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm font-medium text-gray-900">Leases Expiring Soon</span>
-                </div>
-                <span className="text-sm font-bold text-blue-700">{stats.leasesExpiringIn3Months}</span>
-              </div>
-            )}
+            <div className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm">
+              <span className="text-orange-600">Need attention</span>
+            </div>
           </div>
         </div>
 
-        {/* Expenses Summary */}
-        <ExpensesSummaryWidget onViewExpenses={onViewExpenses} />
+        {/* Property Map */}
+        <div className="mb-6 sm:mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Property Locations</h2>
+              <div className="text-xs sm:text-sm text-gray-600">
+                {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} on map
+              </div>
+            </div>
+            <ErrorBoundary>
+              <PropertyMap 
+                properties={properties}
+                selectedProperty={selectedProperty}
+                onPropertySelect={onPropertySelect}
+                height="300px"
+              />
+            </ErrorBoundary>
+          </div>
+        </div>
+
+        {/* Three Column Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">          {/* Urgent Items List */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Items Needing Attention</h2>
+              <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+            </div>
+            
+            {urgentItems.length > 0 ? (
+              <div className="space-y-2 sm:space-y-3">
+                {urgentItems.slice(0, 5).map((item, index) => (
+                  <div key={index} className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gray-50 rounded-lg">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 sm:mt-2 flex-shrink-0 ${
+                      item.priority === 'high' ? 'bg-red-500' : 'bg-yellow-500'
+                    }`}></div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-medium text-gray-900">{item.message}</p>
+                      <p className="text-xs text-gray-500 truncate">{item.property}</p>
+                    </div>
+                    <span className={`inline-flex items-center px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium flex-shrink-0 ${
+                      item.priority === 'high' 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {item.priority}
+                    </span>
+                  </div>
+                ))}
+                {urgentItems.length > 5 && (
+                  <p className="text-xs sm:text-sm text-gray-500 text-center pt-2">
+                    And {urgentItems.length - 5} more items...
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 sm:py-8">
+                <CheckCircleIcon className="w-10 h-10 sm:w-12 sm:h-12 text-green-500 mx-auto mb-3 sm:mb-4" />
+                <p className="text-xs sm:text-sm text-gray-500">All caught up! No urgent items.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Property Status Overview */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Property Status</h2>
+              <HomeIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
+            </div>
+            
+            <div className="space-y-3 sm:space-y-4">
+              {/* Occupied Properties */}
+              <div className="flex items-center justify-between p-2 sm:p-3 bg-green-50 rounded-lg">
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="w-3 h-3 bg-green-500 rounded-full flex-shrink-0"></div>
+                  <span className="text-xs sm:text-sm font-medium text-gray-900">Occupied</span>
+                </div>
+                <span className="text-xs sm:text-sm font-bold text-green-700">{stats.occupiedProperties}</span>
+              </div>
+
+              {/* Vacant Properties */}
+              {stats.vacantProperties > 0 && (
+                <div className="flex items-center justify-between p-2 sm:p-3 bg-yellow-50 rounded-lg">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full flex-shrink-0"></div>
+                    <span className="text-xs sm:text-sm font-medium text-gray-900">Vacant</span>
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-yellow-700">{stats.vacantProperties}</span>
+                </div>
+              )}
+
+              {/* Sold Properties */}
+              {stats.soldProperties > 0 && (
+                <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="w-3 h-3 bg-gray-500 rounded-full flex-shrink-0"></div>
+                    <span className="text-xs sm:text-sm font-medium text-gray-900">Sold</span>
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-gray-700">{stats.soldProperties}</span>
+                </div>
+              )}
+
+              {/* Lease Renewals */}
+              {stats.leasesExpiringIn3Months > 0 && (
+                <div className="flex items-center justify-between p-2 sm:p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <ClockIcon className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500 flex-shrink-0" />
+                    <span className="text-xs sm:text-sm font-medium text-gray-900">Leases Expiring Soon</span>
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-blue-700">{stats.leasesExpiringIn3Months}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Expenses Summary */}
+          <ExpensesSummaryWidget onViewExpenses={onViewExpenses} />
+        </div>
       </div>
     </div>
   );

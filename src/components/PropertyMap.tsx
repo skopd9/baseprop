@@ -436,8 +436,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       )}
       <div ref={mapRef} className="w-full h-full" />
       
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
+      {/* Legend - Hidden on mobile, visible on tablet and up */}
+      <div className="hidden md:block absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
         <h4 className="text-xs font-medium text-gray-900 mb-2">Property Status</h4>
         <div className="space-y-1">
           <div className="flex items-center space-x-2">

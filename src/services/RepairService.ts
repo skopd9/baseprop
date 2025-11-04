@@ -116,6 +116,18 @@ export class RepairService {
     notes?: string;
   }): Promise<Repair | null> {
     try {
+      // First, get the property to get its organization_id
+      const { data: property, error: propertyError } = await supabase
+        .from('properties')
+        .select('organization_id')
+        .eq('id', repairData.propertyId)
+        .single();
+
+      if (propertyError || !property) {
+        console.error('Error fetching property for repair:', propertyError);
+        throw new Error('Failed to find property. Please make sure you have selected a valid property.');
+      }
+
       // Map urgency to priority for database
       const priority = repairData.priority || 'medium';
       
@@ -124,6 +136,7 @@ export class RepairService {
         .insert({
           property_id: repairData.propertyId,
           tenant_id: repairData.tenantId,
+          organization_id: property.organization_id, // Set organization_id from property
           title: repairData.title,
           description: repairData.description,
           category: repairData.category,
@@ -150,13 +163,13 @@ export class RepairService {
 
       if (error) {
         console.error('Error creating repair:', error);
-        return null;
+        throw new Error(`Failed to create repair: ${error.message}`);
       }
 
       return this.transformRepairFromDB(data);
     } catch (error) {
       console.error('Error in createRepair:', error);
-      return null;
+      throw error; // Re-throw to let the component handle it
     }
   }
 
