@@ -38,16 +38,6 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     || import.meta.env.GOOGLE_MAP_API
     || import.meta.env.GOOGLE_MAPS_API_KEY;
 
-  // Debug: Log API key status
-  console.log('API Key check:', {
-    VITE_GOOGLE_MAP_API: import.meta.env.VITE_GOOGLE_MAP_API,
-    VITE_GOOGLE_MAPS_API_KEY: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
-    GOOGLE_MAP_API: import.meta.env.GOOGLE_MAP_API,
-    GOOGLE_MAPS_API_KEY: import.meta.env.GOOGLE_MAPS_API_KEY,
-    finalApiKey: apiKey,
-    apiKeyLength: apiKey?.length
-  });
-
   // Geocode addresses to get coordinates
   const geocodeProperties = async (props: SimplifiedProperty[], googleMaps: any): Promise<PropertyWithCoordinates[]> => {
     if (!apiKey || !googleMaps) {

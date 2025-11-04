@@ -20,12 +20,6 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   const [userEmail, setUserEmail] = useState<string>('');
   const [inviteToken, setInviteToken] = useState<string | null>(null);
 
-  // DEBUG: Test if environment variables are loading
-  console.log('=== Environment Variable Test ===');
-  console.log('VITE_GOOGLE_MAP_API:', import.meta.env.VITE_GOOGLE_MAP_API);
-  console.log('All env vars:', import.meta.env);
-  console.log('================================');
-
   // Check auth state on mount and check for invite token
   useEffect(() => {
     // Check for invite token in URL

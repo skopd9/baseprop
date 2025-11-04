@@ -580,7 +580,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">Property Manager</h1>
+          <h1 className="text-xl font-bold text-gray-900">Base Prop</h1>
           <button
             onClick={() => {
               setSidebarOpen(false);
@@ -759,7 +759,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         <div className="hidden lg:block bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center space-x-2 text-sm text-gray-500">
             <HomeIcon className="w-4 h-4" />
-            <span>Property Manager</span>
+            <span>Base Prop</span>
             <span>/</span>
             <span className="text-gray-900 font-medium">{currentNavItem?.name}</span>
           </div>

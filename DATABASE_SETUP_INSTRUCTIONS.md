@@ -1,5 +1,18 @@
 # Database Setup Instructions
 
+## ⚠️ IMPORTANT: Complete Setup Required
+
+**If you're getting an "organization relationship" error when logging in**, you need to run BOTH migrations:
+
+1. Base schema: `uk_landlord_schema.sql`
+2. **Organizations & Auth**: `migrations/add_auth_and_organizations.sql`
+
+👉 **See `COMPLETE_DATABASE_SETUP.md` for the full step-by-step guide with both migrations.**
+
+👉 **See `FIX_ORGANIZATION_ERROR.md` for a quick fix if you're getting the organization error.**
+
+---
+
 ## Quick Setup (No Production Data)
 
 Since you have no production data, follow these simple steps to set up the clean UK-focused database:
