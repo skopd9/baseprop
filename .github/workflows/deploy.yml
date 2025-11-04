@@ -34,9 +34,13 @@ jobs:
       - name: Verify repository
         run: |
           REPO_URL=$(git remote get-url origin)
-          if [ "$REPO_URL" != "https://github.com/skopd9/baseprop.git" ]; then
+          # Remove .git suffix if present for comparison
+          REPO_URL_CLEAN="${REPO_URL%.git}"
+          EXPECTED_REPO="https://github.com/skopd9/baseprop"
+          
+          if [ "$REPO_URL_CLEAN" != "$EXPECTED_REPO" ]; then
             echo "ERROR: Repository URL mismatch!"
-            echo "Expected: https://github.com/skopd9/baseprop.git"
+            echo "Expected: $EXPECTED_REPO (with or without .git)"
             echo "Got: $REPO_URL"
             exit 1
           fi
