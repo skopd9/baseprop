@@ -20,3 +20,18 @@
   to = "/index.html"
   status = 200
 
+# Security headers to improve firewall/categorization trust
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Content Security Policy
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.supabase.co https://*.netlify.app; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://*.openai.com wss://*.supabase.co; frame-ancestors 'none';"
+    # Security headers
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    # Strict Transport Security (HSTS) - helps with SSL trust
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+
