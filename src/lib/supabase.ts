@@ -19,7 +19,16 @@ export const auth = {
   // See: MAGIC_LINK_CUSTOM_EMAIL_SETUP.md
   async signInWithMagicLink(email: string) {
     // Use production URL for magic links, fallback to current origin for local dev
-    const redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    let redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    
+    // IMPORTANT: Preserve invite token in the redirect URL if present
+    // This ensures the invite flow works even if localStorage is cleared/blocked
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+    if (inviteToken) {
+      redirectUrl = `${redirectUrl}?invite=${inviteToken}`;
+    }
+    
     return await supabase.auth.signInWithOtp({
       email,
       options: {

@@ -25,17 +25,19 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
 
   // Check auth state on mount and check for invite token
   useEffect(() => {
-    // Check for invite token in URL
+    // INVITATION FLOW: Check for invite token in URL first
     const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('invite'); // Fixed: email uses ?invite= parameter
+    const token = urlParams.get('invite'); // Email links use ?invite= parameter
     if (token) {
+      console.log('[Invite Flow] Token found in URL:', token.substring(0, 10) + '...');
       setInviteToken(token);
-      // Store in localStorage to survive magic link redirect
+      // Store in localStorage to survive magic link redirect (backup method)
       localStorage.setItem('pendingInviteToken', token);
     } else {
-      // Check if we have a stored invite token from before auth
+      // FALLBACK: Check if we have a stored invite token from before auth
       const storedToken = localStorage.getItem('pendingInviteToken');
       if (storedToken) {
+        console.log('[Invite Flow] Token restored from localStorage:', storedToken.substring(0, 10) + '...');
         setInviteToken(storedToken);
       }
     }
@@ -121,6 +123,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   };
 
   const handleInviteAccepted = (organizationName: string, role: 'owner' | 'member') => {
+    console.log('[Invite Flow] Invitation accepted! Org:', organizationName, 'Role:', role);
     // Clear token from URL and localStorage
     window.history.replaceState({}, '', window.location.pathname);
     localStorage.removeItem('pendingInviteToken');
@@ -139,7 +142,7 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   };
 
   const handleInviteError = (message: string) => {
-    console.error('Invite error:', message);
+    console.error('[Invite Flow] Error:', message);
     window.history.replaceState({}, '', window.location.pathname);
     localStorage.removeItem('pendingInviteToken');
     setInviteToken(null);
