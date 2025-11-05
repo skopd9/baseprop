@@ -15,6 +15,7 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
   const [error, setError] = useState('');
   const [showNameForm, setShowNameForm] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [showEmailSent, setShowEmailSent] = useState(false);
 
   useEffect(() => {
     loadInvitation();
@@ -31,6 +32,18 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
         setError('This invitation is invalid or has expired.');
       } else {
         setInvitation(invite);
+        
+        // Check if user is authenticated and has a pending name from before auth
+        const { data: { user } } = await supabase.auth.getUser();
+        const storedName = localStorage.getItem('pendingInviteName');
+        
+        if (user && storedName) {
+          // User authenticated after entering their name - auto-accept invitation
+          console.log('[Invite Flow] User authenticated with pending name, auto-accepting invitation');
+          setIsLoading(false);
+          await acceptInvitationWithName(storedName);
+          return;
+        }
       }
     } catch (err: any) {
       console.error('Error loading invitation:', err);
@@ -48,7 +61,10 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        setError('You must be signed in to accept an invitation.');
+        // User not authenticated - show name collection form for sign-up
+        // They'll need to enter their name AND email to proceed
+        setShowNameForm(true);
+        setFullName('');
         return;
       }
 
@@ -60,7 +76,7 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
         .single();
 
       // If user doesn't have a name or it's just their email prefix, ask for their name
-      const emailPrefix = user.email?.split('@')[0] || '';
+      const emailPrefix = user.email?.split('@')[0') || '';
       const hasValidName = profileData?.full_name && 
                           profileData.full_name.trim() !== '' && 
                           profileData.full_name !== emailPrefix;
@@ -94,13 +110,39 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        setError('You must be signed in to accept an invitation.');
+        // User not authenticated - send magic link to invitation email
+        console.log('[Invite Flow] Unauthenticated user accepting invitation, sending magic link to:', invitation.email);
+        
+        // Store the name they entered for use after authentication
+        localStorage.setItem('pendingInviteName', name.trim());
+        
+        // Import auth from supabase
+        const { auth } = await import('../lib/supabase');
+        
+        // Send magic link
+        await auth.signInWithMagicLink(invitation.email);
+        
+        // Show success message - they need to check their email
+        setError('');
         setIsAccepting(false);
+        setShowEmailSent(true);
+        setShowNameForm(false);
+        // The user will be redirected back after clicking magic link
+        // and the invitation will be auto-accepted with their name
         return;
       }
 
-      // Accept invitation with the provided name
-      await OrganizationService.acceptInvitation(token, user.id, name.trim());
+      // User is authenticated - accept invitation with the provided name
+      // Check if there's a stored name from before authentication
+      const storedName = localStorage.getItem('pendingInviteName');
+      const nameToUse = storedName || name.trim();
+      
+      // Clear stored name
+      if (storedName) {
+        localStorage.removeItem('pendingInviteName');
+      }
+      
+      await OrganizationService.acceptInvitation(token, user.id, nameToUse);
       
       // Success! Pass organization details for welcome tour
       onSuccess(invitation.organization_name || 'the organization', invitation.role);
@@ -132,7 +174,33 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl max-w-md w-full p-8">
-        {showNameForm ? (
+        {showEmailSent ? (
+          // Email sent confirmation
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Check your email
+            </h2>
+            <p className="text-gray-600 mb-6">
+              We've sent a magic link to <span className="font-semibold">{invitation?.email}</span>
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-blue-800">
+                Click the link in your email to complete your invitation to <span className="font-semibold">{invitation?.organization_name}</span>
+              </p>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-gray-600 hover:text-gray-900 text-sm"
+            >
+              Didn't receive the email? Click here
+            </button>
+          </div>
+        ) : showNameForm ? (
           // Name collection form
           <div>
             <div className="text-center mb-6">

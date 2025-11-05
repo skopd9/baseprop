@@ -218,16 +218,26 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
     );
   }
 
-  // Authenticated state with invite token
-  if (appState === 'authenticated' && userId && inviteToken) {
+  // Show AcceptInvite modal for ANY user with invite token (authenticated or not)
+  if (inviteToken) {
     return (
-      <OrganizationProvider key={orgProviderKey} userId={userId}>
-        <AcceptInvite
-          token={inviteToken}
-          onSuccess={handleInviteAccepted}
-          onError={handleInviteError}
-        />
-      </OrganizationProvider>
+      <>
+        {userId ? (
+          <OrganizationProvider key={orgProviderKey} userId={userId}>
+            <AcceptInvite
+              token={inviteToken}
+              onSuccess={handleInviteAccepted}
+              onError={handleInviteError}
+            />
+          </OrganizationProvider>
+        ) : (
+          <AcceptInvite
+            token={inviteToken}
+            onSuccess={handleInviteAccepted}
+            onError={handleInviteError}
+          />
+        )}
+      </>
     );
   }
 
