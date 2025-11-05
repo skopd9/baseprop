@@ -179,3 +179,4 @@ See: `MAGIC_LINK_CUSTOM_EMAIL_SETUP.md` for detailed instructions and troublesho
 
 **That's it!** Your magic link emails will now match your beautiful design. ✨
 
+

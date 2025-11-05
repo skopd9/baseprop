@@ -349,3 +349,4 @@ Need help? Check:
 - [Supabase Auth Docs](https://supabase.com/docs/guides/auth)
 - [Resend SMTP Docs](https://resend.com/docs/send-with-smtp)
 
+

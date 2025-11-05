@@ -28,3 +28,4 @@ CREATE POLICY "Users can view organizations they're invited to"
 -- Note: This policy works alongside the existing "Users can view their organizations" policy
 -- Users will be able to see organizations they're invited to OR organizations they're members of
 
+

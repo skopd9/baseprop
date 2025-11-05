@@ -153,3 +153,4 @@ This fix is related to the organization filtering feature. The repairs must have
 - Users can only create repairs for properties in their organization
 - Data isolation between organizations is maintained
 
+

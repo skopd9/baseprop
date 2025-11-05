@@ -317,3 +317,4 @@ useEffect(() => {
 
 **Deployment:** Ready to deploy - frontend only, no migrations required! 🚀
 
+

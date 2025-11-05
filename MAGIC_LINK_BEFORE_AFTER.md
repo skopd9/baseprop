@@ -247,3 +247,4 @@ You'll see the beautiful template right away. 🎉
 
 👉 Open `MAGIC_LINK_QUICK_SETUP.md` and follow the 3 simple steps!
 
+

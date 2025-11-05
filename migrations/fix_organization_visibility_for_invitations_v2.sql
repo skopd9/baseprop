@@ -27,3 +27,4 @@ CREATE POLICY "Users can view organizations they're invited to"
 -- Note: auth.jwt() ->> 'email' extracts the email from the JWT token
 -- This is the correct way to get user email in RLS policies without querying auth.users
 
+

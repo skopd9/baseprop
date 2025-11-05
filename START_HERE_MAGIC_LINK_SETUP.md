@@ -221,3 +221,4 @@ You'll have beautiful magic link emails in 5 minutes. 🚀
 
 Let's make your magic link emails look amazing! ✨
 
+
