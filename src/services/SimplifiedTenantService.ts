@@ -25,39 +25,37 @@ export class SimplifiedTenantService {
         ? `${tenantData.name} (${tenantData.unitNumber})`
         : tenantData.name;
 
-      // Insert into database using actual schema
+      // Insert into database using ACTUAL schema from database
+      // Note: property/lease info is stored in tenant_data JSONB field
       const insertData: any = {
-        tenant_type: 'individual',
+        tenant_type: 'individual', // REQUIRED field
         name: tenantName,
-        phone: tenantData.phone,
-        email: tenantData.email,
+        email: tenantData.email || null,
+        phone: tenantData.phone || null,
         status: 'active',
-        property_id: tenantData.propertyId,
-        lease_start: tenantData.leaseStart?.toISOString().split('T')[0] || null,
-        lease_end: tenantData.leaseEnd?.toISOString().split('T')[0] || null,
-        monthly_rent: tenantData.monthlyRent || null,
-        rent_due_day: tenantData.rentDueDay || 1, // Default to 1st of month
-        deposit_amount: tenantData.depositAmount || null,
         tenant_data: {
           property_id: tenantData.propertyId,
-          unit_number: tenantData.unitNumber,
-          room_id: tenantData.roomId,
-          room_name: tenantData.roomName,
-          lease_start_date: tenantData.leaseStart?.toISOString().split('T')[0],
-          lease_end_date: tenantData.leaseEnd?.toISOString().split('T')[0],
-          monthly_rent: tenantData.monthlyRent,
-          deposit_amount: tenantData.depositAmount,
+          unit_number: tenantData.unitNumber || null,
+          room_id: tenantData.roomId || null,
+          room_name: tenantData.roomName || null,
+          lease_start_date: tenantData.leaseStart?.toISOString().split('T')[0] || null,
+          lease_end_date: tenantData.leaseEnd?.toISOString().split('T')[0] || null,
+          monthly_rent: tenantData.monthlyRent || null,
+          deposit_amount: tenantData.depositAmount || null,
+          rent_due_day: tenantData.rentDueDay || 1,
           rent_status: tenantData.leaseStart ? 'current' : 'pending',
           onboarding_status: 'not_started',
           is_simplified_demo: true,
         }
-      };
+      }
 
       // Add organization_id if provided
       if (organizationId) {
         insertData.organization_id = organizationId;
       }
 
+      console.log('Attempting to insert tenant with data:', JSON.stringify(insertData, null, 2));
+      
       const { data, error } = await supabase
         .from('tenants')
         .insert(insertData)
@@ -65,8 +63,18 @@ export class SimplifiedTenantService {
         .single();
 
       if (error) {
-        console.error('Error creating simplified tenant:', error);
-        return null;
+        console.error('❌ SUPABASE ERROR creating tenant');
+        console.error('Error object:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        console.error('Error hint:', error.hint);
+        console.error('Full error JSON:', JSON.stringify(error, null, 2));
+        console.error('Data that was rejected:', JSON.stringify(insertData, null, 2));
+        
+        // Create a detailed error message
+        const errorMsg = `Database error: ${error.message || 'Unknown error'}${error.details ? ' - ' + error.details : ''}${error.hint ? ' (Hint: ' + error.hint + ')' : ''}`;
+        throw new Error(errorMsg);
       }
 
       // Get property info for the tenant
@@ -87,8 +95,8 @@ export class SimplifiedTenantService {
         unitNumber: tenantData.unitNumber,
         roomId: tenantData.roomId,
         roomName: tenantData.roomName,
-        leaseStart: tenantData.leaseStart || new Date(),
-        leaseEnd: tenantData.leaseEnd || new Date(),
+        leaseStart: tenantData.leaseStart,
+        leaseEnd: tenantData.leaseEnd,
         monthlyRent: tenantData.monthlyRent || 0,
         rentStatus: tenantData.leaseStart ? 'current' : 'pending',
         depositAmount: tenantData.depositAmount || 0,
@@ -127,14 +135,20 @@ export class SimplifiedTenantService {
   }
 
   // Get all simplified tenants
-  static async getSimplifiedTenants(): Promise<SimplifiedTenant[]> {
+  static async getSimplifiedTenants(organizationId?: string): Promise<SimplifiedTenant[]> {
     try {
       // Get tenants with simplified demo flag
-      const { data: tenants, error } = await supabase
+      let query = supabase
         .from('tenants')
         .select('*')
-        .eq('tenant_data->>is_simplified_demo', 'true')
-        .order('name');
+        .eq('tenant_data->>is_simplified_demo', 'true');
+      
+      // Filter by organization if provided
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+      
+      const { data: tenants, error } = await query.order('name');
 
       if (error) {
         console.error('Error fetching simplified tenants:', error);
@@ -163,18 +177,24 @@ export class SimplifiedTenantService {
           // Calculate rent status using RentPaymentService
           const rentDueDay = tenant.rent_due_day || 1;
           const monthlyRent = tenant.monthly_rent || tenant.tenant_data?.monthly_rent || 0;
-          const leaseStart = tenant.lease_start ? new Date(tenant.lease_start) : 
-                           (tenant.tenant_data?.lease_start_date ? new Date(tenant.tenant_data.lease_start_date) : new Date());
-          const leaseEnd = tenant.lease_end ? new Date(tenant.lease_end) : 
-                         (tenant.tenant_data?.lease_end_date ? new Date(tenant.tenant_data.lease_end_date) : new Date());
+          const leaseStartRaw = tenant.lease_start || tenant.tenant_data?.lease_start_date;
+          const leaseEndRaw = tenant.lease_end || tenant.tenant_data?.lease_end_date;
+          const leaseStart = leaseStartRaw ? new Date(leaseStartRaw) : undefined;
+          const leaseEnd = leaseEndRaw ? new Date(leaseEndRaw) : undefined;
           
-          const rentStatusResult = await RentPaymentService.calculateRentStatus(
-            tenant.id,
-            rentDueDay,
-            monthlyRent,
-            leaseStart,
-            leaseEnd
-          );
+          // Only calculate rent status if we have lease dates
+          let rentStatusResult;
+          if (leaseStart && leaseEnd) {
+            rentStatusResult = await RentPaymentService.calculateRentStatus(
+              tenant.id,
+              rentDueDay,
+              monthlyRent,
+              leaseStart,
+              leaseEnd
+            );
+          } else {
+            rentStatusResult = { status: 'pending' as const };
+          }
           
           return this.transformDatabaseTenantToSimplified(tenant, property, rentStatusResult);
         })
@@ -200,12 +220,12 @@ export class SimplifiedTenantService {
     const actualName = nameMatch ? nameMatch[1] : tenant.name;
     const unitNumber = tenantData.unit_number || (nameMatch ? nameMatch[2] : undefined);
 
-    const leaseStart = tenant.lease_start ? new Date(tenant.lease_start) : 
-                      (tenantData.lease_start_date ? new Date(tenantData.lease_start_date) : new Date());
-    const leaseEnd = tenant.lease_end ? new Date(tenant.lease_end) : 
-                    (tenantData.lease_end_date ? new Date(tenantData.lease_end_date) : new Date());
+    const leaseStartRaw = tenant.lease_start || tenantData.lease_start_date;
+    const leaseEndRaw = tenant.lease_end || tenantData.lease_end_date;
+    const leaseStart = leaseStartRaw ? new Date(leaseStartRaw) : undefined;
+    const leaseEnd = leaseEndRaw ? new Date(leaseEndRaw) : undefined;
     const monthlyRent = tenant.monthly_rent || tenantData.monthly_rent || 0;
-    const rentStatus = rentStatusResult?.status || 'current';
+    const rentStatus = rentStatusResult?.status || (leaseStart ? 'current' : 'pending');
     const rentDueDay = tenant.rent_due_day || 1;
 
     return {
@@ -234,37 +254,84 @@ export class SimplifiedTenantService {
   // Update tenant with onboarding completion
   static async updateTenantOnboarding(tenantId: string, updates: Partial<SimplifiedTenant>): Promise<boolean> {
     try {
-      // Get current tenant data
+      // Prepare update object with both column-level and JSONB data
+      const updateData: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      // Update basic tenant info
+      if (updates.name !== undefined) {
+        updateData.name = updates.name;
+      }
+      if (updates.email !== undefined) {
+        updateData.email = updates.email;
+      }
+      if (updates.phone !== undefined) {
+        updateData.phone = updates.phone;
+      }
+
+      // Update main columns
+      if (updates.leaseStart) {
+        updateData.lease_start = updates.leaseStart.toISOString().split('T')[0];
+      }
+      if (updates.leaseEnd) {
+        updateData.lease_end = updates.leaseEnd.toISOString().split('T')[0];
+      }
+      if (updates.monthlyRent !== undefined) {
+        updateData.monthly_rent = updates.monthlyRent;
+      }
+      if (updates.depositAmount !== undefined) {
+        updateData.deposit_amount = updates.depositAmount;
+      }
+      if (updates.depositWeeks !== undefined) {
+        updateData.deposit_weeks = updates.depositWeeks;
+      }
+      if (updates.rentDueDay !== undefined) {
+        updateData.rent_due_day = updates.rentDueDay;
+      }
+
+      // Update onboarding status fields
+      if (updates.onboardingStatus !== undefined) {
+        updateData.onboarding_status = updates.onboardingStatus;
+      }
+      if (updates.onboardingProgress !== undefined) {
+        updateData.onboarding_progress = updates.onboardingProgress;
+      }
+      if (updates.onboardingNotes !== undefined) {
+        updateData.onboarding_notes = updates.onboardingNotes;
+      }
+      if (updates.onboardingCompletedAt) {
+        updateData.onboarding_completed_at = updates.onboardingCompletedAt.toISOString();
+      }
+
+      // Update onboarding data (comprehensive JSONB)
+      if (updates.onboardingData) {
+        updateData.onboarding_data = updates.onboardingData;
+      }
+
+      // Also update tenant_data for backward compatibility
       const { data: currentTenant, error: fetchError } = await supabase
         .from('tenants')
         .select('tenant_data')
         .eq('id', tenantId)
         .single();
 
-      if (fetchError) {
-        console.error('Error fetching tenant for onboarding update:', fetchError);
-        return false;
+      if (!fetchError && currentTenant) {
+        updateData.tenant_data = {
+          ...currentTenant.tenant_data,
+          lease_start_date: updates.leaseStart?.toISOString().split('T')[0] || currentTenant.tenant_data?.lease_start_date,
+          lease_end_date: updates.leaseEnd?.toISOString().split('T')[0] || currentTenant.tenant_data?.lease_end_date,
+          monthly_rent: updates.monthlyRent || currentTenant.tenant_data?.monthly_rent,
+          deposit_amount: updates.depositAmount || currentTenant.tenant_data?.deposit_amount,
+          onboarding_status: updates.onboardingStatus || currentTenant.tenant_data?.onboarding_status,
+          onboarding_progress: updates.onboardingProgress || currentTenant.tenant_data?.onboarding_progress,
+          onboarding_notes: updates.onboardingNotes || currentTenant.tenant_data?.onboarding_notes,
+        };
       }
-
-      // Merge updates with existing tenant data
-      const updatedTenantData = {
-        ...currentTenant.tenant_data,
-        lease_start_date: updates.leaseStart?.toISOString().split('T')[0] || currentTenant.tenant_data.lease_start_date,
-        lease_end_date: updates.leaseEnd?.toISOString().split('T')[0] || currentTenant.tenant_data.lease_end_date,
-        monthly_rent: updates.monthlyRent || currentTenant.tenant_data.monthly_rent,
-        deposit_amount: updates.depositAmount || currentTenant.tenant_data.deposit_amount,
-        rent_status: updates.rentStatus || currentTenant.tenant_data.rent_status,
-        onboarding_status: updates.onboardingStatus || currentTenant.tenant_data.onboarding_status,
-        onboarding_progress: updates.onboardingProgress || currentTenant.tenant_data.onboarding_progress,
-        onboarding_notes: updates.onboardingNotes || currentTenant.tenant_data.onboarding_notes,
-      };
 
       const { error } = await supabase
         .from('tenants')
-        .update({
-          tenant_data: updatedTenantData,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', tenantId);
 
       if (error) {

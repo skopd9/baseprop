@@ -1,4 +1,4 @@
-import { Property } from '../types';
+import { Property, CountryCode } from '../types';
 
 // Room interface for HMO properties
 export interface PropertyRoom {
@@ -13,7 +13,9 @@ export interface PropertyRoom {
 // Simplified property interface for residential landlords
 export interface SimplifiedProperty {
   id: string;
+  propertyReference: number; // Auto-incrementing reference number
   propertyName?: string; // Optional friendly name for the property
+  countryCode: CountryCode; // Country code: UK, GR, US
   address: string;
   propertyType: 'house' | 'flat' | 'hmo';
   bedrooms: number;
@@ -40,6 +42,58 @@ export interface SimplifiedProperty {
   licenseExpiry?: Date;
 }
 
+// Onboarding data interfaces
+export interface TenantCreditCheck {
+  id: string;
+  type: 'tenant' | 'guarantor';
+  name: string;
+  email: string;
+  status: 'pending' | 'ordered' | 'completed' | 'failed';
+  cost: number;
+  provider?: string;
+  orderedDate?: string;
+  completedDate?: string;
+  result?: 'passed' | 'failed' | 'pending';
+  failureReason?: string;
+}
+
+export interface TenantTenancyAgreement {
+  method: 'generate' | 'upload';
+  status: 'not_started' | 'generating' | 'ready_for_signing' | 'signed' | 'uploaded';
+  generatedDate?: string;
+  signedDate?: string;
+  uploadedFileName?: string;
+  docusignEnvelopeId?: string;
+  questions: {
+    petsAllowed: boolean;
+    smokingAllowed: boolean;
+    sublettingAllowed: boolean;
+    decoratingAllowed: boolean;
+    breakClause: boolean;
+    breakClauseMonths?: number;
+  };
+}
+
+export interface TenantPreparationTask {
+  id: string;
+  task: string;
+  completed: boolean;
+  required: boolean;
+}
+
+export interface TenantPreparation {
+  type: 'diy' | 'concierge';
+  checklist: TenantPreparationTask[];
+  conciergeOrdered: boolean;
+  conciergeOrderedDate?: string;
+}
+
+export interface TenantOnboardingData {
+  creditChecks: TenantCreditCheck[];
+  tenancyAgreement: TenantTenancyAgreement;
+  preparation: TenantPreparation;
+}
+
 // Simplified tenant interface
 export interface SimplifiedTenant {
   id: string;
@@ -51,72 +105,89 @@ export interface SimplifiedTenant {
   unitNumber?: string;
   roomId?: string; // For HMO properties - which specific room
   roomName?: string; // Display name of the room (e.g., "Room 1", "Master Bedroom")
-  leaseStart: Date;
-  leaseEnd: Date;
+  leaseStart?: Date;
+  leaseEnd?: Date;
   monthlyRent: number;
   rentStatus: 'current' | 'overdue';
   daysOverdue?: number;
   depositAmount: number;
+  depositWeeks?: number;
   onboardingStatus?: 'not_started' | 'in_progress' | 'completed';
   onboardingProgress?: number;
   onboardingNotes?: string;
+  onboardingCompletedAt?: Date;
+  onboardingData?: TenantOnboardingData;
   rentDueDay?: number; // Day of month rent is due
 }
 
 // Transform property data to simplified residential format (updated for new schema)
 export const transformToSimplifiedProperty = (property: any, actualTenantCount?: number): SimplifiedProperty => {
-  // NEW SCHEMA: Uses regular columns instead of JSONB property_data
+  // SCHEMA: Properties table has core columns (id, name, address, status, property_reference)
+  // and a JSONB property_data column that contains all the property details
+  
+  // Extract property data from JSONB field
+  const propertyData = property.property_data || {};
   
   // Map property types to simplified residential types
-  const getSimplifiedPropertyType = (type: string, isHMO: boolean): 'house' | 'flat' | 'hmo' => {
-    if (isHMO) return 'hmo';
-    if (type === 'house') return 'house';
-    if (type === 'flat' || type === 'studio') return 'flat';
+  const getSimplifiedPropertyType = (type: string, subType: string): 'house' | 'flat' | 'hmo' => {
+    if (subType === 'hmo') return 'hmo';
+    if (subType === 'house') return 'house';
+    if (subType === 'flat' || subType === 'studio') return 'flat';
+    if (type === 'residential') {
+      // Default to flat for residential if no subtype specified
+      return 'flat';
+    }
     return 'flat';
   };
 
   // Determine property status (simplified)
-  const getPropertyStatus = (status: string): 'under_management' | 'sold' => {
-    if (status === 'sold') return 'sold';
+  const getPropertyStatus = (status: string, propertyDataStatus?: string): 'under_management' | 'sold' => {
+    if (status === 'sold' || status === 'disposed' || propertyDataStatus === 'sold') return 'sold';
     return 'under_management';
   };
 
   // Use actual tenant count if provided, otherwise fall back to stored count
-  const tenantCount = actualTenantCount !== undefined ? actualTenantCount : (property.tenant_count || 0);
+  const tenantCount = actualTenantCount !== undefined ? actualTenantCount : (propertyData.tenant_count || 0);
   
-  // Parse HMO units if present (stored as JSONB in new schema)
-  const hmoUnits = property.units ? (Array.isArray(property.units) ? property.units : JSON.parse(property.units)) : [];
-  const totalUnits = Array.isArray(hmoUnits) && hmoUnits.length > 0 ? hmoUnits.length : 1;
+  // Parse HMO units/rooms if present
+  const rooms = propertyData.rooms || [];
+  const unitDetails = propertyData.unit_details || [];
+  const totalUnits = propertyData.units || (rooms.length > 0 ? rooms.length : 1);
+
+  // Extract country code from database (defaults to UK if not set)
+  const countryCode = (property.country_code || propertyData.country_code || 'UK') as CountryCode;
 
   return {
     id: property.id,
-    propertyName: property.name,
+    propertyReference: property.property_reference || 0,
+    propertyName: propertyData.property_name || property.name,
+    countryCode: countryCode,
     address: property.address,
     propertyType: getSimplifiedPropertyType(
-      property.property_type || 'flat', 
-      property.is_hmo || false
+      propertyData.property_type || 'residential', 
+      propertyData.property_sub_type || 'flat'
     ),
-    bedrooms: property.bedrooms || 2,
-    bathrooms: property.bathrooms || 1,
-    targetRent: property.monthly_rent || 1500,
-    purchasePrice: property.purchase_price,
-    salesPrice: null, // Not in new schema yet, can add if needed
+    bedrooms: propertyData.bedrooms || 2,
+    bathrooms: propertyData.bathrooms || 1,
+    targetRent: propertyData.target_rent || propertyData.monthly_rent || 1500,
+    purchasePrice: propertyData.purchase_price,
+    salesPrice: propertyData.sales_price || null,
     tenantCount,
-    status: getPropertyStatus(property.status || 'vacant'),
+    status: getPropertyStatus(property.status, propertyData.status),
     units: totalUnits,
-    unitDetails: hmoUnits.length > 0 ? hmoUnits : undefined,
+    unitDetails: unitDetails.length > 0 ? unitDetails : undefined,
     // Enhanced property details
-    totalArea: property.square_meters,
-    yearBuilt: undefined, // Can add to schema if needed
-    furnished: 'unfurnished', // Can add to schema if needed
-    parking: 'none', // Can add to schema if needed
-    garden: false, // Can add to schema if needed
+    totalArea: propertyData.total_area,
+    yearBuilt: propertyData.year_built,
+    furnished: propertyData.furnished || 'unfurnished',
+    parking: propertyData.parking || 'none',
+    garden: propertyData.garden || false,
     // HMO specific details
-    rooms: [], // Can populate from units if needed
-    maxOccupancy: hmoUnits.length,
-    licenseRequired: property.is_hmo || false,
-    licenseNumber: property.hmo_license_number,
-    licenseExpiry: property.hmo_license_expiry ? new Date(property.hmo_license_expiry) : undefined
+    rooms: rooms || [],
+    maxOccupancy: propertyData.max_occupancy || (rooms.length > 0 ? rooms.length : undefined),
+    licenseRequired: propertyData.license_required || false,
+    licenseNumber: propertyData.license_number,
+    licenseExpiry: propertyData.license_expiry ? new Date(propertyData.license_expiry) : undefined
   };
 };
 
@@ -133,10 +204,17 @@ export const transformToSimplifiedTenant = (
 
   // Extract from tenant_data if main columns don't exist (backward compatibility)
   const tenantData = tenant.tenant_data || {};
-  const leaseStart = tenant.lease_start || tenantData.lease_start_date || new Date();
-  const leaseEnd = tenant.lease_end || tenantData.lease_end_date || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+  // Only set lease dates if they exist - don't default to today/1 year from now
+  const leaseStartRaw = tenant.lease_start || tenantData.lease_start_date;
+  const leaseEndRaw = tenant.lease_end || tenantData.lease_end_date;
+  const leaseStart = leaseStartRaw ? (leaseStartRaw instanceof Date ? leaseStartRaw : new Date(leaseStartRaw)) : undefined;
+  const leaseEnd = leaseEndRaw ? (leaseEndRaw instanceof Date ? leaseEndRaw : new Date(leaseEndRaw)) : undefined;
   const monthlyRent = tenant.monthly_rent || tenantData.monthly_rent || 0;
   const rentDueDay = tenant.rent_due_day || 1;
+  
+  // Parse onboarding data from JSONB column
+  const onboardingData = tenant.onboarding_data || null;
+  const onboardingCompletedAt = tenant.onboarding_completed_at ? new Date(tenant.onboarding_completed_at) : undefined;
 
   return {
     id: tenant.id,
@@ -148,15 +226,18 @@ export const transformToSimplifiedTenant = (
     unitNumber: tenantData.unit_number,
     roomId: tenantData.room_id,
     roomName: tenantData.room_name,
-    leaseStart: leaseStart instanceof Date ? leaseStart : new Date(leaseStart),
-    leaseEnd: leaseEnd instanceof Date ? leaseEnd : new Date(leaseEnd),
+    leaseStart: leaseStart,
+    leaseEnd: leaseEnd,
     monthlyRent: monthlyRent,
     rentStatus: rentStatus,
     daysOverdue: daysOverdue,
     depositAmount: tenant.deposit_amount || tenantData.deposit_amount || 0,
-    onboardingStatus: tenantData.onboarding_status || 'not_started',
-    onboardingProgress: tenantData.onboarding_progress || 0,
-    onboardingNotes: tenantData.onboarding_notes,
+    depositWeeks: tenant.deposit_weeks || 4,
+    onboardingStatus: tenant.onboarding_status || tenantData.onboarding_status || 'not_started',
+    onboardingProgress: tenant.onboarding_progress || tenantData.onboarding_progress || 0,
+    onboardingNotes: tenant.onboarding_notes || tenantData.onboarding_notes,
+    onboardingCompletedAt: onboardingCompletedAt,
+    onboardingData: onboardingData,
     rentDueDay: rentDueDay,
   };
 };
@@ -177,8 +258,8 @@ export const validatePropertyData = (property: SimplifiedProperty): string[] => 
     errors.push('Bathrooms must be between 0 and 5');
   }
 
-  if (property.monthlyRent < 0) {
-    errors.push('Monthly rent cannot be negative');
+  if (property.targetRent < 0) {
+    errors.push('Target rent cannot be negative');
   }
 
   if (property.tenantCount > property.units * 4) {
@@ -203,7 +284,7 @@ export const validateTenantData = (tenant: SimplifiedTenant): string[] => {
     errors.push('Please enter a valid phone number');
   }
 
-  if (tenant.leaseEnd <= tenant.leaseStart) {
+  if (tenant.leaseStart && tenant.leaseEnd && tenant.leaseEnd <= tenant.leaseStart) {
     errors.push('Lease end date must be after start date');
   }
 
@@ -268,7 +349,6 @@ export const getOccupancyStatus = (property: SimplifiedProperty, tenants: Simpli
 
 // Helper function to get occupancy display info
 export const getOccupancyDisplay = (property: SimplifiedProperty, tenants: SimplifiedTenant[]) => {
-  const occupancyStatus = getOccupancyStatus(property, tenants);
   // Safety check: ensure tenants is an array
   const tenantsArray = Array.isArray(tenants) ? tenants : [];
   const propertyTenants = tenantsArray.filter(tenant => tenant.propertyId === property.id);
@@ -281,6 +361,67 @@ export const getOccupancyDisplay = (property: SimplifiedProperty, tenants: Simpl
       tenantInfo: null
     };
   }
+  
+  // Special handling for HMO properties
+  if (property.propertyType === 'hmo' && property.unitDetails && property.unitDetails.length > 0) {
+    const totalUnits = property.unitDetails.length;
+    
+    // Count unique occupied units (based on roomName field)
+    const occupiedUnits = new Set(
+      propertyTenants
+        .filter(t => t.roomName)
+        .map(t => t.roomName)
+    ).size;
+    
+    const vacantUnits = totalUnits - occupiedUnits;
+    
+    if (occupiedUnits === 0) {
+      return {
+        status: 'vacant',
+        label: 'Vacant',
+        color: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+        tenantInfo: null,
+        occupancyDetails: {
+          type: 'hmo',
+          totalUnits,
+          occupiedUnits: 0,
+          vacantUnits: totalUnits
+        }
+      };
+    }
+    
+    if (occupiedUnits === totalUnits) {
+      return {
+        status: 'occupied',
+        label: `Fully Occupied (${occupiedUnits}/${totalUnits})`,
+        color: 'text-green-700 bg-green-50 border-green-200',
+        tenantInfo: propertyTenants,
+        occupancyDetails: {
+          type: 'hmo',
+          totalUnits,
+          occupiedUnits,
+          vacantUnits: 0
+        }
+      };
+    }
+    
+    // Partially occupied
+    return {
+      status: 'partially_occupied',
+      label: `Partially Occupied (${occupiedUnits}/${totalUnits})`,
+      color: 'text-blue-700 bg-blue-50 border-blue-200',
+      tenantInfo: propertyTenants,
+      occupancyDetails: {
+        type: 'hmo',
+        totalUnits,
+        occupiedUnits,
+        vacantUnits
+      }
+    };
+  }
+  
+  // Standard property (non-HMO)
+  const occupancyStatus = getOccupancyStatus(property, tenants);
   
   if (occupancyStatus === 'occupied') {
     return {

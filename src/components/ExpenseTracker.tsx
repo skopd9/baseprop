@@ -4,7 +4,6 @@ import {
   PencilIcon,
   TrashIcon,
   DocumentArrowDownIcon,
-  FunnelIcon,
   ChartBarIcon,
   ReceiptPercentIcon
 } from '@heroicons/react/24/outline';
@@ -53,9 +52,7 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
   const [formData, setFormData] = useState<ExpenseFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Filters
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterProperty, setFilterProperty] = useState('');
+  // Summary
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [showSummary, setShowSummary] = useState(false);
   
@@ -188,17 +185,7 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
     return property ? property.address : 'Unknown Property';
   };
 
-  const filteredExpenses = expenses.filter(expense => {
-    if (filterCategory && expense.category !== filterCategory) return false;
-    if (filterProperty && expense.propertyId !== filterProperty) return false;
-    if (filterYear) {
-      const expenseYear = new Date(expense.expenseDate).getFullYear().toString();
-      if (expenseYear !== filterYear) return false;
-    }
-    return true;
-  });
-
-  const totalFilteredAmount = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const totalAmount = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
   if (isLoading) {
     return (
@@ -290,83 +277,14 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <FunnelIcon className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">Filters:</span>
-          </div>
-          
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="">All Categories</option>
-            {EXPENSE_CATEGORIES.map(category => (
-              <option key={category} value={category}>{category}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterProperty}
-            onChange={(e) => setFilterProperty(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="">All Properties</option>
-            <option value="null">General/Portfolio</option>
-            {properties.map(property => (
-              <option key={property.id} value={property.id}>{property.address}</option>
-            ))}
-          </select>
-
-          <select
-            value={filterYear}
-            onChange={(e) => setFilterYear(e.target.value)}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="">All Years</option>
-            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
-
-          {(filterCategory || filterProperty || filterYear) && (
-            <button
-              onClick={() => {
-                setFilterCategory('');
-                setFilterProperty('');
-                setFilterYear('');
-              }}
-              className="text-sm text-blue-600 hover:text-blue-700"
-            >
-              Clear Filters
-            </button>
-          )}
-        </div>
-        
-        {filteredExpenses.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <div className="text-sm text-gray-600">
-              Showing {filteredExpenses.length} expense{filteredExpenses.length !== 1 ? 's' : ''} 
-              totaling <span className="font-semibold text-gray-900">£{totalFilteredAmount.toLocaleString()}</span>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Expenses Table */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {filteredExpenses.length === 0 ? (
+        {expenses.length === 0 ? (
           <div className="p-8 text-center">
             <ReceiptPercentIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No expenses found</h3>
             <p className="text-gray-600 mb-4">
-              {expenses.length === 0 
-                ? "Start tracking your property expenses to get better insights into your costs."
-                : "Try adjusting your filters to see more expenses."
-              }
+              Start tracking your property expenses to get better insights into your costs.
             </p>
             <button
               onClick={() => setShowAddModal(true)}
@@ -404,7 +322,7 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredExpenses.map((expense) => (
+                {expenses.map((expense) => (
                   <tr key={expense.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(expense.expenseDate).toLocaleDateString()}

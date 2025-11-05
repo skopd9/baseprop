@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTransforms';
 import { RepairService, Repair as RepairServiceType } from '../services/RepairService';
+import { RepairDetailsModal } from './RepairDetailsModal';
 
 interface RepairWorkflowsProps {
   properties: SimplifiedProperty[];
@@ -32,9 +33,11 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
   onLogRepair
 }) => {
   const [repairs, setRepairs] = useState<Repair[]>([]);
+  const [originalRepairs, setOriginalRepairs] = useState<RepairServiceType[]>([]); // Store original DB format
   const [isLoading, setIsLoading] = useState(true);
   const [showRepairForm, setShowRepairForm] = useState(false);
-  const [selectedRepair, setSelectedRepair] = useState<Repair | null>(null);
+  const [selectedRepair, setSelectedRepair] = useState<RepairServiceType | null>(null);
+  const [showRepairModal, setShowRepairModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [repairForm, setRepairForm] = useState({
@@ -55,6 +58,8 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
     setIsLoading(true);
     try {
       const repairsData = await RepairService.getRepairs();
+      // Store original repairs for modal access
+      setOriginalRepairs(repairsData);
       // Transform repairs to match UI expectations
       const transformedRepairs = repairsData.map(mapDBRepairToUI);
       setRepairs(transformedRepairs);
@@ -152,7 +157,8 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
       });
 
       if (newRepair) {
-        // Add to local state
+        // Add to local state (both original and UI format)
+        setOriginalRepairs([newRepair, ...originalRepairs]);
         const uiRepair = mapDBRepairToUI(newRepair);
         setRepairs([uiRepair, ...repairs]);
         
@@ -285,115 +291,137 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {repairs.map((repair) => (
-            <div key={repair.id} className="p-6 hover:bg-gray-50">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-shrink-0">
-                    <div className="p-2 bg-gray-100 rounded-lg">
-                      <WrenchScrewdriverIcon className="w-5 h-5 text-gray-600" />
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {repair.title || repair.description}
-                      </p>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getUrgencyColor(repair.urgency)}`}>
-                        {repair.urgency}
-                      </span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(repair.status)}`}>
-                        {repair.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-1 text-sm text-gray-500">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-1">
-                          <HomeIcon className="w-4 h-4" />
-                          <span className="truncate">{repair.propertyAddress}</span>
+            {repairs.map((repair) => {
+              // Find the original DB repair to preserve all data
+              const originalRepair = originalRepairs.find(r => r.id === repair.id);
+              const repairForModal = originalRepair || repair as RepairServiceType;
+
+              return (
+                <div 
+                  key={repair.id} 
+                  className="p-6 hover:bg-gray-50 cursor-pointer transition-colors"
+                  onClick={() => {
+                    setSelectedRepair(repairForModal);
+                    setShowRepairModal(true);
+                  }}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4 flex-1">
+                      <div className="flex-shrink-0">
+                        <div className="p-2 bg-gray-100 rounded-lg">
+                          <WrenchScrewdriverIcon className="w-5 h-5 text-gray-600" />
                         </div>
-                        {repair.tenantName && (
-                          <div className="flex items-center space-x-1">
-                            <UserIcon className="w-4 h-4" />
-                            <span>Reported by: {repair.tenantName}</span>
-                          </div>
-                        )}
                       </div>
                       
-                      <div className="flex items-center space-x-4">
-                        <span>Reported: {formatDate(repair.reportedDate)}</span>
-                        {repair.scheduledDate && (
-                          <span>Scheduled: {formatDate(repair.scheduledDate)}</span>
-                        )}
-                        {repair.completedDate && (
-                          <span>Completed: {formatDate(repair.completedDate)}</span>
-                        )}
-                      </div>
-                      
-                      {repair.contractor && (
-                        <div className="flex items-center space-x-4">
-                          <span>Contractor: {repair.contractor}</span>
-                          {repair.contractorPhone && (
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            {repair.title || repair.description}
+                          </p>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getUrgencyColor(repair.urgency)}`}>
+                            {repair.urgency}
+                          </span>
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(repair.status)}`}>
+                            {repair.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-1 text-sm text-gray-500">
+                          <div className="flex items-center space-x-4">
                             <div className="flex items-center space-x-1">
-                              <PhoneIcon className="w-3 h-3" />
-                              <span>{repair.contractorPhone}</span>
+                              <HomeIcon className="w-4 h-4" />
+                              <span className="truncate">{repair.propertyAddress}</span>
+                            </div>
+                            {repair.tenantName && (
+                              <div className="flex items-center space-x-1">
+                                <UserIcon className="w-4 h-4" />
+                                <span>Reported by: {repair.tenantName}</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center space-x-4">
+                            <span>Reported: {formatDate(repair.reportedDate)}</span>
+                            {repair.scheduledDate && (
+                              <span>Scheduled: {formatDate(repair.scheduledDate)}</span>
+                            )}
+                            {repair.completedDate && (
+                              <span>Completed: {formatDate(repair.completedDate)}</span>
+                            )}
+                          </div>
+                          
+                          {repair.contractor && (
+                            <div className="flex items-center space-x-4">
+                              <span>Contractor: {repair.contractor}</span>
+                              {repair.contractorPhone && (
+                                <div className="flex items-center space-x-1">
+                                  <PhoneIcon className="w-3 h-3" />
+                                  <span>{repair.contractorPhone}</span>
+                                </div>
+                              )}
                             </div>
                           )}
+                          
+                          {repair.notes && (
+                            <p className="text-gray-600 mt-2 line-clamp-2">{repair.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-end space-y-2 ml-4">
+                      {repair.estimatedCost && (
+                        <div className="flex items-center space-x-1 text-sm">
+                          <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                          <span className="text-gray-600">
+                            Est: {formatCurrency(repair.estimatedCost)}
+                          </span>
                         </div>
                       )}
                       
-                      {repair.notes && (
-                        <p className="text-gray-600 mt-2">{repair.notes}</p>
+                      {repair.actualCost && (
+                        <div className="flex items-center space-x-1 text-sm">
+                          <CurrencyPoundIcon className="w-4 h-4 text-green-600" />
+                          <span className="font-medium text-green-600">
+                            Actual: {formatCurrency(repair.actualCost)}
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
-                
-                <div className="flex flex-col items-end space-y-2">
-                  {repair.estimatedCost && (
-                    <div className="flex items-center space-x-1 text-sm">
-                      <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-600">
-                        Est: {formatCurrency(repair.estimatedCost)}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {repair.actualCost && (
-                    <div className="flex items-center space-x-1 text-sm">
-                      <CurrencyPoundIcon className="w-4 h-4 text-green-600" />
-                      <span className="font-medium text-green-600">
-                        Actual: {formatCurrency(repair.actualCost)}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {repair.status === 'pending' && (
-                    <button
-                      onClick={() => setSelectedRepair(repair)}
-                      className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      Assign Contractor
-                    </button>
-                  )}
-                  
-                  {repair.status === 'in_progress' && (
-                    <button
-                      onClick={() => setSelectedRepair(repair)}
-                      className="inline-flex items-center px-3 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
-                    >
-                      Mark Complete
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Repair Details Modal */}
+      {selectedRepair && (
+        <RepairDetailsModal
+          repair={selectedRepair}
+          isOpen={showRepairModal}
+          onClose={() => {
+            setShowRepairModal(false);
+            setSelectedRepair(null);
+          }}
+          onRepairUpdate={(updatedRepair) => {
+            // Reload repairs to get updated data
+            loadRepairs();
+            // Update selected repair if it's the same one
+            if (selectedRepair && selectedRepair.id === updatedRepair.id) {
+              setSelectedRepair(updatedRepair);
+            }
+          }}
+          onRepairDelete={(repairId) => {
+            // Remove from local state
+            setRepairs(prev => prev.filter(r => r.id !== repairId));
+            setOriginalRepairs(prev => prev.filter(r => r.id !== repairId));
+            setShowRepairModal(false);
+            setSelectedRepair(null);
+          }}
+        />
+      )}
 
       {/* Repair Form Modal */}
       {showRepairForm && (

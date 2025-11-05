@@ -10,12 +10,16 @@ import {
   DocumentArrowUpIcon,
   HomeModernIcon,
   CreditCardIcon,
-  QuestionMarkCircleIcon
+  QuestionMarkCircleIcon,
+  XMarkIcon,
+  BuildingOfficeIcon,
+  MapPinIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
 import { CountryCode, getComplianceRequirements, DEFAULT_COUNTRY, getCountryConfig } from '../lib/countries';
 import { ComplianceType } from '../types';
-import { ComplianceGuideModal } from './ComplianceGuideModal';
 
 interface ComplianceWorkflowsProps {
   properties: SimplifiedProperty[];
@@ -48,7 +52,9 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
 }) => {
   const [compliance, setCompliance] = useState<ComplianceItem[]>(mockCompliance);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
-  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [showRequirementsModal, setShowRequirementsModal] = useState(false);
+  const [selectedRequirementsCountry, setSelectedRequirementsCountry] = useState<CountryCode>('UK');
+  const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
   const [updateForm, setUpdateForm] = useState({
     propertyId: '',
     type: 'gas_safety' as ComplianceType,
@@ -59,9 +65,59 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
     notes: ''
   });
 
+  // Toggle property expansion
+  const togglePropertyExpansion = (propertyId: string) => {
+    setExpandedProperties(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(propertyId)) {
+        newSet.delete(propertyId);
+      } else {
+        newSet.add(propertyId);
+      }
+      return newSet;
+    });
+  };
+
+  // Group compliance by property
+  const complianceByProperty = compliance.reduce((acc, item) => {
+    if (!acc[item.propertyId]) {
+      acc[item.propertyId] = [];
+    }
+    acc[item.propertyId].push(item);
+    return acc;
+  }, {} as Record<string, ComplianceItem[]>);
+
+  // Auto-expand properties with expired certificates on mount
+  React.useEffect(() => {
+    const propertiesWithExpired = properties.filter(property => {
+      const propertyCompliance = complianceByProperty[property.id] || [];
+      return propertyCompliance.some(c => {
+        if (!c.expiryDate) return false;
+        return getDaysUntilExpiry(c.expiryDate) <= 0;
+      });
+    });
+    
+    if (propertiesWithExpired.length > 0 && expandedProperties.size === 0) {
+      setExpandedProperties(new Set(propertiesWithExpired.map(p => p.id)));
+    }
+  }, [properties, compliance, complianceByProperty, expandedProperties.size]);
+
   // Get compliance requirements for country
   const complianceRequirements = getComplianceRequirements(countryCode, false);
   const countryConfig = getCountryConfig(countryCode);
+
+  // Group properties by country
+  const propertiesByCountry = properties.reduce((acc, property) => {
+    const propCountry = property.countryCode || DEFAULT_COUNTRY;
+    if (!acc[propCountry]) {
+      acc[propCountry] = [];
+    }
+    acc[propCountry].push(property);
+    return acc;
+  }, {} as Record<CountryCode, SimplifiedProperty[]>);
+
+  // Get list of countries present in properties
+  const countriesInUse = Object.keys(propertiesByCountry) as CountryCode[];
 
   const getComplianceIcon = (type: ComplianceType) => {
     switch (type) {
@@ -235,14 +291,37 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
     return getDaysUntilExpiry(c.expiryDate) <= 0;
   }).length;
 
-  // Group compliance by property
-  const complianceByProperty = compliance.reduce((acc, item) => {
-    if (!acc[item.propertyId]) {
-      acc[item.propertyId] = [];
-    }
-    acc[item.propertyId].push(item);
+  // Calculate stats by country
+  const statsByCountry = countriesInUse.reduce((acc, country) => {
+    const countryProps = propertiesByCountry[country];
+    const countryCompliance = compliance.filter(c => 
+      countryProps.some(p => p.id === c.propertyId)
+    );
+    acc[country] = {
+      properties: countryProps.length,
+      valid: countryCompliance.filter(c => c.status === 'valid').length,
+      expiring: countryCompliance.filter(c => {
+        if (!c.expiryDate) return false;
+        const days = getDaysUntilExpiry(c.expiryDate);
+        return days <= 90 && days > 0;
+      }).length,
+      expired: countryCompliance.filter(c => {
+        if (!c.expiryDate) return false;
+        return getDaysUntilExpiry(c.expiryDate) <= 0;
+      }).length,
+    };
     return acc;
-  }, {} as Record<string, ComplianceItem[]>);
+  }, {} as Record<CountryCode, { properties: number; valid: number; expiring: number; expired: number }>);
+
+  // Get country flag emoji
+  const getCountryFlag = (country: CountryCode) => {
+    switch (country) {
+      case 'UK': return '🇬🇧';
+      case 'US': return '🇺🇸';
+      case 'GR': return '🇬🇷';
+      default: return '📍';
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -250,11 +329,11 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Compliance Management</h2>
-          <p className="text-gray-600">Track certificates and legal requirements for {countryConfig.name}</p>
+          <p className="text-sm text-gray-600 mt-1">Track certificates and legal requirements</p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex items-center space-x-3">
           <button
-            onClick={() => setShowGuideModal(true)}
+            onClick={() => setShowRequirementsModal(true)}
             className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
           >
             <QuestionMarkCircleIcon className="w-4 h-4 mr-2" />
@@ -262,89 +341,46 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
           </button>
           <button
             onClick={() => setShowUpdateForm(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
           >
             <DocumentArrowUpIcon className="w-4 h-4 mr-2" />
-            Update Certificate
+            Add Certificate
           </button>
         </div>
       </div>
 
-      {/* Market-Specific Info Card */}
-      <div className="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl shadow-sm border border-blue-200 p-6">
-        <div className="flex items-start space-x-4">
-          <div className="flex-shrink-0">
-            <ShieldCheckIcon className="w-8 h-8 text-blue-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {countryConfig.name} Compliance Requirements
-            </h3>
-            <p className="text-sm text-gray-700 mb-3">
-              {countryCode === 'UK' && (
-                <>You need to maintain <strong>{complianceRequirements.length} types of certificates</strong> for UK rental properties. 
-                This includes gas safety, electrical, EPC, deposit protection, and more. Click "View Requirements" for details.</>
-              )}
-              {countryCode === 'US' && (
-                <>US properties require <strong>{complianceRequirements.length} baseline federal compliance items</strong>.
-                Additional state and local requirements may apply. Always check your local housing authority.</>
-              )}
-              {countryCode === 'GR' && (
-                <>Greek properties require <strong>{complianceRequirements.length} key compliance documents</strong>.
-                All rental income must be declared to tax authorities (ΑΑΔΕ) and contracts must be registered.</>
-              )}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {complianceRequirements.slice(0, 5).map((req) => (
-                <span 
-                  key={req.id}
-                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white border border-blue-200 text-gray-700"
-                >
-                  {req.name}
-                </span>
-              ))}
-              {complianceRequirements.length > 5 && (
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white border border-blue-200 text-gray-700">
-                  +{complianceRequirements.length - 5} more
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircleIcon className="w-6 h-6 text-green-600" />
+              <CheckCircleIcon className="w-5 h-5 text-green-600" />
             </div>
-            <div className="ml-4">
+            <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Valid</p>
               <p className="text-2xl font-bold text-gray-900">{validItems}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
           <div className="flex items-center">
             <div className="p-2 bg-yellow-100 rounded-lg">
-              <ClockIcon className="w-6 h-6 text-yellow-600" />
+              <ClockIcon className="w-5 h-5 text-yellow-600" />
             </div>
-            <div className="ml-4">
+            <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Expiring Soon</p>
               <p className="text-2xl font-bold text-gray-900">{expiringSoonItems}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
           <div className="flex items-center">
             <div className="p-2 bg-red-100 rounded-lg">
-              <ExclamationTriangleIcon className="w-6 h-6 text-red-600" />
+              <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />
             </div>
-            <div className="ml-4">
+            <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Expired</p>
               <p className="text-2xl font-bold text-gray-900">{expiredItems}</p>
             </div>
@@ -352,48 +388,173 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
         </div>
       </div>
 
-      {/* Compliance by Property */}
-      <div className="space-y-6">
-        {properties.map((property) => {
+      {/* Compliance by Country and Property */}
+      <div className="space-y-4">
+        {countriesInUse.length === 0 ? (
+          <div className="bg-white rounded-lg shadow border border-gray-200 p-8 text-center">
+            <BuildingOfficeIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No Properties Found</h3>
+            <p className="text-sm text-gray-500">Add properties to start tracking compliance certificates.</p>
+          </div>
+        ) : (
+          countriesInUse.map((country) => {
+            const countryProperties = propertiesByCountry[country];
+            const countryInfo = getCountryConfig(country);
+            const stats = statsByCountry[country];
+            
+            return (
+              <div key={country} className="space-y-4">
+                {/* Country Header */}
+                <div className="bg-white rounded-lg shadow border border-gray-200">
+                  <div className="px-4 py-3 border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <span className="text-2xl">{getCountryFlag(country)}</span>
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900">{countryInfo.name}</h3>
+                          <div className="flex items-center space-x-4 mt-1">
+                            <span className="text-sm text-gray-500">
+                              {countryProperties.length} {countryProperties.length === 1 ? 'property' : 'properties'}
+                            </span>
+                            {stats && stats.valid > 0 && (
+                              <span className="text-sm text-green-600">{stats.valid} valid</span>
+                            )}
+                            {stats && stats.expiring > 0 && (
+                              <span className="text-sm text-yellow-600">{stats.expiring} expiring</span>
+                            )}
+                            {stats && stats.expired > 0 && (
+                              <span className="text-sm text-red-600">{stats.expired} expired</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowRequirementsModal(true);
+                          setSelectedRequirementsCountry(country);
+                        }}
+                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                      >
+                        View Requirements
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Properties in this country */}
+                <div className="space-y-4">
+                  {countryProperties.map((property) => {
           const propertyCompliance = complianceByProperty[property.id] || [];
+                    const propertyValid = propertyCompliance.filter(c => c.status === 'valid').length;
+                    const propertyExpiring = propertyCompliance.filter(c => {
+                      if (!c.expiryDate) return false;
+                      const days = getDaysUntilExpiry(c.expiryDate);
+                      return days <= 90 && days > 0;
+                    }).length;
+                    const propertyExpired = propertyCompliance.filter(c => {
+                      if (!c.expiryDate) return false;
+                      return getDaysUntilExpiry(c.expiryDate) <= 0;
+                    }).length;
+                    
+                    const isExpanded = expandedProperties.has(property.id);
+                    // Auto-expand if property has expired certificates
+                    const shouldAutoExpand = propertyExpired > 0;
           
           return (
             <div key={property.id} className="bg-white rounded-lg shadow border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">{property.address}</h3>
+                        <div 
+                          className="px-4 py-3 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={() => togglePropertyExpansion(property.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 flex-1 min-w-0">
+                              <div className="text-gray-400 flex-shrink-0">
+                                {isExpanded ? (
+                                  <ChevronUpIcon className="w-5 h-5" />
+                                ) : (
+                                  <ChevronDownIcon className="w-5 h-5" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h4 className="text-sm font-medium text-gray-900">{property.address}</h4>
+                                {propertyCompliance.length > 0 && (
+                                  <div className="flex items-center space-x-3 mt-1 text-xs text-gray-500">
+                                    <span>{propertyCompliance.length} certificate{propertyCompliance.length !== 1 ? 's' : ''}</span>
+                                    {propertyValid > 0 && (
+                                      <span className="text-green-600">{propertyValid} valid</span>
+                                    )}
+                                    {propertyExpiring > 0 && (
+                                      <span className="text-yellow-600">{propertyExpiring} expiring</span>
+                                    )}
+                                    {propertyExpired > 0 && (
+                                      <span className="text-red-600 font-medium">{propertyExpired} expired</span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setUpdateForm({...updateForm, propertyId: property.id});
+                                setShowUpdateForm(true);
+                              }}
+                              className="ml-3 px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 flex-shrink-0"
+                            >
+                              Add Certificate
+                            </button>
+                          </div>
               </div>
               
-              <div className="p-6">
+                        {isExpanded && (
+                          <div className="p-4">
                 {propertyCompliance.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {propertyCompliance.map((item) => {
                       const daysUntilExpiry = item.expiryDate ? getDaysUntilExpiry(item.expiryDate) : null;
+                                  const isExpired = daysUntilExpiry !== null && daysUntilExpiry <= 0;
+                                  const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry > 0 && daysUntilExpiry <= 90;
                       
                       return (
-                        <div key={item.id} className="border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-center space-x-2 mb-2">
+                                    <div 
+                                      key={item.id} 
+                                      className={`border rounded-lg p-3 ${
+                                        isExpired 
+                                          ? 'border-red-200 bg-red-50' 
+                                          : isExpiringSoon 
+                                          ? 'border-yellow-200 bg-yellow-50' 
+                                          : 'border-gray-200 bg-white'
+                                      }`}
+                                    >
+                                      <div className="flex items-start space-x-2 mb-2">
+                                        <div className="flex-shrink-0 mt-0.5">
                             {getComplianceIcon(item.type)}
-                            <span className="text-sm font-medium text-gray-900">
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <h5 className="text-sm font-medium text-gray-900">
                               {getComplianceTypeLabel(item.type)}
-                            </span>
+                                          </h5>
+                                        </div>
                           </div>
                           
-                          <div className="space-y-2">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.status)}`}>
+                                      <div className="space-y-1.5">
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(item.status)}`}>
                               {item.status.replace('_', ' ')}
                             </span>
                             
                             {item.expiryDate && (
-                              <div className="text-xs text-gray-500">
-                                <div>Expires: {formatDate(item.expiryDate)}</div>
+                                          <div className="text-xs">
+                                            <div className="text-gray-600">Expires: {formatDate(item.expiryDate)}</div>
                                 {daysUntilExpiry !== null && (
-                                  <div className={`${
-                                    daysUntilExpiry <= 0 ? 'text-red-600' :
-                                    daysUntilExpiry <= 90 ? 'text-yellow-600' :
-                                    'text-green-600'
-                                  }`}>
-                                    {daysUntilExpiry <= 0 
+                                              <div className={`font-medium mt-0.5 ${
+                                                isExpired ? 'text-red-700' :
+                                                isExpiringSoon ? 'text-yellow-700' :
+                                                'text-green-700'
+                                              }`}>
+                                                {isExpired 
                                       ? `Expired ${Math.abs(daysUntilExpiry)} days ago`
+                                                  : isExpiringSoon
+                                                  ? `${daysUntilExpiry} days remaining`
                                       : `${daysUntilExpiry} days remaining`
                                     }
                                   </div>
@@ -402,7 +563,7 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
                             )}
                             
                             {item.certificateNumber && (
-                              <div className="text-xs text-gray-500">
+                                          <div className="text-xs text-gray-500 pt-1 border-t border-gray-200">
                                 Cert: {item.certificateNumber}
                               </div>
                             )}
@@ -419,30 +580,176 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                    <DocumentCheckIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-sm text-gray-500">No compliance records for this property</p>
+                                <DocumentCheckIcon className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                                <p className="text-sm text-gray-600 mb-1">No compliance certificates</p>
                     <button
                       onClick={() => {
                         setUpdateForm({...updateForm, propertyId: property.id});
                         setShowUpdateForm(true);
                       }}
-                      className="mt-2 text-sm text-blue-600 hover:text-blue-500"
-                    >
-                      Add certificate
-                    </button>
-                  </div>
-                )}
+                                  className="mt-3 inline-flex items-center px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                                >
+                                  <DocumentArrowUpIcon className="w-4 h-4 mr-1.5" />
+                                  Add Certificate
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
+      {/* Requirements Modal */}
+      {showRequirementsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Compliance Requirements
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Required documents and certificates by country
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRequirementsModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <XMarkIcon className="w-6 h-6 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Country Tabs */}
+            <div className="border-b border-gray-200 px-6">
+              <nav className="-mb-px flex space-x-8">
+                {(['UK', 'US', 'GR'] as CountryCode[]).map((country) => {
+                  const config = getCountryConfig(country);
+                  return (
+                    <button
+                      key={country}
+                      onClick={() => setSelectedRequirementsCountry(country)}
+                      className={`
+                        py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                        ${selectedRequirementsCountry === country
+                          ? 'border-green-500 text-green-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        }
+                      `}
+                    >
+                      {config.name}
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-6">
+                {/* Requirements List for Selected Country */}
+                <div>
+                  <div className="mb-6">
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {getCountryConfig(selectedRequirementsCountry).name} Compliance Requirements
+                    </h3>
+                    <p className="text-gray-600 mt-1">
+                      Required documents and certificates for rental properties
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {getComplianceRequirements(selectedRequirementsCountry, false).map((req) => (
+                      <div 
+                        key={req.id}
+                        className="border border-gray-200 rounded-lg p-5 hover:border-green-300 transition-colors"
+                      >
+                        <div className="flex items-start space-x-4">
+                          <div className="flex-shrink-0 mt-1">
+                            {getComplianceIcon(req.id as ComplianceType)}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-gray-900 text-lg">
+                                {req.name}
+                                {req.mandatory && (
+                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                    Mandatory
+                                  </span>
+                                )}
+                              </h4>
+                              <span className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
+                                {(() => {
+                                  switch (req.frequency) {
+                                    case 'annual': return 'Every year';
+                                    case 'biennial': return 'Every 2 years';
+                                    case '5_years': return 'Every 5 years';
+                                    case '10_years': return 'Every 10 years';
+                                    case 'once': return 'Once per tenancy';
+                                    case 'as_needed': return 'As needed';
+                                    default: return req.frequency;
+                                  }
+                                })()}
+                              </span>
+                            </div>
+                            <p className="text-gray-600">
+                              {req.description}
+                            </p>
+                            {req.appliesToHMO && !req.appliesToStandard && (
+                              <p className="text-sm text-purple-600 mt-2 font-medium">
+                                ⚠️ HMO properties only
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Info Box */}
+                  <div className="mt-6 bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <p className="text-sm text-blue-800">
+                      <strong>💡 Tip:</strong> Keep all certificates and records for at least 2 years after the tenancy ends.
+                      {selectedRequirementsCountry === 'UK' && ' Provide copies to tenants within 28 days of completion.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end">
+              <button
+                onClick={() => setShowRequirementsModal(false)}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+      </div>
+      )}
+
       {/* Update Form Modal */}
-      {showUpdateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      {showUpdateForm && (() => {
+        // Get selected property to determine country
+        const selectedProperty = properties.find(p => p.id === updateForm.propertyId);
+        const propertyCountry = selectedProperty?.countryCode || DEFAULT_COUNTRY;
+        const propertyCountryRequirements = getComplianceRequirements(propertyCountry, selectedProperty?.propertyType === 'hmo');
+        const propertyCountryConfig = getCountryConfig(propertyCountry);
+        
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-screen overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Update Compliance Certificate</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Add Compliance Certificate</h3>
             
             <form onSubmit={handleUpdateCompliance} className="space-y-4">
               <div>
@@ -451,18 +758,35 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
                 </label>
                 <select
                   value={updateForm.propertyId}
-                  onChange={(e) => setUpdateForm({...updateForm, propertyId: e.target.value})}
+                    onChange={(e) => {
+                      const newPropertyId = e.target.value;
+                      const newProperty = properties.find(p => p.id === newPropertyId);
+                      // Reset certificate type when property changes to ensure it's valid for the new country
+                      setUpdateForm({
+                        ...updateForm, 
+                        propertyId: newPropertyId,
+                        type: (newProperty && getComplianceRequirements(newProperty.countryCode, newProperty.propertyType === 'hmo')[0]?.id) || 'gas_safety' as ComplianceType
+                      });
+                    }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   required
                 >
                   <option value="">Select a property</option>
                   {properties.map((property) => (
                     <option key={property.id} value={property.id}>
-                      {property.address}
+                        {property.address} ({getCountryConfig(property.countryCode).name})
                     </option>
                   ))}
                 </select>
               </div>
+
+                {selectedProperty && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>📍 {propertyCountryConfig.name}</strong> - Showing {propertyCountryConfig.name} compliance requirements
+                    </p>
+                  </div>
+                )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -472,14 +796,19 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
                   value={updateForm.type}
                   onChange={(e) => setUpdateForm({...updateForm, type: e.target.value as ComplianceType})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    disabled={!selectedProperty}
                 >
-                  {complianceRequirements.map((req) => (
+                    {selectedProperty ? (
+                      propertyCountryRequirements.map((req) => (
                     <option key={req.id} value={req.id}>
                       {req.name} {req.mandatory ? '*' : ''}
                     </option>
-                  ))}
+                      ))
+                    ) : (
+                      <option value="">Select a property first</option>
+                    )}
                 </select>
-                <p className="mt-1 text-xs text-gray-500">* = Mandatory</p>
+                  <p className="mt-1 text-xs text-gray-500">* = Mandatory for {selectedProperty ? propertyCountryConfig.name : 'selected country'}</p>
               </div>
 
               <div>
@@ -567,14 +896,8 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
             </form>
           </div>
         </div>
-      )}
-
-      {/* Compliance Guide Modal */}
-      <ComplianceGuideModal
-        isOpen={showGuideModal}
-        onClose={() => setShowGuideModal(false)}
-        countryCode={countryCode}
-      />
+        );
+      })()}
     </div>
   );
 };

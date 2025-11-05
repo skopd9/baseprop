@@ -33,6 +33,8 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'occupied':
       return 'bg-green-100 text-green-800 border-green-200';
+    case 'partially_occupied':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
     case 'vacant':
       return 'bg-yellow-100 text-yellow-800 border-yellow-200';
     case 'under_management':
@@ -63,6 +65,7 @@ const propertyTypes = [
 const statusTypes = [
   { value: '', label: 'All Status' },
   { value: 'occupied', label: 'Occupied' },
+  { value: 'partially_occupied', label: 'Partially Occupied' },
   { value: 'vacant', label: 'Vacant' },
   { value: 'maintenance', label: 'Under Maintenance' },
   { value: 'sold', label: 'Sold' },
@@ -82,7 +85,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
   const safeTenants = Array.isArray(tenants) ? tenants : [];
   
   const [sorting, setSorting] = useState<SortingState>([
-    { id: 'address', desc: false }
+    { id: 'propertyReference', desc: false }
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
@@ -98,6 +101,16 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
   }, [tenants]);
 
   const columns = useMemo<ColumnDef<SimplifiedProperty>[]>(() => [
+    {
+      accessorKey: 'propertyReference',
+      header: 'Ref',
+      cell: info => (
+        <span className="text-sm font-medium text-gray-900">
+          {info.getValue() as number}
+        </span>
+      ),
+      size: 60,
+    },
     {
       accessorKey: 'address',
       header: 'Address',
@@ -185,14 +198,14 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
     },
     {
       id: 'financial_info',
-      header: 'Financial',
+      header: 'Purchase Price',
       cell: info => {
         const property = info.row.original;
         return (
           <div className="space-y-1">
             {property.purchasePrice && (
               <div className="text-xs text-gray-500">
-                Bought: {formatCurrency(property.purchasePrice)}
+                {formatCurrency(property.purchasePrice)}
               </div>
             )}
             {property.salesPrice && (
@@ -201,7 +214,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
               </div>
             )}
             {!property.purchasePrice && !property.salesPrice && (
-              <div className="text-xs text-gray-400">No data</div>
+              <div className="text-xs text-gray-400">Not set</div>
             )}
           </div>
         );

@@ -52,6 +52,7 @@ export class RepairService {
 
       if (error) {
         console.error('Error fetching repairs:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
         return [];
       }
 
@@ -89,6 +90,7 @@ export class RepairService {
 
       if (error) {
         console.error('Error fetching property repairs:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
         return [];
       }
 
@@ -179,27 +181,37 @@ export class RepairService {
   static async updateRepair(
     repairId: string,
     updates: Partial<{
-      status: 'reported' | 'acknowledged' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
-      scheduledDate: Date;
-      completedDate: Date;
-      contractorName: string;
-      contractorCompany: string;
-      contractorPhone: string;
-      actualCost: number;
-      notes: string;
+      title?: string;
+      description?: string;
+      status?: 'reported' | 'acknowledged' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+      priority?: 'low' | 'medium' | 'high' | 'urgent';
+      scheduledDate?: Date;
+      completedDate?: Date;
+      contractorName?: string;
+      contractorCompany?: string;
+      contractorPhone?: string;
+      estimatedCost?: number;
+      actualCost?: number;
+      notes?: string;
+      isEmergency?: boolean;
     }>
   ): Promise<Repair | null> {
     try {
       const dbUpdates: any = {};
       
-      if (updates.status) dbUpdates.status = updates.status;
-      if (updates.scheduledDate) dbUpdates.scheduled_date = updates.scheduledDate;
-      if (updates.completedDate) dbUpdates.completed_date = updates.completedDate;
-      if (updates.contractorName) dbUpdates.contractor_name = updates.contractorName;
-      if (updates.contractorCompany) dbUpdates.contractor_company = updates.contractorCompany;
-      if (updates.contractorPhone) dbUpdates.contractor_phone = updates.contractorPhone;
+      if (updates.title !== undefined) dbUpdates.title = updates.title;
+      if (updates.description !== undefined) dbUpdates.description = updates.description;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+      if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
+      if (updates.completedDate !== undefined) dbUpdates.completed_date = updates.completedDate;
+      if (updates.contractorName !== undefined) dbUpdates.contractor_name = updates.contractorName;
+      if (updates.contractorCompany !== undefined) dbUpdates.contractor_company = updates.contractorCompany;
+      if (updates.contractorPhone !== undefined) dbUpdates.contractor_phone = updates.contractorPhone;
+      if (updates.estimatedCost !== undefined) dbUpdates.estimated_cost = updates.estimatedCost;
       if (updates.actualCost !== undefined) dbUpdates.actual_cost = updates.actualCost;
       if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+      if (updates.isEmergency !== undefined) dbUpdates.is_emergency = updates.isEmergency;
 
       const { data, error } = await supabase
         .from('repairs')

@@ -9,7 +9,7 @@ export class SimplifiedPropertyService {
       let query = supabase
         .from('properties')
         .select('*')
-        .order('created_at', { ascending: false});
+        .order('property_reference', { ascending: true });
 
       // Filter by organization if provided
       if (organizationId) {
@@ -144,7 +144,6 @@ export class SimplifiedPropertyService {
         unit_details: propertyData.unitDetails,
         tenant_count: 0,
         is_simplified_demo: true, // Flag to identify demo properties
-        status: 'active',
       };
 
       // Insert into database
@@ -152,7 +151,7 @@ export class SimplifiedPropertyService {
         asset_register_id: assetRegisterId,
         name: `Property at ${propertyData.address}`,
         address: propertyData.address,
-        status: 'active',
+        status: 'vacant', // New properties start as vacant (allowed values: vacant, occupied, partially_occupied, maintenance, sold)
         property_data: dbPropertyData,
       };
 
@@ -255,7 +254,7 @@ export class SimplifiedPropertyService {
       const { data, error } = await supabase
         .from('properties')
         .update({
-          status: 'disposed', // Use database status
+          status: 'sold', // Database constraint allows: vacant, occupied, partially_occupied, maintenance, sold
           property_data: updatedPropertyData,
           updated_at: new Date().toISOString(),
         })
@@ -363,10 +362,18 @@ export class SimplifiedPropertyService {
       const updatedPropertyData = {
         ...currentProperty.property_data,
         ...(updates.propertyName !== undefined && { property_name: updates.propertyName }),
-        ...(updates.propertyType && { property_sub_type: updates.propertyType }),
+        ...(updates.propertyType && { 
+          property_sub_type: updates.propertyType,
+          property_type: 'residential' // Always residential for simplified properties
+        }),
         ...(updates.bedrooms !== undefined && { bedrooms: updates.bedrooms }),
         ...(updates.bathrooms !== undefined && { bathrooms: updates.bathrooms }),
-        ...(updates.targetRent !== undefined && { monthly_rent: updates.targetRent }),
+        ...(updates.targetRent !== undefined && { 
+          target_rent: updates.targetRent,
+          monthly_rent: updates.targetRent // Keep both for compatibility
+        }),
+        ...(updates.purchasePrice !== undefined && { purchase_price: updates.purchasePrice }),
+        ...(updates.salesPrice !== undefined && { sales_price: updates.salesPrice }),
         ...(updates.tenantCount !== undefined && { tenant_count: updates.tenantCount }),
         // Enhanced property details
         ...(updates.totalArea !== undefined && { total_area: updates.totalArea }),
@@ -379,7 +386,10 @@ export class SimplifiedPropertyService {
         ...(updates.licenseRequired !== undefined && { license_required: updates.licenseRequired }),
         ...(updates.licenseNumber !== undefined && { license_number: updates.licenseNumber }),
         ...(updates.licenseExpiry !== undefined && { license_expiry: updates.licenseExpiry?.toISOString() }),
-        ...(updates.rooms !== undefined && { rooms: updates.rooms }),
+        ...(updates.rooms !== undefined && { 
+          rooms: updates.rooms,
+          units: updates.rooms?.length || 1
+        }),
       };
 
       // Prepare minimal core field updates
@@ -391,17 +401,39 @@ export class SimplifiedPropertyService {
       // Only update core fields that we know exist
       if (updates.address) {
         coreUpdates.address = updates.address;
-        coreUpdates.name = `Property at ${updates.address}`;
+        // Only update name if propertyName is not explicitly set
+        if (!updates.propertyName) {
+          coreUpdates.name = `Property at ${updates.address}`;
+        }
+      }
+      
+      if (updates.propertyName !== undefined) {
+        // If propertyName is explicitly provided, use it
+        // Empty string means user wants to clear the custom name
+        coreUpdates.name = updates.propertyName || (updates.address ? `Property at ${updates.address}` : currentProperty.name);
       }
 
       if (updates.status) {
         // Map simplified status to database status
-        coreUpdates.status = updates.status === 'sold' ? 'sold' : 'active';
+        // Database allows: 'vacant', 'occupied', 'partially_occupied', 'maintenance', 'sold'
+        // Simplified uses: 'under_management', 'sold'
+        if (updates.status === 'sold') {
+          coreUpdates.status = 'sold';
+        }
+        // For 'under_management', don't change the core status field
+        // The occupancy status is calculated dynamically based on tenants
       }
 
+      // NOTE: The properties table only has these columns:
+      // id, asset_register_id, name, address, property_data (JSONB), status, 
+      // created_at, updated_at, module_id, organization_id, property_reference
+      // 
+      // All property details (bedrooms, bathrooms, rent, etc.) are stored in property_data JSONB
+      // So we only update the core columns that exist, not individual property detail columns
 
-
-      // Update in database
+      // Update in database - only update columns that actually exist
+      console.log('Attempting to update property with payload:', coreUpdates);
+      
       const { data, error } = await supabase
         .from('properties')
         .update(coreUpdates)
@@ -410,10 +442,18 @@ export class SimplifiedPropertyService {
         .single();
 
       if (error) {
-        console.error('Error updating simplified property:', error);
-        console.error('Update payload:', coreUpdates);
+        console.error('❌ Error updating simplified property:', error);
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        console.error('Update payload that failed:', JSON.stringify(coreUpdates, null, 2));
         return null;
       }
+      
+      console.log('✅ Property updated successfully:', data);
 
       // Get current tenant count for this property
       const { count: tenantCount } = await supabase

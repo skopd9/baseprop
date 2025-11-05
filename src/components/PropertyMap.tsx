@@ -435,25 +435,6 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         </div>
       )}
       <div ref={mapRef} className="w-full h-full" />
-      
-      {/* Legend - Hidden on mobile, visible on tablet and up */}
-      <div className="hidden md:block absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
-        <h4 className="text-xs font-medium text-gray-900 mb-2">Property Status</h4>
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span className="text-xs text-gray-600">Occupied</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-            <span className="text-xs text-gray-600">Vacant</span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded-full bg-gray-500"></div>
-            <span className="text-xs text-gray-600">Sold</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

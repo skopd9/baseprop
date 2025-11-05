@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { XMarkIcon, UserIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant, validateTenantData } from '../utils/simplifiedDataTransforms';
 import { SimplifiedTenantService } from '../services/SimplifiedTenantService';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 
 
@@ -20,6 +21,7 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
   properties,
   existingTenants,
 }) => {
+  const { currentOrganization } = useOrganization();
   const [formData, setFormData] = useState({
     firstName: '',
     surname: '',
@@ -33,38 +35,11 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get available properties (not at full capacity)
+  // Get all properties - show all properties, user can decide if they want to add more tenants
   const availableProperties = useMemo(() => {
-    const filtered = properties.filter(property => {
-      const propertyTenants = existingTenants.filter(t => t.propertyId === property.id);
-      
-      // Calculate max tenants based on property type and structure
-      let maxTenants = 1; // Default for single-unit properties
-      
-      if (property.propertyType === 'house') {
-        maxTenants = property.bedrooms || 1;
-      } else if (property.propertyType === 'hmo') {
-        // For HMO properties, use bedrooms as max tenants (one tenant per room)
-        maxTenants = property.bedrooms || 1;
-      } else if (property.propertyType === 'apartment' || property.propertyType === 'flat') {
-        // For apartments/flats, typically one tenancy (but could have multiple tenants)
-        maxTenants = property.bedrooms || 1;
-      } else if (property.units && typeof property.units === 'number') {
-        // For properties with defined units
-        maxTenants = property.units;
-      }
-      
-      const isAvailable = propertyTenants.length < maxTenants;
-      
-      // Debug logging
-      // Debug logging removed to reduce console noise
-      
-      return isAvailable;
-    });
-    
-    // Debug logging removed to reduce console noise
-    return filtered;
-  }, [properties, existingTenants]);
+    // Return all properties - let the user decide capacity
+    return properties;
+  }, [properties]);
 
   // Date-related logic removed - now handled in onboarding flow
 
@@ -146,6 +121,8 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
     setError(null);
 
     try {
+      console.log('Form submission started', { formData, isHMO });
+      
       // Validate required fields
       if (!formData.firstName.trim()) {
         throw new Error('First name is required');
@@ -159,35 +136,38 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
         throw new Error('Email address is required for tenant portal access');
       }
 
-      if (!formData.phone.trim()) {
-        throw new Error('Phone number is required');
-      }
-
       if (!formData.propertyId) {
         throw new Error('Please select a property');
       }
 
-      if (isHMO && !formData.unitNumber) {
+      if (isHMO && !formData.roomId) {
         throw new Error('Please select a room for this HMO property');
       }
+      
+      console.log('Validation passed, creating tenant...');
 
       // Basic tenant validation only - lease info will be added in onboarding
 
       // Create tenant data without lease information
       const tenantData = {
         name: `${formData.firstName.trim()} ${formData.surname.trim()}`,
-        email: formData.email.trim() || undefined,
-        phone: formData.phone.trim() || undefined,
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined, // Optional
         propertyId: formData.propertyId,
         unitNumber: isHMO ? formData.unitNumber : undefined,
         roomId: isHMO ? formData.roomId : undefined,
         roomName: isHMO ? formData.roomName : undefined,
       };
+      
+      console.log('Tenant data prepared:', tenantData);
 
       // Basic validation for tenant creation without lease data
 
       // Create tenant in database
-      const createdTenant = await SimplifiedTenantService.createSimplifiedTenant(tenantData);
+      const createdTenant = await SimplifiedTenantService.createSimplifiedTenant(
+        tenantData,
+        currentOrganization?.id
+      );
 
       if (!createdTenant) {
         throw new Error('Failed to create tenant. Please try again.');
@@ -213,9 +193,22 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
         roomName: '',
       });
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error adding tenant:', err);
-      setError(err instanceof Error ? err.message : 'Failed to add tenant');
+      
+      // Extract detailed error message from Supabase error
+      let errorMessage = 'Failed to add tenant';
+      if (err?.message) {
+        errorMessage = err.message;
+      }
+      if (err?.details) {
+        errorMessage += ` - ${err.details}`;
+      }
+      if (err?.hint) {
+        errorMessage += ` (Hint: ${err.hint})`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -311,7 +304,7 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   type="email"
@@ -319,6 +312,7 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="john.smith@email.com"
                 />
@@ -358,15 +352,19 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Select a property</option>
-                  {availableProperties.map((property) => (
-                    <option key={property.id} value={property.id}>
-                      {property.address} ({property.propertyType})
-                    </option>
-                  ))}
+                  {availableProperties.map((property) => {
+                    const propertyTenants = existingTenants.filter(t => t.propertyId === property.id);
+                    const tenantCount = propertyTenants.length;
+                    return (
+                      <option key={property.id} value={property.id}>
+                        {property.address} ({property.propertyType}) - {tenantCount} tenant{tenantCount !== 1 ? 's' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
                 {availableProperties.length === 0 && (
                   <p className="text-xs text-red-600 mt-1">
-                    No properties available. All properties are at full capacity.
+                    No properties found. Please add a property first.
                   </p>
                 )}
               </div>
@@ -446,16 +444,15 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isSubmitting}
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={
-                isSubmitting || 
-                availableProperties.length === 0
-              }
+              onClick={() => console.log('Button clicked!', { isSubmitting, propertiesLength: properties.length, disabled: isSubmitting || properties.length === 0 })}
+              disabled={isSubmitting || properties.length === 0}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
@@ -467,6 +464,11 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
                 'Add Tenant'
               )}
             </button>
+          </div>
+          
+          {/* Debug info - remove after testing */}
+          <div className="text-xs text-gray-500 mt-2">
+            Debug: Properties={properties.length}, Submitting={isSubmitting.toString()}, Disabled={String(isSubmitting || properties.length === 0)}
           </div>
         </form>
       </div>

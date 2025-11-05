@@ -24,6 +24,7 @@ import {
 import { SimplifiedTenant } from '../utils/simplifiedDataTransforms';
 import { SimpleTenantOnboardingService } from '../services/SimpleTenantOnboardingService';
 import { EnhancedTenantOnboardingModal } from './EnhancedTenantOnboardingModal';
+import { TenantDetailsModal } from './TenantDetailsModal';
 
 interface ResidentialTenantsTableProps {
   tenants: SimplifiedTenant[];
@@ -34,17 +35,6 @@ interface ResidentialTenantsTableProps {
   onDeleteTenant: (tenant: SimplifiedTenant) => void;
   onTenantUpdate: (tenant: SimplifiedTenant) => void; // Add callback for tenant updates
 }
-
-const getRentStatusColor = (status: string) => {
-  switch (status) {
-    case 'current':
-      return 'bg-green-100 text-green-800 border-green-200';
-    case 'overdue':
-      return 'bg-red-100 text-red-800 border-red-200';
-    default:
-      return 'bg-gray-100 text-gray-800 border-gray-200';
-  }
-};
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-GB', {
@@ -62,12 +52,6 @@ const formatDate = (date: Date) => {
     year: 'numeric'
   }).format(date);
 };
-
-const rentStatusTypes = [
-  { value: '', label: 'All Status' },
-  { value: 'current', label: 'Up to Date' },
-  { value: 'overdue', label: 'Overdue' },
-];
 
 const onboardingStatusTypes = [
   { value: '', label: 'All Onboarding' },
@@ -92,8 +76,11 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
   const [globalFilter, setGlobalFilter] = useState('');
   const [selectedTenantForOnboarding, setSelectedTenantForOnboarding] = useState<SimplifiedTenant | null>(null);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedTenantForDetails, setSelectedTenantForDetails] = useState<SimplifiedTenant | null>(null);
 
-  const handleOnboardingAction = (tenant: SimplifiedTenant) => {
+  const handleOnboardingAction = (e: React.MouseEvent, tenant: SimplifiedTenant) => {
+    e.stopPropagation(); // Prevent row click
     setSelectedTenantForOnboarding(tenant);
     setShowOnboardingModal(true);
   };
@@ -102,6 +89,18 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
     onTenantUpdate(updatedTenant);
     setShowOnboardingModal(false);
     setSelectedTenantForOnboarding(null);
+  };
+
+  const handleViewDetails = (e: React.MouseEvent, tenant: SimplifiedTenant) => {
+    e.stopPropagation(); // Prevent row click
+    setSelectedTenantForDetails(tenant);
+    setShowDetailsModal(true);
+  };
+
+  const handleTenantRowClick = (tenant: SimplifiedTenant) => {
+    onTenantSelect(tenant);
+    setSelectedTenantForDetails(tenant);
+    setShowDetailsModal(true);
   };
 
   const columns = useMemo<ColumnDef<SimplifiedTenant>[]>(() => [
@@ -177,6 +176,11 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
       header: 'Lease Period',
       cell: info => {
         const tenant = info.row.original;
+        if (!tenant.leaseStart || !tenant.leaseEnd) {
+          return (
+            <span className="text-xs text-gray-400 italic">Not set</span>
+          );
+        }
         const isExpiringSoon = tenant.leaseEnd <= new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 3 months
         
         return (
@@ -207,30 +211,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
         </div>
       ),
       size: 120,
-    },
-    {
-      accessorKey: 'rentStatus',
-      header: 'Rent Status',
-      cell: info => {
-        const tenant = info.row.original;
-        const status = tenant.rentStatus;
-        const daysOverdue = tenant.daysOverdue;
-        
-        let statusLabel = 'Up to Date';
-        if (status === 'overdue' && daysOverdue !== undefined) {
-          statusLabel = `Overdue (${daysOverdue} ${daysOverdue === 1 ? 'day' : 'days'})`;
-        } else if (status === 'overdue') {
-          statusLabel = 'Overdue';
-        }
-        
-        return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getRentStatusColor(status)}`}>
-            {statusLabel}
-          </span>
-        );
-      },
-      filterFn: 'equals',
-      size: 140,
     },
     {
       id: 'onboardingStatus',
@@ -294,39 +274,38 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
       header: 'Actions',
       cell: info => {
         const tenant = info.row.original;
-        const getOnboardingAction = (tenant: SimplifiedTenant) => {
-          const status = tenant.onboardingStatus || 'not_started';
-          switch (status) {
-            case 'not_started':
-              return { label: 'Start Onboarding', color: 'blue' };
-            case 'in_progress':
-              return { label: 'Continue Onboarding', color: 'orange' };
-            case 'completed':
-              return { label: 'View Onboarding', color: 'green' };
-            default:
-              return { label: 'Start Onboarding', color: 'blue' };
-          }
-        };
-        
-        const actionInfo = getOnboardingAction(tenant);
+        const isOnboardingComplete = tenant.onboardingStatus === 'completed';
         
         return (
           <div className="flex items-center space-x-2">
+            {!isOnboardingComplete ? (
+              <button
+                onClick={(e) => handleOnboardingAction(e, tenant)}
+                className={`inline-flex items-center px-2 py-1 border rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  tenant.onboardingStatus === 'not_started' 
+                    ? 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-blue-500' 
+                    : 'border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:ring-orange-500'
+                }`}
+                title={`${tenant.onboardingStatus === 'not_started' ? 'Start' : 'Continue'} Onboarding for ${tenant.name}`}
+              >
+                <ClipboardDocumentListIcon className="w-3 h-3 mr-1" />
+                {tenant.onboardingStatus === 'not_started' ? 'Start Onboarding' : 'Continue'}
+              </button>
+            ) : (
+              <button
+                onClick={(e) => handleViewDetails(e, tenant)}
+                className="inline-flex items-center px-2 py-1 border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                title={`View details for ${tenant.name}`}
+              >
+                <UserIcon className="w-3 h-3 mr-1" />
+                View Details
+              </button>
+            )}
             <button
-              onClick={() => handleOnboardingAction(tenant)}
-              className={`inline-flex items-center px-2 py-1 border rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                actionInfo.color === 'blue' ? 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-blue-500' :
-                actionInfo.color === 'orange' ? 'border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:ring-orange-500' :
-                actionInfo.color === 'green' ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100 focus:ring-green-500' :
-                'border-gray-300 text-gray-700 bg-gray-50 hover:bg-gray-100 focus:ring-gray-500'
-              }`}
-              title={`${actionInfo.label} for ${tenant.name}`}
-            >
-              <ClipboardDocumentListIcon className="w-3 h-3 mr-1" />
-              {actionInfo.label}
-            </button>
-            <button
-              onClick={() => onDeleteTenant(tenant)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteTenant(tenant);
+              }}
               className="inline-flex items-center px-2 py-1 border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
               title={`Delete ${tenant.name}`}
             >
@@ -358,11 +337,10 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
 
   // Calculate summary stats
   const totalRent = tenants.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
-  const overdueCount = tenants.filter(t => t.rentStatus === 'overdue').length;
   const expiringLeases = tenants.filter(t => {
     const threeMonthsFromNow = new Date();
     threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-    return t.leaseEnd <= threeMonthsFromNow;
+    return t.leaseEnd ? t.leaseEnd <= threeMonthsFromNow : false;
   }).length;
 
   return (
@@ -386,19 +364,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
               onChange={(e) => setGlobalFilter(e.target.value)}
               className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-            
-            {/* Rent Status Filter */}
-            <select
-              value={(table.getColumn('rentStatus')?.getFilterValue() as string) ?? ''}
-              onChange={(e) => table.getColumn('rentStatus')?.setFilterValue(e.target.value || undefined)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {rentStatusTypes.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
 
             {/* Onboarding Status Filter */}
             <select
@@ -437,12 +402,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
               <span className="text-gray-600">Total Monthly Rent:</span>
               <span className="font-medium text-gray-900">{formatCurrency(totalRent)}</span>
             </div>
-            {overdueCount > 0 && (
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span className="text-red-600">{overdueCount} overdue payment{overdueCount > 1 ? 's' : ''}</span>
-              </div>
-            )}
             {expiringLeases > 0 && (
               <div className="flex items-center space-x-2">
                 <CalendarIcon className="w-4 h-4 text-yellow-600" />
@@ -503,7 +462,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
                       ? 'bg-blue-50 border-l-4 border-blue-500'
                       : 'border-l-4 border-transparent hover:border-l-4 hover:border-blue-200'
                   }`}
-                  onClick={() => onTenantSelect(row.original)}
+                  onClick={() => handleTenantRowClick(row.original)}
                 >
                   {row.getVisibleCells().map(cell => (
                     <td key={cell.id} className="px-4 py-4 whitespace-nowrap text-sm">
@@ -544,7 +503,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
         </div>
       )}
       {/* Onboarding Management Modal */}
-      {/* Simple Onboarding Modal */}
       {showOnboardingModal && selectedTenantForOnboarding && (
         <EnhancedTenantOnboardingModal
           isOpen={showOnboardingModal}
@@ -557,6 +515,25 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
           onComplete={handleOnboardingComplete}
         />
       )}
+
+      {/* Tenant Details Modal */}
+      <TenantDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedTenantForDetails(null);
+        }}
+        tenant={selectedTenantForDetails}
+        onTenantUpdate={(updatedTenant) => {
+          onTenantUpdate(updatedTenant);
+          // Update the selected tenant in the modal so it shows fresh data
+          setSelectedTenantForDetails(updatedTenant);
+        }}
+        onStartOnboarding={(tenant) => {
+          setSelectedTenantForOnboarding(tenant);
+          setShowOnboardingModal(true);
+        }}
+      />
     </div>
   );
 };

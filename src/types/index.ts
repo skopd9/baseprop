@@ -49,7 +49,7 @@ export interface Agent {
 // =====================================================
 
 export type PropertyType = 'house' | 'flat' | 'hmo' | 'studio' | 'other';
-export type PropertyStatus = 'vacant' | 'occupied' | 'maintenance' | 'sold';
+export type PropertyStatus = 'vacant' | 'occupied' | 'partially_occupied' | 'maintenance' | 'sold';
 
 export interface HMOUnit {
   name: string;
@@ -57,8 +57,20 @@ export interface HMOUnit {
   targetRent: number;
 }
 
+// Occupancy tracking for properties (especially HMOs)
+export interface PropertyOccupancy {
+  type: 'standard' | 'hmo';
+  totalCapacity: number; // For HMO: number of units, for standard: 1
+  occupiedCount: number;
+  vacantCount?: number; // Only for HMOs
+  occupancyRate: number; // Percentage
+  vacancyRate: number; // Percentage
+  occupancyStatus: 'vacant' | 'occupied' | 'partially_occupied';
+}
+
 export interface Property {
   id: string;
+  propertyReference: number; // Auto-incrementing reference: 1, 2, 3, etc.
   countryCode: CountryCode;
   
   // Address
@@ -119,6 +131,9 @@ export interface Tenant {
   phone?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  
+  // HMO-Specific: which unit/room this tenant occupies
+  hmoUnitName?: string;
   
   // UK-Specific
   rightToRentChecked: boolean;

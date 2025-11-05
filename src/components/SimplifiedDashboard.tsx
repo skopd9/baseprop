@@ -1,16 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   HomeIcon,
   UserGroupIcon,
   CurrencyPoundIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  ClockIcon
+  ClockIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant, getOccupancyStatus } from '../utils/simplifiedDataTransforms';
-import { PropertyMap } from './PropertyMap';
 import { ExpensesSummaryWidget } from './ExpensesSummaryWidget';
-import { ErrorBoundary } from './ErrorBoundary';
 
 interface SimplifiedDashboardProps {
   properties: SimplifiedProperty[];
@@ -39,6 +39,24 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
   selectedProperty,
   onPropertySelect
 }) => {
+  // State for collapsible categories
+  const [expandedCategories, setExpandedCategories] = useState<{
+    rent: boolean;
+    leases: boolean;
+    vacancies: boolean;
+  }>({
+    rent: false,
+    leases: false,
+    vacancies: false
+  });
+
+  const toggleCategory = (category: 'rent' | 'leases' | 'vacancies') => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
   // Calculate statistics from actual data
   const stats = React.useMemo(() => {
     // Safety checks: ensure arrays are valid
@@ -55,6 +73,7 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
     const overdueRent = tenantsArray.filter(t => t.rentStatus === 'overdue').length;
     
     const leasesExpiringIn3Months = tenantsArray.filter(tenant => {
+      if (!tenant.leaseEnd) return false;
       const threeMonthsFromNow = new Date();
       threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
       return tenant.leaseEnd <= threeMonthsFromNow;
@@ -75,30 +94,51 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
     };
   }, [properties, tenants]);
 
-  // Calculate urgent items with safety checks
+  // Calculate urgent items with safety checks, grouped by category
+  const urgentItemsByCategory = React.useMemo(() => {
+    const overdueRentItems = (Array.isArray(tenants) ? tenants : [])
+      .filter(t => t.rentStatus === 'overdue')
+      .map(t => ({
+        type: 'rent' as const,
+        message: `${t.name} - Rent overdue`,
+        property: t.propertyAddress,
+        priority: 'high' as const
+      }));
+
+    const expiringLeaseItems = (Array.isArray(tenants) ? tenants : [])
+      .filter(t => {
+        if (!t.leaseEnd) return false;
+        const oneMonthFromNow = new Date();
+        oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
+        return t.leaseEnd <= oneMonthFromNow;
+      })
+      .map(t => ({
+        type: 'lease' as const,
+        message: `${t.name} - Lease expires soon`,
+        property: t.propertyAddress,
+        priority: 'medium' as const
+      }));
+
+    const vacancyItems = (Array.isArray(properties) ? properties : [])
+      .filter(p => getOccupancyStatus(p, Array.isArray(tenants) ? tenants : []) === 'vacant' && p.status === 'under_management')
+      .map(p => ({
+        type: 'vacancy' as const,
+        message: `${p.address} - Property vacant`,
+        property: p.address,
+        priority: 'high' as const
+      }));
+
+    return {
+      rent: overdueRentItems,
+      leases: expiringLeaseItems,
+      vacancies: vacancyItems
+    };
+  }, [properties, tenants]);
+
   const urgentItems = [
-    ...(Array.isArray(tenants) ? tenants : []).filter(t => t.rentStatus === 'overdue').map(t => ({
-      type: 'rent',
-      message: `${t.name} - Rent overdue`,
-      property: t.propertyAddress,
-      priority: 'high'
-    })),
-    ...(Array.isArray(tenants) ? tenants : []).filter(t => {
-      const oneMonthFromNow = new Date();
-      oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
-      return t.leaseEnd <= oneMonthFromNow;
-    }).map(t => ({
-      type: 'lease',
-      message: `${t.name} - Lease expires soon`,
-      property: t.propertyAddress,
-      priority: 'medium'
-    })),
-    ...(Array.isArray(properties) ? properties : []).filter(p => getOccupancyStatus(p, Array.isArray(tenants) ? tenants : []) === 'vacant' && p.status === 'under_management').map(p => ({
-      type: 'vacancy',
-      message: `${p.address} - Property vacant`,
-      property: p.address,
-      priority: 'high'
-    }))
+    ...urgentItemsByCategory.rent,
+    ...urgentItemsByCategory.leases,
+    ...urgentItemsByCategory.vacancies
   ];
 
   const formatCurrency = (amount: number) => {
@@ -190,58 +230,123 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
           </div>
         </div>
 
-        {/* Property Map */}
-        <div className="mb-6 sm:mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Property Locations</h2>
-              <div className="text-xs sm:text-sm text-gray-600">
-                {properties.length} propert{properties.length === 1 ? 'y' : 'ies'} on map
-              </div>
-            </div>
-            <ErrorBoundary>
-              <PropertyMap 
-                properties={properties}
-                selectedProperty={selectedProperty}
-                onPropertySelect={onPropertySelect}
-                height="300px"
-              />
-            </ErrorBoundary>
-          </div>
-        </div>
 
         {/* Three Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">          {/* Urgent Items List */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">          {/* Urgent Items List - Grouped by Category */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base sm:text-lg font-semibold text-gray-900">Items Needing Attention</h2>
-              <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+              <div className="flex items-center space-x-2">
+                <span className="text-xs sm:text-sm font-medium text-gray-600">{urgentItems.length}</span>
+                <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500" />
+              </div>
             </div>
             
             {urgentItems.length > 0 ? (
-              <div className="space-y-2 sm:space-y-3">
-                {urgentItems.slice(0, 5).map((item, index) => (
-                  <div key={index} className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-gray-50 rounded-lg">
-                    <div className={`w-2 h-2 rounded-full mt-1.5 sm:mt-2 flex-shrink-0 ${
-                      item.priority === 'high' ? 'bg-red-500' : 'bg-yellow-500'
-                    }`}></div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900">{item.message}</p>
-                      <p className="text-xs text-gray-500 truncate">{item.property}</p>
-                    </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 sm:py-1 rounded-full text-xs font-medium flex-shrink-0 ${
-                      item.priority === 'high' 
-                        ? 'bg-red-100 text-red-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {item.priority}
-                    </span>
+              <div className="space-y-3">
+                {/* Overdue Rent Category */}
+                {urgentItemsByCategory.rent.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => toggleCategory('rent')}
+                      className="w-full flex items-center justify-between p-3 bg-red-50 hover:bg-red-100 transition-colors"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <CurrencyPoundIcon className="w-4 h-4 text-red-600" />
+                        <h3 className="text-sm font-semibold text-gray-900">Overdue Rent</h3>
+                        <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                          {urgentItemsByCategory.rent.length}
+                        </span>
+                      </div>
+                      {expandedCategories.rent ? (
+                        <ChevronUpIcon className="w-4 h-4 text-gray-600" />
+                      ) : (
+                        <ChevronDownIcon className="w-4 h-4 text-gray-600" />
+                      )}
+                    </button>
+                    {expandedCategories.rent && (
+                      <div className="p-2 space-y-2 bg-white">
+                        {urgentItemsByCategory.rent.map((item, index) => (
+                          <div key={`rent-${index}`} className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-red-50 rounded-lg border-l-2 border-red-500">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900">{item.message}</p>
+                              <p className="text-xs text-gray-500 truncate">{item.property}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-                {urgentItems.length > 5 && (
-                  <p className="text-xs sm:text-sm text-gray-500 text-center pt-2">
-                    And {urgentItems.length - 5} more items...
-                  </p>
+                )}
+
+                {/* Expiring Leases Category */}
+                {urgentItemsByCategory.leases.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => toggleCategory('leases')}
+                      className="w-full flex items-center justify-between p-3 bg-yellow-50 hover:bg-yellow-100 transition-colors"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <ClockIcon className="w-4 h-4 text-yellow-600" />
+                        <h3 className="text-sm font-semibold text-gray-900">Expiring Leases</h3>
+                        <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                          {urgentItemsByCategory.leases.length}
+                        </span>
+                      </div>
+                      {expandedCategories.leases ? (
+                        <ChevronUpIcon className="w-4 h-4 text-gray-600" />
+                      ) : (
+                        <ChevronDownIcon className="w-4 h-4 text-gray-600" />
+                      )}
+                    </button>
+                    {expandedCategories.leases && (
+                      <div className="p-2 space-y-2 bg-white">
+                        {urgentItemsByCategory.leases.map((item, index) => (
+                          <div key={`lease-${index}`} className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-yellow-50 rounded-lg border-l-2 border-yellow-500">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900">{item.message}</p>
+                              <p className="text-xs text-gray-500 truncate">{item.property}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Vacancies Category */}
+                {urgentItemsByCategory.vacancies.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => toggleCategory('vacancies')}
+                      className="w-full flex items-center justify-between p-3 bg-orange-50 hover:bg-orange-100 transition-colors"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <HomeIcon className="w-4 h-4 text-orange-600" />
+                        <h3 className="text-sm font-semibold text-gray-900">Vacant Properties</h3>
+                        <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                          {urgentItemsByCategory.vacancies.length}
+                        </span>
+                      </div>
+                      {expandedCategories.vacancies ? (
+                        <ChevronUpIcon className="w-4 h-4 text-gray-600" />
+                      ) : (
+                        <ChevronDownIcon className="w-4 h-4 text-gray-600" />
+                      )}
+                    </button>
+                    {expandedCategories.vacancies && (
+                      <div className="p-2 space-y-2 bg-white">
+                        {urgentItemsByCategory.vacancies.map((item, index) => (
+                          <div key={`vacancy-${index}`} className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-orange-50 rounded-lg border-l-2 border-orange-500">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-medium text-gray-900">{item.message}</p>
+                              <p className="text-xs text-gray-500 truncate">{item.property}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ) : (

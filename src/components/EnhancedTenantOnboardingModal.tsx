@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { XMarkIcon, UserIcon, CheckCircleIcon, ClockIcon, DocumentTextIcon, ShieldCheckIcon, HomeIcon, ArrowUpTrayIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { SimplifiedTenant, SimplifiedProperty } from '../utils/simplifiedDataTransforms';
 import { CreditCheck } from '../types/creditCheck';
@@ -87,6 +87,17 @@ export const EnhancedTenantOnboardingModal: React.FC<EnhancedTenantOnboardingMod
     depositWeeks: 4,
     rentDueDate: 1,
   });
+
+  // Reset lease info when tenant changes (especially important when opening modal for new tenant)
+  useEffect(() => {
+    setLeaseInfo({
+      startDate: tenant.leaseStart ? tenant.leaseStart.toISOString().split('T')[0] : '',
+      endDate: tenant.leaseEnd ? tenant.leaseEnd.toISOString().split('T')[0] : '',
+      monthlyRent: tenant.monthlyRent || Math.round(property.targetRent / (property.propertyType === 'hmo' ? property.bedrooms : 1)),
+      depositWeeks: 4,
+      rentDueDate: 1,
+    });
+  }, [tenant.id, tenant.leaseStart, tenant.leaseEnd, tenant.monthlyRent, property.targetRent, property.propertyType, property.bedrooms]);
 
   const [creditChecks, setCreditChecks] = useState<CreditCheck[]>([
     {
@@ -290,15 +301,51 @@ export const EnhancedTenantOnboardingModal: React.FC<EnhancedTenantOnboardingMod
   };
 
   const handleComplete = () => {
+    // Prepare onboarding data to save
+    const onboardingData = {
+      creditChecks: creditChecks.map(check => ({
+        id: check.id,
+        type: check.type,
+        name: check.name,
+        email: check.email,
+        status: check.status,
+        cost: check.cost,
+        provider: selectedProvider,
+        orderedDate: check.orderedDate || undefined,
+        completedDate: check.completedDate || undefined,
+        result: check.result || undefined,
+        failureReason: check.failureReason || undefined,
+      })),
+      tenancyAgreement: {
+        method: tenancyAgreement.method,
+        status: tenancyAgreement.status,
+        generatedDate: tenancyAgreement.generatedDate?.toISOString(),
+        signedDate: tenancyAgreement.signedDate?.toISOString(),
+        uploadedFileName: tenancyAgreement.uploadedFileName,
+        docusignEnvelopeId: tenancyAgreement.docusignEnvelope?.envelopeId,
+        questions: tenancyAgreement.questions,
+      },
+      preparation: {
+        type: preparationService.type,
+        checklist: preparationService.checklist,
+        conciergeOrdered: preparationService.conciergeOrdered,
+        conciergeOrderedDate: preparationService.conciergeOrderedDate?.toISOString(),
+      }
+    };
+
     const updatedTenant: SimplifiedTenant = {
       ...tenant,
       leaseStart: new Date(leaseInfo.startDate),
       leaseEnd: new Date(leaseInfo.endDate),
       monthlyRent: leaseInfo.monthlyRent,
       depositAmount: calculateDepositAmount(leaseInfo.monthlyRent, leaseInfo.depositWeeks),
+      depositWeeks: leaseInfo.depositWeeks,
+      rentDueDay: leaseInfo.rentDueDate,
       rentStatus: 'current',
       onboardingStatus: 'completed',
       onboardingProgress: 100,
+      onboardingCompletedAt: new Date(),
+      onboardingData: onboardingData,
     };
     
     onComplete(updatedTenant);
@@ -313,8 +360,18 @@ export const EnhancedTenantOnboardingModal: React.FC<EnhancedTenantOnboardingMod
   const hasFailedChecks = creditChecks.some(check => check.status === 'failed');
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-4 mx-auto p-6 border w-full max-w-4xl shadow-lg rounded-lg bg-white mb-8">
+    <div 
+      className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div 
+        className="relative top-4 mx-auto p-6 border w-full max-w-4xl shadow-lg rounded-lg bg-white mb-8"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">

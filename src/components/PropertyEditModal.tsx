@@ -619,6 +619,40 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
               )}
             </div>
 
+            {/* Financial Information */}
+            <div className="space-y-4 border-t border-gray-200 pt-6">
+              <h3 className="text-lg font-medium text-gray-900">Financial Information</h3>
+              
+              {/* Purchase Price */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Purchase Price (Acquisition Cost)
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    value={formData.purchasePrice || ''}
+                    onChange={(e) => handleInputChange('purchasePrice', e.target.value ? parseFloat(e.target.value) : undefined)}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="250000"
+                  />
+                </div>
+                {formData.purchasePrice && (
+                  <p className="mt-1 text-sm text-gray-500">
+                    Current value: {formatCurrency(formData.purchasePrice)}
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  The original cost to acquire this property (optional)
+                </p>
+              </div>
+            </div>
+
             {/* Current Tenants Info */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-2">
