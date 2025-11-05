@@ -7,10 +7,12 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  MapPinIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant, getOccupancyStatus } from '../utils/simplifiedDataTransforms';
 import { ExpensesSummaryWidget } from './ExpensesSummaryWidget';
+import { PropertyMap } from './PropertyMap';
 
 interface SimplifiedDashboardProps {
   properties: SimplifiedProperty[];
@@ -230,6 +232,22 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
           </div>
         </div>
 
+
+        {/* Map Section */}
+        <div className="mb-6 sm:mb-8">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">Property Locations</h2>
+              <MapPinIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+            </div>
+            <PropertyMap
+              properties={properties}
+              selectedProperty={selectedProperty}
+              onPropertySelect={onPropertySelect}
+              height="400px"
+            />
+          </div>
+        </div>
 
         {/* Three Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">          {/* Urgent Items List - Grouped by Category */}

@@ -11,8 +11,6 @@ import {
   XMarkIcon,
   ArrowRightOnRectangleIcon,
   ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   QuestionMarkCircleIcon,
   Cog6ToothIcon,
   UserIcon
@@ -129,7 +127,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   const [selectedProperty, setSelectedProperty] = useState<SimplifiedProperty | null>(null);
   const [selectedTenant, setSelectedTenant] = useState<SimplifiedTenant | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showOrgSettings, setShowOrgSettings] = useState(false);
   const [showUserSettings, setShowUserSettings] = useState(false);
@@ -605,155 +602,92 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col ${
-        sidebarCollapsed ? 'w-16' : 'w-64'
-      }`}>
-        {/* Sidebar Header */}
-        <div className={`flex items-center h-16 border-b border-gray-200 flex-shrink-0 relative ${
-          sidebarCollapsed ? 'px-2 justify-center' : 'px-6 justify-between'
-        }`}>
-          {sidebarCollapsed ? (
-            <>
-              <h1 className="text-xl font-bold text-gray-900">BP</h1>
-              <button
-                onClick={() => {
-                  console.log('Expand button clicked');
-                  setSidebarCollapsed(false);
-                }}
-                className="hidden lg:block absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors z-50 pointer-events-auto"
-                title="Expand sidebar"
-                type="button"
-              >
-                <ChevronRightIcon className="w-5 h-5" />
-              </button>
-            </>
-          ) : (
-            <>
-              <h1 className="text-xl font-bold text-gray-900">Base Prop</h1>
-              <div className="flex items-center gap-2">
+      } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+          <h1 className="text-xl font-bold text-gray-900">Base Prop</h1>
+          <button
+            onClick={() => {
+              setSidebarOpen(false);
+              // Close property edit modal when closing mobile sidebar
+              if (showPropertyEditModal) {
+                setShowPropertyEditModal(false);
+                setSelectedProperty(null);
+              }
+            }}
+            className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
+
+        <nav className="mt-6 px-3">
+          <div className="space-y-1">
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentView === item.id;
+              
+              return (
                 <button
+                  key={item.id}
                   onClick={() => {
-                    console.log('Collapse button clicked');
-                    setSidebarCollapsed(true);
-                  }}
-                  className="hidden lg:block p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
-                  title="Collapse sidebar"
-                  type="button"
-                >
-                  <ChevronLeftIcon className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => {
-                    setSidebarOpen(false);
-                    // Close property edit modal when closing mobile sidebar
+                    // Close property edit modal when clicking any menu item
                     if (showPropertyEditModal) {
                       setShowPropertyEditModal(false);
                       setSelectedProperty(null);
                     }
+                    setCurrentView(item.id);
+                    setSidebarOpen(false);
                   }}
-                  className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600"
-                  type="button"
+                  className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    isActive
+                      ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
                 >
-                  <XMarkIcon className="w-5 h-5" />
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Scrollable Navigation Section */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <nav className={`mt-6 ${sidebarCollapsed ? 'px-2' : 'px-3'}`}>
-            <div className="space-y-1">
-              {navigationItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentView === item.id;
-                
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      // Close property edit modal when clicking any menu item
-                      if (showPropertyEditModal) {
-                        setShowPropertyEditModal(false);
-                        setSelectedProperty(null);
-                      }
-                      setCurrentView(item.id);
-                      setSidebarOpen(false);
-                    }}
-                    className={`w-full flex items-center rounded-md transition-colors ${
-                      sidebarCollapsed 
-                        ? 'justify-center px-2 py-2' 
-                        : 'px-3 py-2'
-                    } ${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-700'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                    title={sidebarCollapsed ? item.name : undefined}
-                  >
-                    <Icon className={`h-5 w-5 ${isActive ? 'text-blue-700' : 'text-gray-400'} ${
-                      !sidebarCollapsed ? 'mr-3' : ''
-                    }`} />
-                    {!sidebarCollapsed && (
-                      <div className="text-left">
-                        <div className="font-medium text-sm">{item.name}</div>
-                        <div className="text-xs text-gray-500">{item.description}</div>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </nav>
-
-          {/* Get Started - positioned in scrollable area */}
-          <div className={`mt-6 border-t border-gray-200 bg-white ${
-            sidebarCollapsed ? 'px-2 pb-3' : 'px-3 pb-3'
-          }`}>
-            <div className="pt-3">
-              <button
-                onClick={() => {
-                  if (showPropertyEditModal) {
-                    setShowPropertyEditModal(false);
-                    setSelectedProperty(null);
-                  }
-                  setCurrentView('onboarding');
-                  setSidebarOpen(false);
-                }}
-                className={`w-full flex items-center rounded-md transition-colors ${
-                  sidebarCollapsed 
-                    ? 'justify-center px-2 py-2' 
-                    : 'px-3 py-2'
-                } ${
-                  currentView === 'onboarding'
-                    ? 'bg-green-100 text-green-700 border-r-2 border-green-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-                title={sidebarCollapsed ? 'Get Started' : undefined}
-              >
-                <QuestionMarkCircleIcon className={`h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'} ${
-                  !sidebarCollapsed ? 'mr-3' : ''
-                }`} />
-                {!sidebarCollapsed && (
+                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-700' : 'text-gray-400'}`} />
                   <div className="text-left">
-                    <div className="font-medium text-sm">Get Started</div>
-                    <div className="text-xs text-gray-500">Complete setup</div>
+                    <div className="font-medium">{item.name}</div>
+                    <div className="text-xs text-gray-500">{item.description}</div>
                   </div>
-                )}
-              </button>
-            </div>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Get Started - positioned at bottom, separate from main nav */}
+        <div className="absolute bottom-20 left-0 right-0 px-3 pb-3 border-t border-gray-200 bg-white">
+          <div className="pt-3">
+            <button
+              onClick={() => {
+                if (showPropertyEditModal) {
+                  setShowPropertyEditModal(false);
+                  setSelectedProperty(null);
+                }
+                setCurrentView('onboarding');
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                currentView === 'onboarding'
+                  ? 'bg-green-100 text-green-700 border-r-2 border-green-700'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <QuestionMarkCircleIcon className={`mr-3 h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'}`} />
+              <div className="text-left">
+                <div className="font-medium">Get Started</div>
+                <div className="text-xs text-gray-500">Complete setup</div>
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* User Profile Section at Bottom - Fixed */}
-        <div className={`flex-shrink-0 border-t border-gray-200 bg-gray-50 ${
-          sidebarCollapsed ? 'p-2' : 'p-4'
-        }`}>
+        {/* User Profile Section at Bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
           {/* Organization Selector (if multiple orgs) */}
-          {userOrganizations.length > 1 && !sidebarCollapsed && (
+          {userOrganizations.length > 1 && (
             <div className="mb-3">
               <select
                 value={currentOrganization?.id || ''}
@@ -769,30 +703,35 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
             </div>
           )}
 
-          <div className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-            {!sidebarCollapsed && (
-              <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3 flex-1 min-w-0">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold shadow-sm">
+                {currentOrganization?.name.charAt(0).toUpperCase() || 'O'}
+              </div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
                   {orgLoading ? 'Loading...' : currentOrganization?.name || (orgError ? 'Error loading' : 'No organization')}
                 </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {orgError ? (
+                    <span className="text-red-600" title={orgError}>Error loading organizations</span>
+                  ) : (
+                    `${userOrganizations.length} ${userOrganizations.length === 1 ? 'workspace' : 'workspaces'}`
+                  )}
+                </p>
               </div>
-            )}
+            </div>
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex-shrink-0 rounded-full hover:ring-2 hover:ring-gray-300 transition-all"
-                title="User menu"
+                className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               >
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold shadow-sm">
-                  {currentOrganization?.name.charAt(0).toUpperCase() || 'O'}
-                </div>
+                <ChevronDownIcon className={`w-5 h-5 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
               </button>
               
               {/* Dropdown Menu */}
               {userMenuOpen && (
-                <div className={`absolute bottom-full bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 ${
-                  sidebarCollapsed ? 'right-0 mb-2 w-56' : 'right-0 mb-2 w-56'
-                }`}>
+                <div className="absolute bottom-full right-0 mb-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                   <button
                     onClick={() => {
                       setShowUserSettings(true);
@@ -830,14 +769,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Navigation Bar - Always persistent and clear/transparent (desktop only) */}
-        <div className="hidden lg:block fixed top-0 left-0 right-0 z-[60] bg-transparent border-b border-gray-200/30">
-          <div className={`h-16 transition-all duration-300 ${
-            sidebarCollapsed ? 'ml-16' : 'ml-64'
-          }`} />
-        </div>
-
-        {/* Mobile Top Bar - Only visible on mobile */}
+        {/* Top bar */}
         <div className="bg-white shadow-sm border-b border-gray-200 lg:hidden">
           <div className="flex items-center justify-between h-16 px-4">
             <button
@@ -875,7 +807,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         )}
 
         {/* Main content area */}
-        <main className="flex-1 overflow-auto pt-0 lg:pt-16">
+        <main className="flex-1 overflow-auto lg:pt-16">
           {renderCurrentView()}
         </main>
       </div>
