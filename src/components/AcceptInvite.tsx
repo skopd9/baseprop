@@ -137,15 +137,31 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
             // Check if user already exists
             if (result.userExists) {
               // User exists but not logged in - send magic link
-              console.log('[Invite Flow] User exists, sending magic link');
-              const { auth } = await import('../lib/supabase');
-              await auth.signInWithMagicLink(invitation.email);
-              setError('');
-              setIsAccepting(false);
-              setShowEmailSent(true);
-              setShowNameForm(false);
-              localStorage.setItem('pendingInviteName', name.trim());
-              return;
+              console.log('[Invite Flow] User exists, sending magic link to:', invitation.email);
+              try {
+                const { auth } = await import('../lib/supabase');
+                const { error: magicLinkError } = await auth.signInWithMagicLink(invitation.email);
+                
+                if (magicLinkError) {
+                  console.error('[Invite Flow] Magic link error:', magicLinkError);
+                  setError(`Failed to send magic link: ${magicLinkError.message}. You may need to sign in manually first, then click the invitation link again.`);
+                  setIsAccepting(false);
+                  return;
+                }
+                
+                console.log('[Invite Flow] Magic link sent successfully');
+                setError('');
+                setIsAccepting(false);
+                setShowEmailSent(true);
+                setShowNameForm(false);
+                localStorage.setItem('pendingInviteName', name.trim());
+                return;
+              } catch (magicLinkError: any) {
+                console.error('[Invite Flow] Exception sending magic link:', magicLinkError);
+                setError(`Unable to send magic link. Please try logging in manually first, then click the invitation link again.`);
+                setIsAccepting(false);
+                return;
+              }
             }
             throw new Error(result.error || 'Failed to create account');
           }
