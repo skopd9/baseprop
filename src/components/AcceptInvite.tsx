@@ -76,7 +76,7 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
         .single();
 
       // If user doesn't have a name or it's just their email prefix, ask for their name
-      const emailPrefix = user.email?.split('@')[0') || '';
+      const emailPrefix = user.email?.split('@')[0] || '';
       const hasValidName = profileData?.full_name && 
                           profileData.full_name.trim() !== '' && 
                           profileData.full_name !== emailPrefix;
