@@ -28,6 +28,8 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
     try {
       const invite = await OrganizationService.getInvitationByToken(token);
       
+      console.log('[Invite Flow] Loaded invitation:', invite);
+      
       if (!invite) {
         setError('This invitation is invalid or has expired.');
       } else {
@@ -107,29 +109,76 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
 
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      let { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // User not authenticated - send magic link to invitation email
-        console.log('[Invite Flow] Unauthenticated user accepting invitation, sending magic link to:', invitation.email);
+        // User not authenticated - create account automatically and log them in
+        console.log('[Invite Flow] Creating account for new user:', invitation.email);
         
-        // Store the name they entered for use after authentication
-        localStorage.setItem('pendingInviteName', name.trim());
-        
-        // Import auth from supabase
-        const { auth } = await import('../lib/supabase');
-        
-        // Send magic link
-        await auth.signInWithMagicLink(invitation.email);
-        
-        // Show success message - they need to check their email
-        setError('');
-        setIsAccepting(false);
-        setShowEmailSent(true);
-        setShowNameForm(false);
-        // The user will be redirected back after clicking magic link
-        // and the invitation will be auto-accepted with their name
-        return;
+        try {
+          // Call our serverless function to create the user with email pre-confirmed
+          console.log('[Invite Flow] Attempting auto-signup via serverless function');
+          const response = await fetch('/.netlify/functions/accept-invitation-signup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email: invitation.email,
+              name: name.trim(),
+              invitationToken: token
+            })
+          });
+
+          const result = await response.json();
+          console.log('[Invite Flow] Serverless function response:', { status: response.status, result });
+
+          if (!response.ok) {
+            // Check if user already exists
+            if (result.userExists) {
+              // User exists but not logged in - send magic link
+              console.log('[Invite Flow] User exists, sending magic link');
+              const { auth } = await import('../lib/supabase');
+              await auth.signInWithMagicLink(invitation.email);
+              setError('');
+              setIsAccepting(false);
+              setShowEmailSent(true);
+              setShowNameForm(false);
+              localStorage.setItem('pendingInviteName', name.trim());
+              return;
+            }
+            throw new Error(result.error || 'Failed to create account');
+          }
+
+          // Set the session returned from the serverless function
+          console.log('[Invite Flow] Setting session from serverless function');
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: result.session.access_token,
+            refresh_token: result.session.refresh_token
+          });
+
+          if (sessionError) {
+            throw new Error('Failed to authenticate: ' + sessionError.message);
+          }
+
+          // Get the newly authenticated user
+          const { data: { user: newUser } } = await supabase.auth.getUser();
+          if (!newUser) {
+            throw new Error('Failed to get authenticated user');
+          }
+
+          user = newUser;
+          console.log('[Invite Flow] User account created and authenticated:', user.id);
+          
+        } catch (createError: any) {
+          console.error('[Invite Flow] Error creating account:', createError);
+          console.error('[Invite Flow] Error details:', createError.message);
+          
+          // Show user-friendly error instead of fallback
+          setError('Unable to auto-create account. The serverless function may not be deployed yet. Please check the setup guide.');
+          setIsAccepting(false);
+          return;
+        }
       }
 
       // User is authenticated - accept invitation with the provided name

@@ -28,19 +28,37 @@ Key:   FROM_EMAIL
 Value: noreply@yourdomain.com
 ```
 
+#### Variable 3:
+```
+Key:   SUPABASE_SERVICE_ROLE_KEY
+Value: your_supabase_service_role_key_here
+```
+
 **Important:** 
 - ✅ Use `RESEND_API_KEY` (NOT `VITE_RESEND_API_KEY`)
 - ✅ These are server-side variables (secure)
 - ✅ `FROM_EMAIL` must be verified in Resend for production
+- ✅ `SUPABASE_SERVICE_ROLE_KEY` is needed for automatic user account creation (found in Supabase Dashboard → Project Settings → API → service_role key)
 
-### Step 3: Get Your Resend API Key
+### Step 3: Get Your API Keys
 
+#### Resend API Key:
 If you don't have it:
 1. Go to: https://resend.com/api-keys
 2. Sign in
 3. Click **"Create API Key"**
 4. Copy the key (starts with `re_`)
 5. Paste it into Netlify
+
+#### Supabase Service Role Key:
+1. Go to: https://supabase.com/dashboard
+2. Select your project
+3. Go to: **Project Settings** → **API**
+4. Scroll down to **Project API keys**
+5. Copy the **`service_role`** key (⚠️ Keep this secret!)
+6. Paste it into Netlify
+
+**⚠️ Security Warning:** The service_role key has admin privileges. NEVER expose it in client-side code or commit it to git. Only use it in server-side functions (like Netlify Functions).
 
 ### Step 4: Trigger a Redeploy
 
@@ -127,12 +145,14 @@ For production, verify your domain in Resend:
 ## ✅ Checklist
 
 - [ ] Added `RESEND_API_KEY` in Netlify environment variables
-- [ ] Added `FROM_EMAIL` in Netlify environment variables  
+- [ ] Added `FROM_EMAIL` in Netlify environment variables
+- [ ] Added `SUPABASE_SERVICE_ROLE_KEY` in Netlify environment variables  
 - [ ] Triggered a redeploy
 - [ ] Build completed successfully
-- [ ] Function appears in Functions tab
+- [ ] Functions appear in Functions tab (`send-invitation-email`, `accept-invitation-signup`)
 - [ ] Tested invitation sending
 - [ ] Received email
+- [ ] Tested invitation acceptance (new users should be auto-logged in)
 
 ---
 
