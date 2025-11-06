@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   XMarkIcon,
   WrenchScrewdriverIcon,
@@ -37,6 +37,9 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssignContractor, setShowAssignContractor] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [originalRepair, setOriginalRepair] = useState<RepairServiceType | null>(null);
+  const pendingCloseRef = useRef<(() => void) | null>(null);
   
   const [editedRepair, setEditedRepair] = useState<RepairServiceType | null>(null);
   const [contractorForm, setContractorForm] = useState({
@@ -49,6 +52,7 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
   useEffect(() => {
     if (repair) {
       setEditedRepair({ ...repair });
+      setOriginalRepair({ ...repair });
       setContractorForm({
         contractorName: repair.contractor || '',
         contractorCompany: repair.contractorCompany || '',
@@ -60,6 +64,7 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
     setError(null);
     setSuccessMessage(null);
     setShowAssignContractor(false);
+    setShowCloseConfirm(false);
   }, [repair]);
 
   if (!isOpen || !repair || !editedRepair) return null;
@@ -126,14 +131,63 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
     setSuccessMessage(null);
   };
 
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = (): boolean => {
+    if (!originalRepair || !editedRepair || !isEditMode) return false;
+    
+    // Compare all editable fields
+    const compareDates = (a: Date | undefined, b: Date | undefined): boolean => {
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      return a.getTime() === b.getTime();
+    };
+    
+    return (
+      editedRepair.title !== originalRepair.title ||
+      editedRepair.description !== originalRepair.description ||
+      editedRepair.urgency !== originalRepair.urgency ||
+      editedRepair.status !== originalRepair.status ||
+      editedRepair.estimatedCost !== originalRepair.estimatedCost ||
+      editedRepair.actualCost !== originalRepair.actualCost ||
+      !compareDates(editedRepair.scheduledDate, originalRepair.scheduledDate) ||
+      !compareDates(editedRepair.completedDate, originalRepair.completedDate) ||
+      editedRepair.contractor !== originalRepair.contractor ||
+      editedRepair.contractorCompany !== originalRepair.contractorCompany ||
+      editedRepair.contractorPhone !== originalRepair.contractorPhone ||
+      editedRepair.notes !== originalRepair.notes
+    );
+  };
+
+  const handleClose = () => {
+    if (isEditMode && hasUnsavedChanges()) {
+      setShowCloseConfirm(true);
+      pendingCloseRef.current = onClose;
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirm(false);
+    if (pendingCloseRef.current) {
+      pendingCloseRef.current();
+      pendingCloseRef.current = null;
+    }
+    // Reset to original state
+    if (originalRepair) {
+      setEditedRepair({ ...originalRepair });
+      setIsEditMode(false);
+    }
+  };
+
   const handleCancel = () => {
-    if (repair) {
-      setEditedRepair({ ...repair });
+    if (repair && originalRepair) {
+      setEditedRepair({ ...originalRepair });
       setContractorForm({
-        contractorName: repair.contractor || '',
-        contractorCompany: repair.contractorCompany || '',
-        contractorPhone: repair.contractorPhone || '',
-        scheduledDate: repair.scheduledDate ? repair.scheduledDate.toISOString().split('T')[0] : ''
+        contractorName: originalRepair.contractor || '',
+        contractorCompany: originalRepair.contractorCompany || '',
+        contractorPhone: originalRepair.contractorPhone || '',
+        scheduledDate: originalRepair.scheduledDate ? originalRepair.scheduledDate.toISOString().split('T')[0] : ''
       });
     }
     setIsEditMode(false);
@@ -204,6 +258,10 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
       if (updatedRepair) {
         setSuccessMessage('Repair updated successfully!');
         setIsEditMode(false);
+        
+        // Update original repair data after successful save
+        setOriginalRepair({ ...updatedRepair });
+        setEditedRepair({ ...updatedRepair });
         
         if (onRepairUpdate) {
           onRepairUpdate(updatedRepair);
@@ -342,16 +400,16 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-25 z-40"
-        onClick={onClose}
+        onClick={handleClose}
       />
       
       {/* Modal */}
       <div 
-        className="fixed right-0 top-0 h-full w-1/3 min-w-[600px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto"
+        className="fixed right-0 top-0 h-full w-1/3 min-w-[600px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-orange-100 rounded-lg">
               <WrenchScrewdriverIcon className="w-5 h-5 text-orange-600" />
@@ -387,7 +445,7 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
               </button>
             )}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <XMarkIcon className="w-5 h-5 text-gray-500" />
@@ -396,7 +454,7 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
           {/* Success Message */}
           {successMessage && (
             <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -784,8 +842,8 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-6">
+        {/* Footer - Sticky at bottom */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 shadow-lg flex-shrink-0">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setShowDeleteConfirm(true)}
@@ -807,8 +865,8 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
                   </button>
                   <button
                     onClick={handleSave}
-                    disabled={isSaving}
-                    className="px-4 py-2 text-sm bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 flex items-center"
+                    disabled={isSaving || !hasUnsavedChanges()}
+                    className="px-4 py-2 text-sm bg-orange-600 text-white rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                   >
                     {isSaving ? (
                       <>
@@ -823,7 +881,7 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
               )}
               {!isEditMode && (
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
                 >
                   Close
@@ -844,6 +902,21 @@ export const RepairDetailsModal: React.FC<RepairDetailsModalProps> = ({
         type="warning"
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      {/* Close Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showCloseConfirm}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Are you sure you want to close without saving?"
+        confirmText="Discard Changes"
+        cancelText="Cancel"
+        type="warning"
+        onConfirm={handleConfirmClose}
+        onCancel={() => {
+          setShowCloseConfirm(false);
+          pendingCloseRef.current = null;
+        }}
       />
     </>
   );

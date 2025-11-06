@@ -40,6 +40,9 @@ export interface SimplifiedProperty {
   licenseRequired?: boolean; // Whether HMO license is required
   licenseNumber?: string; // HMO license number
   licenseExpiry?: Date;
+  // Ownership details
+  ownershipType?: 'individual' | 'company'; // Type of ownership
+  companyName?: string; // Company name if ownership type is company
 }
 
 // Onboarding data interfaces
@@ -187,7 +190,10 @@ export const transformToSimplifiedProperty = (property: any, actualTenantCount?:
     maxOccupancy: propertyData.max_occupancy || (rooms.length > 0 ? rooms.length : undefined),
     licenseRequired: propertyData.license_required || false,
     licenseNumber: propertyData.license_number,
-    licenseExpiry: propertyData.license_expiry ? new Date(propertyData.license_expiry) : undefined
+    licenseExpiry: propertyData.license_expiry ? new Date(propertyData.license_expiry) : undefined,
+    // Ownership details
+    ownershipType: propertyData.ownership_type,
+    companyName: propertyData.company_name
   };
 };
 

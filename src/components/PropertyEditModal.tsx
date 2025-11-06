@@ -1,36 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   XMarkIcon,
   HomeIcon,
-  BuildingOfficeIcon,
   CurrencyPoundIcon,
-  UserGroupIcon,
-  CheckIcon,
   ExclamationTriangleIcon,
-  MapPinIcon,
   Squares2X2Icon,
   SparklesIcon,
   ShieldCheckIcon,
-  InformationCircleIcon,
   DocumentTextIcon,
   ArrowUpTrayIcon,
   TrashIcon,
   EyeIcon,
   PaperClipIcon,
-  PhotoIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ArrowPathIcon,
-  StarIcon
+  ChevronDownIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
-import { PropertyPhotoService, PropertyPhoto } from '../services/PropertyPhotoService';
 import { SimplifiedProperty, PropertyRoom } from '../utils/simplifiedDataTransforms';
 import { validatePropertyData } from '../utils/simplifiedDataTransforms';
 import { CountryCode } from '../types';
 import { useCurrency } from '../hooks/useCurrency';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '../lib/supabase';
+import { ConfirmationDialog } from './ConfirmationDialog';
 
 interface PropertyEditModalProps {
   property: SimplifiedProperty | null;
@@ -39,16 +30,6 @@ interface PropertyEditModalProps {
   onSave: (property: SimplifiedProperty) => void;
 }
 
-const propertyTypeOptions = [
-  { value: 'house', label: 'House', icon: HomeIcon },
-  { value: 'flat', label: 'Flat', icon: BuildingOfficeIcon },
-  { value: 'hmo', label: 'HMO', icon: UserGroupIcon }
-];
-
-const statusOptions = [
-  { value: 'under_management', label: 'Under Management', color: 'text-blue-700 bg-blue-50 border-blue-200' },
-  { value: 'sold', label: 'Sold', color: 'text-gray-700 bg-gray-50 border-gray-200' }
-];
 
 // Property Document Types by Country
 interface PropertyDocumentType {
@@ -62,8 +43,6 @@ const UK_PROPERTY_DOCUMENTS: PropertyDocumentType[] = [
   { id: 'title_deeds', name: 'Title Deeds', description: 'Legal ownership documentation', required: false },
   { id: 'property_survey', name: 'Property Survey/Valuation', description: 'Professional property survey report', required: false },
   { id: 'building_insurance', name: 'Building Insurance Policy', description: 'Current building insurance certificate', required: false },
-  { id: 'eicr_property', name: 'EICR Certificate', description: 'Electrical Installation Condition Report', required: false },
-  { id: 'epc', name: 'Energy Performance Certificate', description: 'EPC rating certificate', required: false },
   { id: 'purchase_documents', name: 'Purchase Documents', description: 'Property purchase contracts and completion documents', required: false },
   { id: 'mortgage_documents', name: 'Mortgage Documents', description: 'Mortgage agreement and statements', required: false },
   { id: 'property_tax', name: 'Property Tax Documents', description: 'Council tax, stamp duty, and other tax records', required: false },
@@ -77,7 +56,6 @@ const UK_PROPERTY_DOCUMENTS: PropertyDocumentType[] = [
 const GREECE_PROPERTY_DOCUMENTS: PropertyDocumentType[] = [
   { id: 'title_deeds', name: 'Title Deeds (Τίτλος Ιδιοκτησίας)', description: 'Legal ownership documentation', required: false },
   { id: 'building_permit', name: 'Building Permit (Οικοδομική Άδεια)', description: 'Valid building permit', required: false },
-  { id: 'epc_greece', name: 'Energy Certificate (ΠΕΑ)', description: 'Energy Performance Certificate', required: false },
   { id: 'property_tax_greece', name: 'ENFIA Tax Documents', description: 'Property tax documentation', required: false },
   { id: 'cadastral', name: 'Cadastral Registry', description: 'Land registry documentation', required: false },
   { id: 'topographic', name: 'Topographic Diagram', description: 'Official topographic diagram', required: false },
@@ -164,123 +142,31 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
   const [documents, setDocuments] = useState<PropertyDocument[]>([]);
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
   const [viewingDocument, setViewingDocument] = useState<PropertyDocument | null>(null);
-  const [photos, setPhotos] = useState<PropertyPhoto[]>([]);
-  const [loadingPhotos, setLoadingPhotos] = useState(false);
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
-  const [uploadingPhotos, setUploadingPhotos] = useState(false);
-  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [originalData, setOriginalData] = useState<SimplifiedProperty | null>(null);
+  const [originalAddressFields, setOriginalAddressFields] = useState({
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    postcode: ''
+  });
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+  
+  // Track expanded/collapsed state for each section
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    basicInfo: true,
+    specifications: true,
+    features: true,
+    financial: true,
+    hmoDetails: true,
+    documents: true
+  });
 
-  // Load photos when property changes
-  useEffect(() => {
-    if (property && isOpen) {
-      loadPhotos();
-    } else {
-      setPhotos([]);
-      setSelectedPhotoIndex(null);
-    }
-  }, [property?.id, isOpen]);
-
-  const loadPhotos = async () => {
-    if (!property?.id) return;
-
-    setLoadingPhotos(true);
-    try {
-      const propertyPhotos = await PropertyPhotoService.getPropertyPhotos(property.id);
-      setPhotos(propertyPhotos);
-      // Auto-select first photo (or primary photo if available)
-      if (propertyPhotos.length > 0) {
-        const primaryIndex = propertyPhotos.findIndex(p => p.isPrimary);
-        setSelectedPhotoIndex(primaryIndex >= 0 ? primaryIndex : 0);
-      } else {
-        setSelectedPhotoIndex(null);
-      }
-    } catch (error) {
-      console.error('Error loading photos:', error);
-    } finally {
-      setLoadingPhotos(false);
-    }
-  };
-
-  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0 || !property?.id || !currentOrganization?.id) return;
-
-    setUploadingPhotos(true);
-    setErrors([]);
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-          setErrors(prev => [...prev, `${file.name} is not an image file`]);
-          continue;
-        }
-
-        // Validate file size (10MB max)
-        if (file.size > 10 * 1024 * 1024) {
-          setErrors(prev => [...prev, `${file.name} exceeds 10MB limit`]);
-          continue;
-        }
-
-        // Upload photo
-        await PropertyPhotoService.uploadPhoto({
-          propertyId: property.id,
-          organizationId: currentOrganization.id,
-          file: file,
-          isPrimary: photos.length === 0 && i === 0, // First photo if no photos exist
-          displayOrder: photos.length + i,
-        });
-      }
-
-      // Reload photos after upload
-      await loadPhotos();
-    } catch (error) {
-      console.error('Error uploading photos:', error);
-      setErrors(prev => [...prev, error instanceof Error ? error.message : 'Failed to upload photos']);
-    } finally {
-      setUploadingPhotos(false);
-      // Clear file input
-      event.target.value = '';
-    }
-  };
-
-  const handleDeletePhoto = async (photoId: string) => {
-    if (!confirm('Are you sure you want to delete this photo?')) return;
-
-    setDeletingPhotoId(photoId);
-    try {
-      await PropertyPhotoService.deletePhoto(photoId);
-      
-      // Reload photos after deletion
-      await loadPhotos();
-      
-      // If we deleted the selected photo, select the first remaining photo
-      if (photos.length > 1) {
-        setSelectedPhotoIndex(0);
-      } else {
-        setSelectedPhotoIndex(null);
-      }
-    } catch (error) {
-      console.error('Error deleting photo:', error);
-      setErrors(prev => [...prev, 'Failed to delete photo']);
-    } finally {
-      setDeletingPhotoId(null);
-    }
-  };
-
-  const handleSetPrimaryPhoto = async (photoId: string) => {
-    if (!property?.id) return;
-
-    try {
-      await PropertyPhotoService.setPrimaryPhoto(photoId, property.id);
-      // Reload photos to update primary status
-      await loadPhotos();
-    } catch (error) {
-      console.error('Error setting primary photo:', error);
-      setErrors(prev => [...prev, 'Failed to set primary photo']);
-    }
+  const toggleSection = (sectionKey: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
   };
 
   // Update form data when property changes
@@ -337,6 +223,14 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
             city,
             postcode
           });
+          
+          // Store original address fields for change detection
+          setOriginalAddressFields({
+            addressLine1,
+            addressLine2,
+            city,
+            postcode
+          });
         } catch (err) {
           console.error('Error in loadPropertyData:', err);
         }
@@ -344,7 +238,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
 
       loadPropertyData();
       
-      setFormData({
+      const initialFormData = {
         ...property,
         // Ensure all fields have proper defaults
         propertyName: property.propertyName || '',
@@ -368,9 +262,15 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
         licenseRequired: property.licenseRequired || false,
         licenseNumber: property.licenseNumber || undefined,
         licenseExpiry: property.licenseExpiry || undefined,
-        rooms: property.rooms || []
-      });
+        rooms: property.rooms || [],
+        ownershipType: property.ownershipType || undefined,
+        companyName: property.companyName || undefined
+      };
+      
+      setFormData(initialFormData);
+      setOriginalData(initialFormData);
       setErrors([]);
+      setShowCloseConfirm(false);
     }
   }, [property, isOpen]);
 
@@ -395,7 +295,78 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
     }
   };
 
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = (): boolean => {
+    if (!originalData || !property) return false;
+    
+    // Check address fields
+    const addressChanged = 
+      addressFields.addressLine1 !== originalAddressFields.addressLine1 ||
+      addressFields.addressLine2 !== originalAddressFields.addressLine2 ||
+      addressFields.city !== originalAddressFields.city ||
+      addressFields.postcode !== originalAddressFields.postcode;
+    
+    if (addressChanged) return true;
+    
+    // Deep comparison of form data
+    const compareValues = (a: any, b: any): boolean => {
+      if (a === b) return true;
+      if (a == null || b == null) return a === b;
+      if (typeof a !== typeof b) return false;
+      if (typeof a === 'object') {
+        if (Array.isArray(a) !== Array.isArray(b)) return false;
+        if (Array.isArray(a)) {
+          if (a.length !== b.length) return false;
+          return a.every((item, index) => compareValues(item, b[index]));
+        }
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        return keysA.every(key => compareValues(a[key], b[key]));
+      }
+      return false;
+    };
+    
+    // Compare key fields
+    const fieldsToCompare: (keyof SimplifiedProperty)[] = [
+      'propertyName', 'propertyType', 'bedrooms', 'bathrooms', 'targetRent',
+      'status', 'units', 'purchasePrice', 'salesPrice', 'actualRent',
+      'totalArea', 'yearBuilt', 'furnished', 'parking', 'garden',
+      'maxOccupancy', 'licenseRequired', 'licenseNumber', 'licenseExpiry', 'rooms',
+      'ownershipType', 'companyName'
+    ];
+    
+    for (const field of fieldsToCompare) {
+      if (!compareValues(formData[field], originalData[field])) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  const handleClose = () => {
+    if (hasUnsavedChanges()) {
+      setShowCloseConfirm(true);
+      pendingCloseRef.current = onClose;
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirm(false);
+    if (pendingCloseRef.current) {
+      pendingCloseRef.current();
+      pendingCloseRef.current = null;
+    }
+  };
+
   const handleSave = async () => {
+    if (!hasUnsavedChanges()) {
+      return; // No changes to save
+    }
+    
     // Validate address fields
     if (!addressFields.addressLine1.trim()) {
       setErrors(['Address Line 1 is required']);
@@ -442,6 +413,11 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
         // Add structured address fields that will be saved to property_data
         _addressFields: addressFields
       } as any);
+      
+      // Update original data after successful save
+      setOriginalData(updatedFormData);
+      setOriginalAddressFields({ ...addressFields });
+      
       onClose();
     } catch (error) {
       console.error('Error saving property:', error);
@@ -523,16 +499,16 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-25 z-40"
-        onClick={onClose}
+        onClick={handleClose}
       />
       
       {/* Modal */}
       <div 
-        className="fixed right-0 top-0 h-full w-1/3 min-w-[500px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto"
+        className="fixed right-0 top-0 h-full w-1/3 min-w-[500px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-100 rounded-lg">
               <HomeIcon className="w-5 h-5 text-blue-600" />
@@ -543,7 +519,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <XMarkIcon className="w-5 h-5 text-gray-500" />
@@ -551,7 +527,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 min-h-0">
           {/* Error Messages */}
           {errors.length > 0 && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
@@ -572,22 +548,34 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
           <div className="space-y-5">
             {/* SECTION 1: Basic Information */}
             <div className="bg-white border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center space-x-2 mb-4">
-                <HomeIcon className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-semibold text-gray-900">Basic Information</h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection('basicInfo')}
+                className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center space-x-2">
+                  <HomeIcon className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-base font-semibold text-gray-900">Basic Information</h3>
+                </div>
+                {expandedSections.basicInfo ? (
+                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
               
-              <div className="space-y-4">
+              {expandedSections.basicInfo && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
                 {/* Property Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Property Name <span className="text-gray-400 font-normal">(Optional)</span>
+                    Property Name
                   </label>
                   <input
                     type="text"
                     value={formData.propertyName || ''}
                     onChange={(e) => handleInputChange('propertyName', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                     placeholder="e.g. Sunset House, Victoria Apartments..."
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -605,20 +593,20 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                       type="text"
                       value={addressFields.addressLine1}
                       onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine1: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                       placeholder={currentOrganization?.country_code === 'US' ? 'e.g., 123 Main Street' : 'e.g., 123 High Street'}
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Address Line 2 <span className="text-gray-400 font-normal">(optional)</span>
+                      Address Line 2
                     </label>
                     <input
                       type="text"
                       value={addressFields.addressLine2}
                       onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine2: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                       placeholder="Apartment, suite, unit, etc."
                     />
                   </div>
@@ -632,7 +620,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                         type="text"
                         value={addressFields.city}
                         onChange={(e) => setAddressFields(prev => ({ ...prev, city: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                         placeholder={currentOrganization?.country_code === 'US' ? 'New York' : currentOrganization?.country_code === 'GR' ? 'Athens' : 'London'}
                       />
                     </div>
@@ -645,7 +633,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                         type="text"
                         value={addressFields.postcode}
                         onChange={(e) => setAddressFields(prev => ({ ...prev, postcode: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                         placeholder={currentOrganization?.country_code === 'US' ? '10001' : currentOrganization?.country_code === 'GR' ? '106 82' : 'SW1A 1AA'}
                       />
                     </div>
@@ -657,29 +645,15 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Property Type <span className="text-red-500">*</span>
                   </label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {propertyTypeOptions.map((option) => {
-                      const Icon = option.icon;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => handleInputChange('propertyType', option.value as SimplifiedProperty['propertyType'])}
-                          className={`flex items-center space-x-3 p-3 border rounded-lg transition-colors ${
-                            formData.propertyType === option.value
-                              ? 'border-blue-500 bg-blue-50 text-blue-700'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <Icon className="w-5 h-5" />
-                          <span className="font-medium">{option.label}</span>
-                          {formData.propertyType === option.value && (
-                            <CheckIcon className="w-4 h-4 ml-auto" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <select
+                    value={formData.propertyType}
+                    onChange={(e) => handleInputChange('propertyType', e.target.value as SimplifiedProperty['propertyType'])}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="house">House</option>
+                    <option value="flat">Flat</option>
+                    <option value="hmo">HMO</option>
+                  </select>
                 </div>
 
                 {/* Status */}
@@ -687,37 +661,39 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
-                  <div className="space-y-2">
-                    {statusOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => handleInputChange('status', option.value as SimplifiedProperty['status'])}
-                        className={`w-full flex items-center justify-between p-3 border rounded-lg transition-colors ${
-                          formData.status === option.value
-                            ? option.color + ' border-current'
-                            : 'border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        <span className="font-medium">{option.label}</span>
-                        {formData.status === option.value && (
-                          <CheckIcon className="w-4 h-4" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => handleInputChange('status', e.target.value as SimplifiedProperty['status'])}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="under_management">Under Management</option>
+                    <option value="sold">Sold</option>
+                  </select>
                 </div>
               </div>
+              )}
             </div>
 
             {/* SECTION 2: Property Specifications */}
             <div className="bg-white border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center space-x-2 mb-4">
-                <Squares2X2Icon className="w-5 h-5 text-purple-600" />
-                <h3 className="text-base font-semibold text-gray-900">Property Specifications</h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection('specifications')}
+                className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center space-x-2">
+                  <Squares2X2Icon className="w-5 h-5 text-purple-600" />
+                  <h3 className="text-base font-semibold text-gray-900">Property Specifications</h3>
+                </div>
+                {expandedSections.specifications ? (
+                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
               
-              <div className="space-y-4">
+              {expandedSections.specifications && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
                 {/* Bedrooms & Bathrooms */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -730,7 +706,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                       max="10"
                       value={formData.bedrooms}
                       onChange={(e) => handleInputChange('bedrooms', parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                     />
                   </div>
                   <div>
@@ -743,7 +719,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                       max="5"
                       value={formData.bathrooms}
                       onChange={(e) => handleInputChange('bathrooms', parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                     />
                   </div>
                 </div>
@@ -759,7 +735,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                       min="0"
                       value={formData.totalArea || ''}
                       onChange={(e) => handleInputChange('totalArea', e.target.value ? parseFloat(e.target.value) : undefined)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                       placeholder="e.g. 120"
                     />
                   </div>
@@ -773,22 +749,35 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                       max={new Date().getFullYear()}
                       value={formData.yearBuilt || ''}
                       onChange={(e) => handleInputChange('yearBuilt', e.target.value ? parseInt(e.target.value) : undefined)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                       placeholder="e.g. 1995"
                     />
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
             {/* SECTION 3: Features & Amenities */}
             <div className="bg-white border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center space-x-2 mb-4">
-                <SparklesIcon className="w-5 h-5 text-amber-600" />
-                <h3 className="text-base font-semibold text-gray-900">Features & Amenities</h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection('features')}
+                className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center space-x-2">
+                  <SparklesIcon className="w-5 h-5 text-amber-600" />
+                  <h3 className="text-base font-semibold text-gray-900">Features & Amenities</h3>
+                </div>
+                {expandedSections.features ? (
+                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
               
-              <div className="space-y-4">
+              {expandedSections.features && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
                 {/* Furnished & Parking */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -798,7 +787,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                     <select
                       value={formData.furnished || 'unfurnished'}
                       onChange={(e) => handleInputChange('furnished', e.target.value as 'furnished' | 'unfurnished' | 'part_furnished')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                     >
                       <option value="unfurnished">Unfurnished</option>
                       <option value="part_furnished">Part Furnished</option>
@@ -812,7 +801,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                     <select
                       value={formData.parking || 'none'}
                       onChange={(e) => handleInputChange('parking', e.target.value as 'none' | 'street' | 'driveway' | 'garage')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                     >
                       <option value="none">No Parking</option>
                       <option value="street">Street Parking</option>
@@ -839,16 +828,29 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                   </label>
                 </div>
               </div>
+              )}
             </div>
 
             {/* SECTION 4: Financial Details */}
             <div className="bg-white border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center space-x-2 mb-4">
-                <CurrencyPoundIcon className="w-5 h-5 text-green-600" />
-                <h3 className="text-base font-semibold text-gray-900">Financial Details</h3>
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleSection('financial')}
+                className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+              >
+                <div className="flex items-center space-x-2">
+                  <CurrencyPoundIcon className="w-5 h-5 text-green-600" />
+                  <h3 className="text-base font-semibold text-gray-900">Financial Details</h3>
+                </div>
+                {expandedSections.financial ? (
+                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
               
-              <div className="space-y-4">
+              {expandedSections.financial && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
                 {/* Target Rent - Hidden for HMO properties */}
                 {formData.propertyType !== 'hmo' && (
                   <div>
@@ -898,7 +900,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                 {/* Purchase Price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Purchase Price <span className="text-gray-400 font-normal">(Optional)</span>
+                    Purchase Price
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -923,18 +925,76 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                     The original acquisition cost of this property
                   </p>
                 </div>
+
+                {/* Ownership Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ownership Type
+                  </label>
+                  <select
+                    value={formData.ownershipType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value as 'individual' | 'company' | '';
+                      handleInputChange('ownershipType', value || undefined);
+                      // Clear company name if switching to individual
+                      if (value !== 'company') {
+                        handleInputChange('companyName', undefined);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="">Select ownership type...</option>
+                    <option value="individual">Individual</option>
+                    <option value="company">Company</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Select whether the property is owned by an individual or a company
+                  </p>
+                </div>
+
+                {/* Company Name - Only show if ownership type is company */}
+                {formData.ownershipType === 'company' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Company Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.companyName || ''}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. ABC Property Holdings Ltd"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter the legal name of the company that owns this property (optional)
+                    </p>
+                  </div>
+                )}
               </div>
+              )}
             </div>
 
             {/* SECTION 5: HMO-Specific Details (only shown for HMO properties) */}
             {formData.propertyType === 'hmo' && (
               <div className="bg-white border border-gray-200 rounded-lg p-5">
-                <div className="flex items-center space-x-2 mb-4">
-                  <ShieldCheckIcon className="w-5 h-5 text-indigo-600" />
-                  <h3 className="text-base font-semibold text-gray-900">HMO Details</h3>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSection('hmoDetails')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <ShieldCheckIcon className="w-5 h-5 text-indigo-600" />
+                    <h3 className="text-base font-semibold text-gray-900">HMO Details</h3>
+                  </div>
+                  {expandedSections.hmoDetails ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
                 
-                <div className="space-y-4">
+                {expandedSections.hmoDetails && (
+                  <div className="space-y-4 transition-all duration-200 ease-in-out">
                   {/* Max Occupancy */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -946,7 +1006,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                       max="20"
                       value={formData.maxOccupancy || ''}
                       onChange={(e) => handleInputChange('maxOccupancy', e.target.value ? parseInt(e.target.value) : undefined)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                       placeholder="e.g. 6"
                     />
                     <p className="mt-1 text-xs text-gray-500">
@@ -992,7 +1052,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                             type="text"
                             value={formData.licenseNumber || ''}
                             onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                             placeholder="HMO License Number"
                             required={formData.licenseRequired}
                           />
@@ -1005,7 +1065,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                             type="date"
                             value={formData.licenseExpiry ? formData.licenseExpiry.toISOString().split('T')[0] : ''}
                             onChange={(e) => handleInputChange('licenseExpiry', e.target.value ? new Date(e.target.value) : undefined)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                             required={formData.licenseRequired}
                           />
                         </div>
@@ -1116,179 +1176,30 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                     </div>
                   </div>
                 </div>
+                )}
               </div>
             )}
 
-            {/* SECTION 6: Property Photos */}
+            {/* SECTION 6: Property Documents */}
             <div className="bg-white border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center justify-between mb-4">
+              <button
+                type="button"
+                onClick={() => toggleSection('documents')}
+                className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+              >
                 <div className="flex items-center space-x-2">
-                  <PhotoIcon className="w-5 h-5 text-blue-600" />
-                  <h3 className="text-base font-semibold text-gray-900">Property Photos</h3>
+                  <DocumentTextIcon className="w-5 h-5 text-teal-600" />
+                  <h3 className="text-base font-semibold text-gray-900">Property Documents</h3>
                 </div>
-                {/* Add Photos Button */}
-                <label className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                  <PhotoIcon className="w-4 h-4 mr-2" />
-                  {uploadingPhotos ? 'Uploading...' : 'Add Photos'}
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    disabled={uploadingPhotos}
-                    className="sr-only"
-                  />
-                </label>
-              </div>
+                {expandedSections.documents ? (
+                  <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
               
-              {loadingPhotos ? (
-                <div className="text-center py-8">
-                  <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Loading photos...</p>
-                </div>
-              ) : photos.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                  <PhotoIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-gray-600 mb-1">No photos available</p>
-                  <p className="text-xs text-gray-500 mb-4">Click "Add Photos" above to upload property images</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Main Photo Display */}
-                  {selectedPhotoIndex !== null && selectedPhotoIndex < photos.length && photos[selectedPhotoIndex] && (
-                    <div className="relative bg-gray-900 rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                      <img
-                        src={photos[selectedPhotoIndex].url || ''}
-                        alt={photos[selectedPhotoIndex].caption || `Photo ${selectedPhotoIndex + 1}`}
-                        className="w-full h-full object-contain"
-                      />
-                      {/* Primary Badge and Set Primary Button */}
-                      <div className="absolute top-2 left-2 flex items-center space-x-2">
-                        {photos[selectedPhotoIndex].isPrimary ? (
-                          <div className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center space-x-1">
-                            <StarIconSolid className="w-3 h-3" />
-                            <span>Primary</span>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleSetPrimaryPhoto(photos[selectedPhotoIndex].id)}
-                            className="bg-gray-800 bg-opacity-70 hover:bg-opacity-90 text-white px-2 py-1 rounded text-xs font-medium flex items-center space-x-1 transition-all"
-                            title="Set as primary photo"
-                          >
-                            <StarIcon className="w-3 h-3" />
-                            <span>Set Primary</span>
-                          </button>
-                        )}
-                      </div>
-                      {/* Delete Button */}
-                      <button
-                        onClick={() => handleDeletePhoto(photos[selectedPhotoIndex].id)}
-                        disabled={deletingPhotoId === photos[selectedPhotoIndex].id}
-                        className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition-all disabled:opacity-50"
-                        title="Delete photo"
-                      >
-                        {deletingPhotoId === photos[selectedPhotoIndex].id ? (
-                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <TrashIcon className="w-4 h-4" />
-                        )}
-                      </button>
-                      {photos.length > 1 && (
-                        <>
-                          <button
-                            onClick={() => setSelectedPhotoIndex(selectedPhotoIndex > 0 ? selectedPhotoIndex - 1 : photos.length - 1)}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-full transition-all"
-                          >
-                            <ChevronLeftIcon className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedPhotoIndex(selectedPhotoIndex < photos.length - 1 ? selectedPhotoIndex + 1 : 0)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-full transition-all"
-                          >
-                            <ChevronRightIcon className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Thumbnail Grid */}
-                  {photos.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-gray-700 mb-2">
-                        {photos.length} {photos.length === 1 ? 'photo' : 'photos'}
-                      </p>
-                      <div className="grid grid-cols-4 gap-2">
-                        {photos.map((photo, index) => (
-                          <div
-                            key={photo.id}
-                            className={`relative group aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                              selectedPhotoIndex === index
-                                ? 'border-blue-600 ring-2 ring-blue-200'
-                                : 'border-gray-200'
-                            }`}
-                          >
-                            <button
-                              onClick={() => setSelectedPhotoIndex(index)}
-                              className="w-full h-full"
-                            >
-                              <img
-                                src={photo.url || ''}
-                                alt={`Thumbnail ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-                            </button>
-                            {/* Primary Badge */}
-                            {photo.isPrimary ? (
-                              <div className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-1 py-0.5 rounded flex items-center">
-                                <StarIconSolid className="w-2.5 h-2.5 mr-0.5" />
-                                <span>P</span>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSetPrimaryPhoto(photo.id);
-                                }}
-                                className="absolute top-1 left-1 bg-gray-800 bg-opacity-70 hover:bg-opacity-90 text-white p-1 rounded-full transition-all opacity-0 group-hover:opacity-100"
-                                title="Set as primary photo"
-                              >
-                                <StarIcon className="w-3 h-3" />
-                              </button>
-                            )}
-                            {/* Delete Button on Thumbnail */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeletePhoto(photo.id);
-                              }}
-                              disabled={deletingPhotoId === photo.id}
-                              className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                              title="Delete photo"
-                            >
-                              {deletingPhotoId === photo.id ? (
-                                <ArrowPathIcon className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <TrashIcon className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* SECTION 7: Property Documents */}
-            <div className="bg-white border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center space-x-2 mb-4">
-                <DocumentTextIcon className="w-5 h-5 text-teal-600" />
-                <h3 className="text-base font-semibold text-gray-900">Property Documents</h3>
-              </div>
-              
-              <div className="space-y-4">
+              {expandedSections.documents && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
                 {/* Upload New Document */}
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Upload New Document</h4>
@@ -1301,7 +1212,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                       <select
                         value={selectedDocumentType}
                         onChange={(e) => setSelectedDocumentType(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
                       >
                         <option value="">Select document type...</option>
                         {availableDocumentTypes.map(docType => (
@@ -1406,15 +1317,16 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                   </div>
                 )}
               </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-gray-200 p-6">
+        {/* Footer - Sticky at bottom */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 shadow-lg flex-shrink-0">
           <div className="flex space-x-3">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               disabled={isSaving}
             >
@@ -1422,7 +1334,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
             </button>
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || !hasUnsavedChanges()}
               className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {isSaving ? (
@@ -1523,6 +1435,20 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
         </>
       )}
 
+      {/* Close Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showCloseConfirm}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Are you sure you want to close without saving?"
+        confirmText="Discard Changes"
+        cancelText="Cancel"
+        type="warning"
+        onConfirm={handleConfirmClose}
+        onCancel={() => {
+          setShowCloseConfirm(false);
+          pendingCloseRef.current = null;
+        }}
+      />
     </>
   );
 };

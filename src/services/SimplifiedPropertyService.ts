@@ -404,6 +404,9 @@ export class SimplifiedPropertyService {
           rooms: updates.rooms,
           units: updates.rooms?.length || 1
         }),
+        // Ownership details
+        ...(updates.ownershipType !== undefined && { ownership_type: updates.ownershipType }),
+        ...(updates.companyName !== undefined && { company_name: updates.companyName }),
         // Structured address fields
         ...(addressFields && {
           address_line_1: addressFields.addressLine1,
