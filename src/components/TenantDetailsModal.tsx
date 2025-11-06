@@ -44,7 +44,7 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
     if (tenant) {
       setEditedTenant({ ...tenant });
     }
-    setIsEditMode(false);
+    setIsEditMode(true); // Open directly in edit mode for consistency with properties
     setError(null);
     setSuccessMessage(null);
   }, [tenant]);
@@ -213,6 +213,26 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
 
         {/* Content */}
         <div className="px-6 py-6 space-y-6">
+          {/* Property Information - Moved to top */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
+              <HomeIcon className="w-5 h-5 mr-2 text-gray-600" />
+              Property Details
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-gray-500">Address</p>
+                <p className="text-sm text-gray-900">{tenant.propertyAddress}</p>
+              </div>
+              {tenant.unitNumber && (
+                <div>
+                  <p className="text-xs text-gray-500">Unit/Room</p>
+                  <p className="text-sm text-gray-900">{tenant.roomName || tenant.unitNumber}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Basic Information */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
@@ -270,26 +290,6 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
                   )}
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Property Information */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
-              <HomeIcon className="w-5 h-5 mr-2 text-gray-600" />
-              Property Details
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-xs text-gray-500">Address</p>
-                <p className="text-sm text-gray-900">{tenant.propertyAddress}</p>
-              </div>
-              {tenant.unitNumber && (
-                <div>
-                  <p className="text-xs text-gray-500">Unit/Room</p>
-                  <p className="text-sm text-gray-900">{tenant.roomName || tenant.unitNumber}</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -404,26 +404,6 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
               )}
             </div>
           </div>
-
-          {/* Rent Status - Only show for onboarded tenants */}
-          {tenant.onboardingStatus === 'completed' && (
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center">
-                <CurrencyPoundIcon className="w-5 h-5 mr-2 text-gray-600" />
-                Payment Status
-              </h3>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">Current Status</span>
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
-                  tenant.rentStatus === 'current' 
-                    ? 'bg-green-100 text-green-800 border-green-200' 
-                    : 'bg-red-100 text-red-800 border-red-200'
-                }`}>
-                  {tenant.rentStatus === 'current' ? 'Up to Date' : `Overdue ${tenant.daysOverdue || 0} days`}
-                </span>
-              </div>
-            </div>
-          )}
 
           {/* Onboarding Status */}
           {hasOnboardingData && (
