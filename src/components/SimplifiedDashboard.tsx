@@ -68,16 +68,26 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
     const propertiesArray = Array.isArray(properties) ? properties : [];
     const tenantsArray = Array.isArray(tenants) ? tenants : [];
     
-    const totalProperties = propertiesArray.length;
-    const totalTenants = tenantsArray.length;
-    const occupiedProperties = propertiesArray.filter(p => getOccupancyStatus(p, tenantsArray) === 'occupied').length;
-    const vacantProperties = propertiesArray.filter(p => getOccupancyStatus(p, tenantsArray) === 'vacant').length;
+    // Filter to only properties under management (exclude sold properties) for KPIs
+    const propertiesUnderManagement = propertiesArray.filter(p => p.status !== 'sold');
+    
+    // Get property IDs under management for tenant filtering
+    const underManagementPropertyIds = new Set(propertiesUnderManagement.map(p => p.id));
+    
+    // Filter tenants to only those in properties under management
+    const tenantsUnderManagement = tenantsArray.filter(t => underManagementPropertyIds.has(t.propertyId));
+    
+    // Calculate stats using only properties/tenants under management
+    const totalProperties = propertiesUnderManagement.length;
+    const totalTenants = tenantsUnderManagement.length;
+    const occupiedProperties = propertiesUnderManagement.filter(p => getOccupancyStatus(p, tenantsArray) === 'occupied').length;
+    const vacantProperties = propertiesUnderManagement.filter(p => getOccupancyStatus(p, tenantsArray) === 'vacant').length;
     const soldProperties = propertiesArray.filter(p => p.status === 'sold').length;
     
-    const totalMonthlyRent = tenantsArray.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
-    const overdueRent = tenantsArray.filter(t => t.rentStatus === 'overdue').length;
+    const totalMonthlyRent = tenantsUnderManagement.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
+    const overdueRent = tenantsUnderManagement.filter(t => t.rentStatus === 'overdue').length;
     
-    const leasesExpiringIn3Months = tenantsArray.filter(tenant => {
+    const leasesExpiringIn3Months = tenantsUnderManagement.filter(tenant => {
       if (!tenant.leaseEnd) return false;
       const threeMonthsFromNow = new Date();
       threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
