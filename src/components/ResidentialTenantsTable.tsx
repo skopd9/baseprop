@@ -335,13 +335,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
     globalFilterFn: 'includesString',
   });
 
-  // Calculate summary stats
-  const expiringLeases = tenants.filter(t => {
-    const threeMonthsFromNow = new Date();
-    threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
-    return t.leaseEnd ? t.leaseEnd <= threeMonthsFromNow : false;
-  }).length;
-
   return (
     <div className="bg-white rounded-lg shadow border border-gray-200">
       {/* Header */}
@@ -391,20 +384,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
           </div>
         </div>
       </div>
-
-      {/* Summary Stats */}
-      {expiringLeases > 0 && (
-        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2">
-                <CalendarIcon className="w-4 h-4 text-yellow-600" />
-                <span className="text-yellow-600">{expiringLeases} lease{expiringLeases > 1 ? 's' : ''} expiring soon</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       <div className="overflow-x-auto">

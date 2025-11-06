@@ -641,8 +641,8 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white transform ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col border-r border-gray-200`}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
-          <h1 className="text-xl font-bold text-gray-900">Base Prop</h1>
+        <div className="flex items-center justify-between h-12 px-6 border-b border-gray-200 flex-shrink-0">
+          <h1 className="text-lg font-bold text-gray-900">Base Prop</h1>
           <button
             onClick={() => {
               setSidebarOpen(false);
@@ -720,8 +720,11 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
 
         {/* User Profile Section at Bottom */}
         <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3 flex-1 min-w-0">
+          <div className="flex items-center justify-between" ref={userMenuRef}>
+            <button
+              onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center space-x-3 flex-1 min-w-0 hover:opacity-80 transition-opacity cursor-pointer"
+            >
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold shadow-sm">
                 {currentOrganization?.name.charAt(0).toUpperCase() || 'W'}
               </div>
@@ -737,8 +740,8 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                   )}
                 </p>
               </div>
-            </div>
-            <div className="relative" ref={userMenuRef}>
+            </button>
+            <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -786,14 +789,14 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
 
       {/* Main content */}
       <div className={`flex-1 flex flex-col overflow-hidden ${userEmail ? 'pt-0' : ''}`}>
-        {/* Top bar - Add top margin if notification might be shown */}
-        <div className={`bg-white border-b border-gray-200 flex-shrink-0 ${userEmail ? 'mt-[60px] sm:mt-[56px]' : ''}`}>
-          <div className="flex items-center justify-between h-16 px-4">
+        {/* Top bar */}
+        <div className="bg-white border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between h-12 px-4 sm:px-6">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600 lg:hidden"
+              className="p-1 rounded-md text-gray-400 hover:text-gray-600 lg:hidden"
             >
-              <Bars3Icon className="w-6 h-6" />
+              <Bars3Icon className="w-4 h-4" />
             </button>
             <div className="flex-1" /> {/* Spacer */}
             
@@ -806,15 +809,15 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                   e.stopPropagation();
                   setWorkspaceSelectorOpen(!workspaceSelectorOpen);
                 }}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
                   {currentOrganization?.name.charAt(0).toUpperCase() || 'W'}
                 </div>
                 <span className="hidden sm:block text-gray-700 font-medium max-w-[120px] truncate">
                   {currentOrganization?.name || 'No workspace'}
                 </span>
-                <ChevronDownIcon className={`w-4 h-4 text-gray-500 transition-transform ${workspaceSelectorOpen ? 'rotate-180' : ''}`} />
+                <ChevronDownIcon className={`w-3.5 h-3.5 text-gray-500 transition-transform ${workspaceSelectorOpen ? 'rotate-180' : ''}`} />
               </button>
               
               {/* Workspace Dropdown - Top Right */}

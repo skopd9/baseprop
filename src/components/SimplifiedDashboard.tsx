@@ -154,9 +154,9 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      <div className="pt-3 sm:pt-4 px-4 sm:px-6 pb-4 sm:pb-6 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-6 sm:mb-8">
+        <div className="mb-4 sm:mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Property Dashboard</h1>
           <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Welcome back! Here's what's happening with your properties.</p>
         </div>
