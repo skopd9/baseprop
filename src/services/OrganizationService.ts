@@ -314,6 +314,36 @@ export class OrganizationService {
   }
 
   /**
+   * Get pending invitations for the current user (by email)
+   */
+  static async getUserPendingInvitations(userEmail: string): Promise<OrganizationInvitation[]> {
+    try {
+      const { data, error } = await supabase
+        .from('organization_invitations')
+        .select(`
+          *,
+          organizations (
+            name
+          )
+        `)
+        .eq('email', userEmail)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      return (data || []).map(inv => ({
+        ...inv,
+        organization_name: (inv as any).organizations?.name
+      }));
+    } catch (error) {
+      console.error('Error getting user pending invitations:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get invitation by token
    */
   static async getInvitationByToken(token: string): Promise<OrganizationInvitation | null> {
@@ -340,6 +370,31 @@ export class OrganizationService {
     } catch (error) {
       console.error('Error getting invitation:', error);
       return null;
+    }
+  }
+
+  /**
+   * Check if a user is already a member of an organization
+   */
+  static async isUserMember(organizationId: string, userId: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking membership:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Error checking membership:', error);
+      return false;
     }
   }
 

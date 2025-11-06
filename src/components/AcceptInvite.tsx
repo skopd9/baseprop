@@ -70,6 +70,19 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
         return;
       }
 
+      // First, check if user is already a member of this organization
+      const isAlreadyMember = await OrganizationService.isUserMember(
+        invitation.organization_id,
+        user.id
+      );
+
+      if (isAlreadyMember) {
+        // User is already a member - accept invitation immediately without asking for name
+        console.log('[Invite Flow] User is already a member, accepting invitation directly');
+        await acceptInvitationWithName(''); // Empty name is fine, will use existing profile
+        return;
+      }
+
       // Check if user has a name set
       const { data: profileData } = await supabase
         .from('user_profiles')
@@ -99,7 +112,10 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
 
   const acceptInvitationWithName = async (name: string) => {
     if (!invitation) return;
-    if (!name.trim()) {
+    
+    // Only require name if user is not authenticated (new user signup)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user && !name.trim()) {
       setError('Please enter your full name');
       return;
     }
@@ -144,7 +160,13 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
                 
                 if (magicLinkError) {
                   console.error('[Invite Flow] Magic link error:', magicLinkError);
-                  setError(`Failed to send magic link: ${magicLinkError.message}. You may need to sign in manually first, then click the invitation link again.`);
+                  
+                  // Handle rate limit error specifically
+                  if (magicLinkError.message?.includes('rate limit') || magicLinkError.message?.includes('429')) {
+                    setError(`Too many emails sent. Please wait a few minutes and try again, or sign in manually at the login page, then click the invitation link again.`);
+                  } else {
+                    setError(`Failed to send magic link: ${magicLinkError.message}. Please sign in manually first, then click the invitation link again.`);
+                  }
                   setIsAccepting(false);
                   return;
                 }
@@ -158,7 +180,13 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
                 return;
               } catch (magicLinkError: any) {
                 console.error('[Invite Flow] Exception sending magic link:', magicLinkError);
-                setError(`Unable to send magic link. Please try logging in manually first, then click the invitation link again.`);
+                
+                // Handle rate limit error specifically
+                if (magicLinkError.message?.includes('rate limit') || magicLinkError.message?.includes('429')) {
+                  setError(`Too many emails sent. Please wait a few minutes and try again, or sign in manually at the login page, then click the invitation link again.`);
+                } else {
+                  setError(`Unable to send magic link. Please try logging in manually first, then click the invitation link again.`);
+                }
                 setIsAccepting(false);
                 return;
               }
@@ -200,14 +228,27 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       // User is authenticated - accept invitation with the provided name
       // Check if there's a stored name from before authentication
       const storedName = localStorage.getItem('pendingInviteName');
-      const nameToUse = storedName || name.trim();
+      let nameToUse = storedName || name.trim();
+      
+      // If no name provided and user is authenticated, try to get their existing name
+      if (!nameToUse && user) {
+        const { data: profileData } = await supabase
+          .from('user_profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileData?.full_name && profileData.full_name.trim() !== '') {
+          nameToUse = profileData.full_name;
+        }
+      }
       
       // Clear stored name
       if (storedName) {
         localStorage.removeItem('pendingInviteName');
       }
       
-      await OrganizationService.acceptInvitation(token, user.id, nameToUse);
+      await OrganizationService.acceptInvitation(token, user.id, nameToUse || undefined);
       
       // Success! Pass organization details for welcome tour
       onSuccess(invitation.organization_name || 'the organization', invitation.role);

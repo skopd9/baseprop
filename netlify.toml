@@ -24,6 +24,8 @@
 # Required:
 #   RESEND_API_KEY - Your Resend API key
 #   FROM_EMAIL - Your verified sender email (e.g., noreply@yourdomain.com)
+#   SUPABASE_SERVICE_ROLE_KEY - Supabase service role key (for magic links)
+#   VITE_SUPABASE_URL - Your Supabase project URL
 
 [[redirects]]
   from = "/*"

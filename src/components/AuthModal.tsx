@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { auth } from '../lib/supabase';
 
 interface AuthModalProps {
@@ -7,16 +7,23 @@ interface AuthModalProps {
   onSuccess: () => void;
 }
 
+// Cooldown period: 60 seconds between requests for the same email
+const EMAIL_COOLDOWN_MS = 60 * 1000;
+
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const lastSubmissionRef = useRef<{ email: string; timestamp: number } | null>(null);
 
   const resetForm = () => {
     setEmail('');
     setError('');
     setEmailSent(false);
+    isSubmittingRef.current = false;
+    // Note: We keep lastSubmissionRef to maintain cooldown even after modal close
   };
 
   const handleClose = () => {
@@ -26,6 +33,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling
+    
+    // Prevent double submission - check ref immediately
+    if (isSubmittingRef.current) {
+      console.log('Submission blocked: already submitting');
+      return;
+    }
+
+    // Check if we're already loading
+    if (isLoading) {
+      console.log('Submission blocked: already loading');
+      return;
+    }
+
+    // Check cooldown period for the same email
+    const now = Date.now();
+    if (lastSubmissionRef.current) {
+      const { email: lastEmail, timestamp } = lastSubmissionRef.current;
+      const timeSinceLastSubmission = now - timestamp;
+      
+      if (lastEmail.toLowerCase() === email.toLowerCase() && timeSinceLastSubmission < EMAIL_COOLDOWN_MS) {
+        const secondsRemaining = Math.ceil((EMAIL_COOLDOWN_MS - timeSinceLastSubmission) / 1000);
+        setError(`Please wait ${secondsRemaining} second${secondsRemaining !== 1 ? 's' : ''} before requesting another magic link for this email.`);
+        return;
+      }
+    }
+
+    // Set submitting flag immediately (before async operations)
+    isSubmittingRef.current = true;
     setIsLoading(true);
     setError('');
 
@@ -36,13 +72,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         throw authError;
       }
 
+      // Record successful submission
+      lastSubmissionRef.current = {
+        email: email.toLowerCase(),
+        timestamp: Date.now()
+      };
+
       // Show success message
       setEmailSent(true);
     } catch (error: any) {
       console.error('Magic link error:', error);
-      setError(error.message || 'Failed to send magic link. Please try again.');
+      
+      // Check for rate limit errors specifically
+      // Supabase AuthApiError can have message, status, or statusCode
+      const errorMessage = error.message || '';
+      const errorStatus = error.status || error.statusCode;
+      const isRateLimitError = 
+        errorMessage.toLowerCase().includes('rate limit') ||
+        errorMessage.toLowerCase().includes('429') ||
+        errorMessage.toLowerCase().includes('email rate limit') ||
+        errorMessage.toLowerCase().includes('too many requests') ||
+        errorStatus === 429 ||
+        error.code === '429';
+      
+      if (isRateLimitError) {
+        setError('Too many emails sent. Please wait a few minutes before requesting another magic link. If you need immediate access, please contact support.');
+        
+        // Record the rate limit to prevent immediate retry
+        lastSubmissionRef.current = {
+          email: email.toLowerCase(),
+          timestamp: Date.now()
+        };
+      } else {
+        setError(errorMessage || 'Failed to send magic link. Please try again.');
+      }
     } finally {
       setIsLoading(false);
+      // Use setTimeout to ensure ref is reset after React's state update cycle
+      setTimeout(() => {
+        isSubmittingRef.current = false;
+      }, 100);
     }
   };
 

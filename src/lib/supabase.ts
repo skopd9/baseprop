@@ -14,15 +14,85 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Authentication Service Functions
 // =====================================================
 export const auth = {
-  // Send magic link to email
-  // Note: To use custom email template, configure Supabase SMTP with Resend
-  // See: MAGIC_LINK_CUSTOM_EMAIL_SETUP.md
+  // Send magic link to email via Resend (bypasses Supabase email rate limits)
+  // Uses custom Netlify function to generate link and send via Resend
   async signInWithMagicLink(email: string) {
     // Use production URL for magic links, fallback to current origin for local dev
     let redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
     
     // IMPORTANT: Preserve invite token in the redirect URL if present
     // This ensures the invite flow works even if localStorage is cleared/blocked
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+    if (inviteToken) {
+      redirectUrl = `${redirectUrl}?invite=${inviteToken}`;
+    }
+    
+    // Check if we're in development (localhost)
+    const isDevelopment = window.location.hostname === 'localhost' || 
+                         window.location.hostname === '127.0.0.1';
+    
+    // In development, use Supabase's built-in method (fallback)
+    // In production, use custom Netlify function that sends via Resend
+    if (isDevelopment) {
+      console.log('[Magic Link] Development mode: using Supabase built-in email');
+      return await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectUrl,
+          shouldCreateUser: true
+        }
+      });
+    }
+    
+    // Production: Use custom Netlify function that sends via Resend (bypasses Supabase rate limits)
+    try {
+      console.log('[Magic Link] Production mode: using custom Resend function');
+      const response = await fetch('/.netlify/functions/send-magic-link', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          redirectTo: redirectUrl
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          data: null,
+          error: {
+            message: result.error || 'Failed to send magic link',
+            status: response.status,
+            code: response.status.toString()
+          }
+        };
+      }
+
+      return {
+        data: { user: null, session: null },
+        error: null
+      };
+    } catch (error: any) {
+      console.error('[Magic Link] Error with custom function:', error);
+      return {
+        data: null,
+        error: {
+          message: error.message || 'Failed to send magic link',
+          status: 500,
+          code: '500'
+        }
+      };
+    }
+  },
+
+  // Fallback method using Supabase's built-in email (if needed for testing)
+  async signInWithMagicLinkSupabase(email: string) {
+    let redirectUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    
     const urlParams = new URLSearchParams(window.location.search);
     const inviteToken = urlParams.get('invite');
     if (inviteToken) {

@@ -23,6 +23,7 @@ import { UserSettings } from './UserSettings';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 import { OnboardingWizard } from './OnboardingWizard';
 import { GetStarted } from './GetStarted';
+import { InvitationNotification } from './InvitationNotification';
 import { useOrganization } from '../contexts/OrganizationContext';
 
 import TenancyManagementModal from './TenancyManagementModal';
@@ -120,7 +121,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   userEmail = '',
   onOnboardingComplete
 }) => {
-  const { currentOrganization, userOrganizations, switchOrganization, error: orgError, isLoading: orgLoading } = useOrganization();
+  const { currentOrganization, userOrganizations, switchOrganization, refreshOrganizations, error: orgError, isLoading: orgLoading } = useOrganization();
   // Start on onboarding tab if user needs to complete onboarding
   const [currentView, setCurrentView] = useState<ViewType>(showOnboarding ? 'onboarding' : 'dashboard');
   const [properties, setProperties] = useState<SimplifiedProperty[]>([]);
@@ -605,7 +606,20 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   };
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-white relative">
+      {/* Invitation Notification Banner - Fixed at top */}
+      {userEmail && (
+        <InvitationNotification
+          userEmail={userEmail}
+          onInvitationAccepted={() => {
+            // Refresh organizations to show the newly joined workspace
+            if (refreshOrganizations) {
+              refreshOrganizations();
+            }
+          }}
+        />
+      )}
+      
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -771,9 +785,9 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <div className="bg-white border-b border-gray-200 flex-shrink-0">
+      <div className={`flex-1 flex flex-col overflow-hidden ${userEmail ? 'pt-0' : ''}`}>
+        {/* Top bar - Add top margin if notification might be shown */}
+        <div className={`bg-white border-b border-gray-200 flex-shrink-0 ${userEmail ? 'mt-[60px] sm:mt-[56px]' : ''}`}>
           <div className="flex items-center justify-between h-16 px-4">
             <button
               onClick={() => setSidebarOpen(true)}
