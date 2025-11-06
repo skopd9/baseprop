@@ -25,6 +25,18 @@ export class SimplifiedTenantService {
         ? `${tenantData.name} (${tenantData.unitNumber})`
         : tenantData.name;
 
+      // Get property info (country_code, organization_id, address for all needs)
+      const { data: property, error: propertyError } = await supabase
+        .from('properties')
+        .select('country_code, organization_id, address, property_data')
+        .eq('id', tenantData.propertyId)
+        .single();
+
+      if (propertyError) {
+        console.error('Error fetching property for tenant creation:', propertyError);
+        throw new Error('Could not verify property country');
+      }
+
       // Insert into database using ACTUAL schema from database
       // Note: property/lease info is stored in tenant_data JSONB field
       const insertData: any = {
@@ -33,6 +45,7 @@ export class SimplifiedTenantService {
         email: tenantData.email || null,
         phone: tenantData.phone || null,
         status: 'active',
+        country_code: property.country_code || 'UK', // Match property's country
         tenant_data: {
           property_id: tenantData.propertyId,
           unit_number: tenantData.unitNumber || null,
@@ -49,10 +62,8 @@ export class SimplifiedTenantService {
         }
       }
 
-      // Add organization_id if provided
-      if (organizationId) {
-        insertData.organization_id = organizationId;
-      }
+      // Add organization_id (use property's org if not provided)
+      insertData.organization_id = organizationId || property.organization_id;
 
       console.log('Attempting to insert tenant with data:', JSON.stringify(insertData, null, 2));
       
@@ -76,13 +87,6 @@ export class SimplifiedTenantService {
         const errorMsg = `Database error: ${error.message || 'Unknown error'}${error.details ? ' - ' + error.details : ''}${error.hint ? ' (Hint: ' + error.hint + ')' : ''}`;
         throw new Error(errorMsg);
       }
-
-      // Get property info for the tenant
-      const { data: property } = await supabase
-        .from('properties')
-        .select('address, property_data')
-        .eq('id', tenantData.propertyId)
-        .single();
 
       // Create a simplified tenant object with the additional data
       const simplifiedTenant: SimplifiedTenant = {
@@ -137,6 +141,20 @@ export class SimplifiedTenantService {
   // Get all simplified tenants
   static async getSimplifiedTenants(organizationId?: string): Promise<SimplifiedTenant[]> {
     try {
+      // Get organization's country code if organizationId provided
+      let orgCountryCode: string | null = null;
+      if (organizationId) {
+        const { data: org, error: orgError } = await supabase
+          .from('organizations')
+          .select('country_code')
+          .eq('id', organizationId)
+          .single();
+        
+        if (!orgError && org) {
+          orgCountryCode = org.country_code || 'UK';
+        }
+      }
+
       // Get tenants with simplified demo flag
       let query = supabase
         .from('tenants')
@@ -146,6 +164,11 @@ export class SimplifiedTenantService {
       // Filter by organization if provided
       if (organizationId) {
         query = query.eq('organization_id', organizationId);
+      }
+
+      // CRITICAL: Filter by country code to prevent mixing tenants from different countries
+      if (orgCountryCode) {
+        query = query.eq('country_code', orgCountryCode);
       }
       
       const { data: tenants, error } = await query.order('name');

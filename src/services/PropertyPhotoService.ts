@@ -157,14 +157,15 @@ export class PropertyPhotoService {
         .select('*')
         .eq('property_id', propertyId)
         .eq('is_primary', true)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No primary photo found
-          return null;
-        }
         throw error;
+      }
+
+      // If no photo found, data will be null
+      if (!data) {
+        return null;
       }
 
       const photo = this.mapToPropertyPhoto(data);

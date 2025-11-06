@@ -230,28 +230,64 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
 
   const handlePropertySave = async (updatedProperty: SimplifiedProperty) => {
     try {
-      const savedProperty = await SimplifiedPropertyService.updateSimplifiedProperty(
-        updatedProperty.id,
-        updatedProperty
-      );
-
-      if (savedProperty) {
-        setProperties(prev => 
-          prev.map(p => p.id === updatedProperty.id ? savedProperty : p)
+      // Check if this is a new property (no id or empty id)
+      const isNewProperty = !updatedProperty.id || updatedProperty.id === '';
+      
+      if (isNewProperty) {
+        // Create new property
+        const savedProperty = await SimplifiedPropertyService.createSimplifiedProperty(
+          updatedProperty,
+          currentOrganization?.id
         );
-        setSelectedProperty(savedProperty);
-        setSuccessMessage('Property updated successfully!');
+        
+        if (savedProperty) {
+          setProperties(prev => [savedProperty, ...prev]);
+          setSelectedProperty(savedProperty);
+          setSuccessMessage('Property added successfully!');
+        } else {
+          setSuccessMessage('Failed to add property. Please try again.');
+        }
       } else {
-        setSuccessMessage('Failed to update property. Please try again.');
+        // Update existing property
+        const savedProperty = await SimplifiedPropertyService.updateSimplifiedProperty(
+          updatedProperty.id,
+          updatedProperty
+        );
+
+        if (savedProperty) {
+          setProperties(prev => 
+            prev.map(p => p.id === updatedProperty.id ? savedProperty : p)
+          );
+          setSelectedProperty(savedProperty);
+          setSuccessMessage('Property updated successfully!');
+        } else {
+          setSuccessMessage('Failed to update property. Please try again.');
+        }
       }
     } catch (error) {
       console.error('Error saving property:', error);
-      setSuccessMessage('Failed to update property. Please try again.');
+      setSuccessMessage(`Failed to ${!updatedProperty.id ? 'add' : 'update'} property. Please try again.`);
     }
   };
 
   const handleAddProperty = () => {
-    setShowAddPropertyModal(true);
+    // Create an empty property object to trigger wizard mode
+    const newProperty: SimplifiedProperty = {
+      id: '', // Empty ID triggers wizard mode
+      propertyReference: 0,
+      countryCode: currentOrganization?.country_code || 'UK',
+      address: '',
+      propertyType: 'house',
+      bedrooms: 2,
+      bathrooms: 1,
+      targetRent: 1200,
+      tenantCount: 0,
+      status: 'under_management',
+      units: 1,
+      rooms: []
+    };
+    setSelectedProperty(newProperty);
+    setShowPropertyEditModal(true);
   };
 
   const handlePropertyAdded = (newProperty: SimplifiedProperty) => {

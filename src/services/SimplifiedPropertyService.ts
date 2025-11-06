@@ -3,6 +3,52 @@ import { SimplifiedProperty, SimplifiedTenant, transformToSimplifiedProperty, tr
 import { RentPaymentService } from './RentPaymentService';
 
 export class SimplifiedPropertyService {
+  // Geocode an address to get latitude and longitude coordinates
+  static async geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+    try {
+      // Get Google Maps API key from environment
+      const apiKey = import.meta.env.VITE_GOOGLE_MAP_API 
+        || import.meta.env.VITE_GOOGLE_MAPS_API_KEY 
+        || import.meta.env.GOOGLE_MAP_API
+        || import.meta.env.GOOGLE_MAPS_API_KEY;
+
+      if (!apiKey) {
+        console.warn('Google Maps API key not configured. Skipping geocoding.');
+        return null;
+      }
+
+      // Use Google Geocoding API
+      const encodedAddress = encodeURIComponent(address);
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error('Geocoding API request failed:', response.status, response.statusText);
+        return null;
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        const location = data.results[0].geometry.location;
+        return {
+          lat: location.lat,
+          lng: location.lng
+        };
+      } else if (data.status === 'ZERO_RESULTS') {
+        console.warn(`No geocoding results found for address: ${address}`);
+        return null;
+      } else {
+        console.error('Geocoding failed:', data.status, data.error_message || '');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error geocoding address:', error);
+      return null;
+    }
+  }
+
   // Get all simplified properties from database
   static async getSimplifiedProperties(organizationId?: string): Promise<SimplifiedProperty[]> {
     try {
@@ -85,6 +131,20 @@ export class SimplifiedPropertyService {
   // Get all simplified tenants from database
   static async getSimplifiedTenants(organizationId?: string): Promise<SimplifiedTenant[]> {
     try {
+      // Get organization's country code if organizationId provided
+      let orgCountryCode: string | null = null;
+      if (organizationId) {
+        const { data: org, error: orgError } = await supabase
+          .from('organizations')
+          .select('country_code')
+          .eq('id', organizationId)
+          .single();
+        
+        if (!orgError && org) {
+          orgCountryCode = org.country_code || 'UK';
+        }
+      }
+
       let query = supabase
         .from('tenants')
         .select(`
@@ -101,6 +161,11 @@ export class SimplifiedPropertyService {
       // Filter by organization if provided
       if (organizationId) {
         query = query.eq('organization_id', organizationId);
+      }
+
+      // CRITICAL: Filter by country code to prevent mixing tenants from different countries
+      if (orgCountryCode) {
+        query = query.eq('country_code', orgCountryCode);
       }
 
       const { data, error } = await query;
@@ -129,8 +194,25 @@ export class SimplifiedPropertyService {
     unitDetails?: Array<{ name: string; area: number; targetRent: number }>;
   }, organizationId?: string): Promise<SimplifiedProperty | null> {
     try {
+      // Get organization's country code if organizationId provided
+      let orgCountryCode: string = 'UK'; // Default to UK
+      if (organizationId) {
+        const { data: org, error: orgError } = await supabase
+          .from('organizations')
+          .select('country_code')
+          .eq('id', organizationId)
+          .single();
+        
+        if (!orgError && org) {
+          orgCountryCode = org.country_code || 'UK';
+        }
+      }
+
       // Generate a unique asset register ID
       const assetRegisterId = `SIMP-${Date.now().toString().slice(-6)}`;
+      
+      // Geocode the address to get coordinates
+      const coordinates = await this.geocodeAddress(propertyData.address);
       
       // Prepare property data for database
       const dbPropertyData = {
@@ -153,6 +235,9 @@ export class SimplifiedPropertyService {
         address: propertyData.address,
         status: 'vacant', // New properties start as vacant (allowed values: vacant, occupied, partially_occupied, maintenance, sold)
         property_data: dbPropertyData,
+        country_code: orgCountryCode, // Set country code from organization
+        latitude: coordinates?.lat || null,
+        longitude: coordinates?.lng || null,
       };
 
       // Add organization_id if provided
@@ -372,10 +457,18 @@ export class SimplifiedPropertyService {
         ].filter(Boolean).join(', ');
       }
 
+      // Check if address has changed and re-geocode if needed
+      let newCoordinates: { lat: number; lng: number } | null = null;
+      const addressChanged = fullAddress && fullAddress !== currentProperty.address;
+      
+      if (addressChanged) {
+        console.log('Address changed, re-geocoding:', fullAddress);
+        newCoordinates = await this.geocodeAddress(fullAddress);
+      }
+
       // Merge updates with existing property data
       const updatedPropertyData = {
         ...currentProperty.property_data,
-        ...(updates.propertyName !== undefined && { property_name: updates.propertyName }),
         ...(updates.propertyType && { 
           property_sub_type: updates.propertyType,
           property_type: 'residential' // Always residential for simplified properties
@@ -425,16 +518,19 @@ export class SimplifiedPropertyService {
       // Only update core fields that we know exist
       if (fullAddress) {
         coreUpdates.address = fullAddress;
-        // Only update name if propertyName is not explicitly set
-        if (!updates.propertyName) {
-          coreUpdates.name = `Property at ${fullAddress}`;
-        }
+        coreUpdates.name = `Property at ${fullAddress}`;
       }
-      
-      if (updates.propertyName !== undefined) {
-        // If propertyName is explicitly provided, use it
-        // Empty string means user wants to clear the custom name
-        coreUpdates.name = updates.propertyName || (fullAddress ? `Property at ${fullAddress}` : currentProperty.name);
+
+      // Update coordinates if address changed and geocoding was successful
+      if (addressChanged && newCoordinates) {
+        coreUpdates.latitude = newCoordinates.lat;
+        coreUpdates.longitude = newCoordinates.lng;
+        console.log('Updated coordinates:', newCoordinates);
+      } else if (addressChanged && !newCoordinates) {
+        // If address changed but geocoding failed, clear coordinates
+        coreUpdates.latitude = null;
+        coreUpdates.longitude = null;
+        console.warn('Geocoding failed for new address, coordinates cleared');
       }
 
       if (updates.status) {
@@ -446,6 +542,11 @@ export class SimplifiedPropertyService {
         }
         // For 'under_management', don't change the core status field
         // The occupancy status is calculated dynamically based on tenants
+      }
+
+      // Update property_reference if provided
+      if (updates.propertyReference !== undefined) {
+        coreUpdates.property_reference = updates.propertyReference;
       }
 
       // NOTE: The properties table only has these columns:

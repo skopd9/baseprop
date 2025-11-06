@@ -14,7 +14,6 @@ export interface PropertyRoom {
 export interface SimplifiedProperty {
   id: string;
   propertyReference: number; // Auto-incrementing reference number
-  propertyName?: string; // Optional friendly name for the property
   countryCode: CountryCode; // Country code: UK, GR, US
   address: string;
   propertyType: 'house' | 'flat' | 'hmo';
@@ -28,6 +27,9 @@ export interface SimplifiedProperty {
   status: 'under_management' | 'sold';
   units: number | Array<{ name: string; area?: number }>;
   unitDetails?: Array<{ name: string; area: number; targetRent: number }>; // Detailed unit info for HMO
+  // Geocoding coordinates for map display
+  latitude?: number; // Geocoded latitude coordinate
+  longitude?: number; // Geocoded longitude coordinate
   // Enhanced property details
   totalArea?: number; // Total floor area in square meters
   yearBuilt?: number;
@@ -163,7 +165,6 @@ export const transformToSimplifiedProperty = (property: any, actualTenantCount?:
   return {
     id: property.id,
     propertyReference: property.property_reference || 0,
-    propertyName: propertyData.property_name || property.name,
     countryCode: countryCode,
     address: property.address,
     propertyType: getSimplifiedPropertyType(
@@ -179,6 +180,9 @@ export const transformToSimplifiedProperty = (property: any, actualTenantCount?:
     status: getPropertyStatus(property.status, propertyData.status),
     units: totalUnits,
     unitDetails: unitDetails.length > 0 ? unitDetails : undefined,
+    // Geocoding coordinates (extracted from database columns)
+    latitude: property.latitude ? Number(property.latitude) : undefined,
+    longitude: property.longitude ? Number(property.longitude) : undefined,
     // Enhanced property details
     totalArea: propertyData.total_area,
     yearBuilt: propertyData.year_built,

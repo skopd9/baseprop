@@ -214,11 +214,22 @@ export const db = {
   },
 
   // Tenants
-  async getTenants() {
-    const { data, error } = await supabase
+  async getTenants(filters?: { organizationId?: string; countryCode?: string }) {
+    let query = supabase
       .from('tenants')
-      .select('*')
-      .order('name');
+      .select('*');
+    
+    // Apply filters if provided
+    if (filters?.organizationId) {
+      query = query.eq('organization_id', filters.organizationId);
+    }
+    
+    // CRITICAL: Filter by country code to prevent mixing tenants from different countries
+    if (filters?.countryCode) {
+      query = query.eq('country_code', filters.countryCode);
+    }
+    
+    const { data, error } = await query.order('name');
     
     if (error) throw error;
     return data;

@@ -11,11 +11,6 @@ interface PropertyMapProps {
   className?: string;
 }
 
-interface PropertyWithCoordinates extends SimplifiedProperty {
-  lat?: number;
-  lng?: number;
-}
-
 export const PropertyMap: React.FC<PropertyMapProps> = ({
   properties = [],
   selectedProperty,
@@ -30,7 +25,6 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const loaderInstanceRef = useRef<Loader | null>(null);
   const [isLoading, setIsLoading] = useState(false); // Start false to allow immediate render
   const [error, setError] = useState<string | null>(null);
-  const [propertiesWithCoords, setPropertiesWithCoords] = useState<PropertyWithCoordinates[]>([]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenMapRef = useRef<HTMLDivElement>(null);
   const fullscreenMapInstanceRef = useRef<any>(null);
@@ -41,56 +35,6 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     || import.meta.env.VITE_GOOGLE_MAPS_API_KEY 
     || import.meta.env.GOOGLE_MAP_API
     || import.meta.env.GOOGLE_MAPS_API_KEY;
-
-  // Geocode addresses to get coordinates
-  const geocodeProperties = async (props: SimplifiedProperty[], google: any): Promise<PropertyWithCoordinates[]> => {
-    if (!apiKey || !google || !google.maps) {
-      return props;
-    }
-
-    try {
-      const geocoder = new google.maps.Geocoder();
-      
-      const geocodedProperties = await Promise.all(
-        props.map(async (property) => {
-          try {
-            const result = await new Promise<any[]>((resolve, reject) => {
-              geocoder.geocode({ address: property.address }, (results, status) => {
-                if (status === 'OK' && results) {
-                  resolve(results);
-                } else {
-                  reject(new Error(`Geocoding failed: ${status}`));
-                }
-              });
-            });
-
-            if (result && result[0]) {
-              const location = result[0].geometry.location;
-              return {
-                ...property,
-                lat: location.lat(),
-                lng: location.lng()
-              };
-            }
-          } catch (error) {
-            // Silently fail geocoding for individual properties
-            // Only log if it's not a ZERO_RESULTS error (which is common for invalid addresses)
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            if (!errorMsg.includes('ZERO_RESULTS')) {
-              console.warn(`Failed to geocode ${property.address}:`, error);
-            }
-          }
-          
-          return property;
-        })
-      );
-
-      return geocodedProperties;
-    } catch (error) {
-      // Silently fail geocoding - we'll still show the map without coordinates
-      return props;
-    }
-  };
 
   // Initialize map
   useEffect(() => {
@@ -166,10 +110,6 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         }
 
         const googleMaps = google.maps;
-        
-        // Geocode properties after loading Google Maps
-        const geocodedProps = await geocodeProperties(properties, google);
-        setPropertiesWithCoords(geocodedProps);
 
         if (!mapRef.current) return;
 
@@ -177,17 +117,17 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         let center = { lat: 51.5074, lng: -0.1278 };
         let zoom = 10;
 
-        // If we have properties with coordinates, center on them
-        const propertiesWithValidCoords = geocodedProps.filter(p => p.lat && p.lng);
+        // Filter properties with valid stored coordinates
+        const propertiesWithValidCoords = properties.filter(p => p.latitude && p.longitude);
         if (propertiesWithValidCoords.length > 0) {
           if (propertiesWithValidCoords.length === 1) {
-            center = { lat: propertiesWithValidCoords[0].lat!, lng: propertiesWithValidCoords[0].lng! };
+            center = { lat: propertiesWithValidCoords[0].latitude!, lng: propertiesWithValidCoords[0].longitude! };
             zoom = 15;
           } else {
             // Calculate bounds to fit all properties
             const bounds = new googleMaps.LatLngBounds();
             propertiesWithValidCoords.forEach(property => {
-              bounds.extend({ lat: property.lat!, lng: property.lng! });
+              bounds.extend({ lat: property.latitude!, lng: property.longitude! });
             });
             
             // We'll fit bounds after map is created
@@ -220,7 +160,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         // Add markers for properties with coordinates
         propertiesWithValidCoords.forEach((property) => {
           const marker = new googleMaps.Marker({
-            position: { lat: property.lat!, lng: property.lng! },
+            position: { lat: property.latitude!, lng: property.longitude! },
             map,
             title: property.address,
             icon: {
@@ -238,7 +178,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           const infoWindow = new googleMaps.InfoWindow({
             content: `
               <div class="p-2 min-w-[200px]">
-                <h3 class="font-semibold text-gray-900 mb-1">${property.propertyName || property.address}</h3>
+                <h3 class="font-semibold text-gray-900 mb-1">${property.address}</h3>
                 <p class="text-sm text-gray-600 mb-2">${property.address}</p>
                 <div class="flex items-center justify-between text-xs">
                   <span class="px-2 py-1 rounded-full ${
@@ -321,7 +261,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         if (propertiesWithValidCoords.length > 1) {
           const bounds = new googleMaps.LatLngBounds();
           propertiesWithValidCoords.forEach(property => {
-            bounds.extend({ lat: property.lat!, lng: property.lng! });
+            bounds.extend({ lat: property.latitude!, lng: property.longitude! });
           });
           map.fitBounds(bounds);
           
@@ -394,20 +334,19 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   useEffect(() => {
     if (!selectedProperty || !mapInstanceRef.current) return;
 
-    const selectedPropertyWithCoords = propertiesWithCoords.find(p => p.id === selectedProperty.id);
-    if (selectedPropertyWithCoords && selectedPropertyWithCoords.lat && selectedPropertyWithCoords.lng) {
+    if (selectedProperty.latitude && selectedProperty.longitude) {
       mapInstanceRef.current.panTo({
-        lat: selectedPropertyWithCoords.lat,
-        lng: selectedPropertyWithCoords.lng
+        lat: selectedProperty.latitude,
+        lng: selectedProperty.longitude
       });
       
       // Find and open the info window for the selected property
-      const marker = markersRef.current.find(m => m.getTitle() === selectedPropertyWithCoords.address);
+      const marker = markersRef.current.find(m => m.getTitle() === selectedProperty.address);
       if (marker && (marker as any).infoWindow) {
         (marker as any).infoWindow.open(mapInstanceRef.current, marker);
       }
     }
-  }, [selectedProperty, propertiesWithCoords]);
+  }, [selectedProperty]);
 
   // Handle ESC key to close fullscreen
   useEffect(() => {
@@ -464,8 +403,8 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
         const googleMaps = google.maps;
         
-        // Use the same properties with coordinates
-        const propertiesWithValidCoords = propertiesWithCoords.filter(p => p.lat && p.lng);
+        // Use properties with valid stored coordinates
+        const propertiesWithValidCoords = properties.filter(p => p.latitude && p.longitude);
         
         // Default center (London, UK)
         let center = { lat: 51.5074, lng: -0.1278 };
@@ -473,7 +412,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
         if (propertiesWithValidCoords.length > 0) {
           if (propertiesWithValidCoords.length === 1) {
-            center = { lat: propertiesWithValidCoords[0].lat!, lng: propertiesWithValidCoords[0].lng! };
+            center = { lat: propertiesWithValidCoords[0].latitude!, lng: propertiesWithValidCoords[0].longitude! };
             zoom = 15;
           }
         }
@@ -504,7 +443,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         // Add markers for properties with coordinates
         propertiesWithValidCoords.forEach((property) => {
           const marker = new googleMaps.Marker({
-            position: { lat: property.lat!, lng: property.lng! },
+            position: { lat: property.latitude!, lng: property.longitude! },
             map: fullscreenMap,
             title: property.address,
             icon: {
@@ -521,7 +460,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           const infoWindow = new googleMaps.InfoWindow({
             content: `
               <div class="p-2 min-w-[200px]">
-                <h3 class="font-semibold text-gray-900 mb-1">${property.propertyName || property.address}</h3>
+                <h3 class="font-semibold text-gray-900 mb-1">${property.address}</h3>
                 <p class="text-sm text-gray-600 mb-2">${property.address}</p>
                 <div class="flex items-center justify-between text-xs">
                   <span class="px-2 py-1 rounded-full ${
@@ -602,7 +541,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         if (propertiesWithValidCoords.length > 1) {
           const bounds = new googleMaps.LatLngBounds();
           propertiesWithValidCoords.forEach(property => {
-            bounds.extend({ lat: property.lat!, lng: property.lng! });
+            bounds.extend({ lat: property.latitude!, lng: property.longitude! });
           });
           fullscreenMap.fitBounds(bounds);
           
@@ -613,18 +552,15 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         }
 
         // Update selected property in fullscreen map
-        if (selectedProperty) {
-          const selectedPropertyWithCoords = propertiesWithValidCoords.find(p => p.id === selectedProperty.id);
-          if (selectedPropertyWithCoords && selectedPropertyWithCoords.lat && selectedPropertyWithCoords.lng) {
-            fullscreenMap.panTo({
-              lat: selectedPropertyWithCoords.lat,
-              lng: selectedPropertyWithCoords.lng
-            });
-            
-            const marker = fullscreenMarkersRef.current.find(m => m.getTitle() === selectedPropertyWithCoords.address);
-            if (marker && (marker as any).infoWindow) {
-              (marker as any).infoWindow.open(fullscreenMap, marker);
-            }
+        if (selectedProperty && selectedProperty.latitude && selectedProperty.longitude) {
+          fullscreenMap.panTo({
+            lat: selectedProperty.latitude,
+            lng: selectedProperty.longitude
+          });
+          
+          const marker = fullscreenMarkersRef.current.find(m => m.getTitle() === selectedProperty.address);
+          if (marker && (marker as any).infoWindow) {
+            (marker as any).infoWindow.open(fullscreenMap, marker);
           }
         }
 
@@ -647,7 +583,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       fullscreenMarkersRef.current = [];
       fullscreenMapInstanceRef.current = null;
     };
-  }, [isFullscreen, propertiesWithCoords, selectedProperty, apiKey, onPropertySelect]);
+  }, [isFullscreen, properties, selectedProperty, apiKey, onPropertySelect]);
 
   if (error) {
     return (
