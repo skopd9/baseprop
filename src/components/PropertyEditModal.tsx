@@ -16,11 +16,21 @@ import {
   ArrowUpTrayIcon,
   TrashIcon,
   EyeIcon,
-  PaperClipIcon
+  PaperClipIcon,
+  PhotoIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ArrowPathIcon,
+  StarIcon
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { PropertyPhotoService, PropertyPhoto } from '../services/PropertyPhotoService';
 import { SimplifiedProperty, PropertyRoom } from '../utils/simplifiedDataTransforms';
 import { validatePropertyData } from '../utils/simplifiedDataTransforms';
 import { CountryCode } from '../types';
+import { useCurrency } from '../hooks/useCurrency';
+import { useOrganization } from '../contexts/OrganizationContext';
+import { supabase } from '../lib/supabase';
 
 interface PropertyEditModalProps {
   property: SimplifiedProperty | null;
@@ -61,7 +71,6 @@ const UK_PROPERTY_DOCUMENTS: PropertyDocumentType[] = [
   { id: 'building_regulations', name: 'Building Regulations Certificates', description: 'Building control completion certificates', required: false },
   { id: 'warranty', name: 'Warranty Documents', description: 'NHBC or other warranty certificates', required: false },
   { id: 'floor_plans', name: 'Floor Plans', description: 'Property layout and floor plans', required: false },
-  { id: 'photos', name: 'Property Photos', description: 'Photos of the property', required: false },
   { id: 'other', name: 'Other Documents', description: 'Any other relevant property documents', required: false }
 ];
 
@@ -117,6 +126,8 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
   onClose,
   onSave
 }) => {
+  const { formatCurrency } = useCurrency();
+  const { currentOrganization } = useOrganization();
   const [formData, setFormData] = useState<SimplifiedProperty>({
     id: '',
     propertyName: '',
@@ -140,15 +151,199 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
     rooms: []
   });
   
+  // Structured address fields
+  const [addressFields, setAddressFields] = useState({
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    postcode: ''
+  });
+  
   const [errors, setErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [documents, setDocuments] = useState<PropertyDocument[]>([]);
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
   const [viewingDocument, setViewingDocument] = useState<PropertyDocument | null>(null);
+  const [photos, setPhotos] = useState<PropertyPhoto[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+
+  // Load photos when property changes
+  useEffect(() => {
+    if (property && isOpen) {
+      loadPhotos();
+    } else {
+      setPhotos([]);
+      setSelectedPhotoIndex(null);
+    }
+  }, [property?.id, isOpen]);
+
+  const loadPhotos = async () => {
+    if (!property?.id) return;
+
+    setLoadingPhotos(true);
+    try {
+      const propertyPhotos = await PropertyPhotoService.getPropertyPhotos(property.id);
+      setPhotos(propertyPhotos);
+      // Auto-select first photo (or primary photo if available)
+      if (propertyPhotos.length > 0) {
+        const primaryIndex = propertyPhotos.findIndex(p => p.isPrimary);
+        setSelectedPhotoIndex(primaryIndex >= 0 ? primaryIndex : 0);
+      } else {
+        setSelectedPhotoIndex(null);
+      }
+    } catch (error) {
+      console.error('Error loading photos:', error);
+    } finally {
+      setLoadingPhotos(false);
+    }
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0 || !property?.id || !currentOrganization?.id) return;
+
+    setUploadingPhotos(true);
+    setErrors([]);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          setErrors(prev => [...prev, `${file.name} is not an image file`]);
+          continue;
+        }
+
+        // Validate file size (10MB max)
+        if (file.size > 10 * 1024 * 1024) {
+          setErrors(prev => [...prev, `${file.name} exceeds 10MB limit`]);
+          continue;
+        }
+
+        // Upload photo
+        await PropertyPhotoService.uploadPhoto({
+          propertyId: property.id,
+          organizationId: currentOrganization.id,
+          file: file,
+          isPrimary: photos.length === 0 && i === 0, // First photo if no photos exist
+          displayOrder: photos.length + i,
+        });
+      }
+
+      // Reload photos after upload
+      await loadPhotos();
+    } catch (error) {
+      console.error('Error uploading photos:', error);
+      setErrors(prev => [...prev, error instanceof Error ? error.message : 'Failed to upload photos']);
+    } finally {
+      setUploadingPhotos(false);
+      // Clear file input
+      event.target.value = '';
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: string) => {
+    if (!confirm('Are you sure you want to delete this photo?')) return;
+
+    setDeletingPhotoId(photoId);
+    try {
+      await PropertyPhotoService.deletePhoto(photoId);
+      
+      // Reload photos after deletion
+      await loadPhotos();
+      
+      // If we deleted the selected photo, select the first remaining photo
+      if (photos.length > 1) {
+        setSelectedPhotoIndex(0);
+      } else {
+        setSelectedPhotoIndex(null);
+      }
+    } catch (error) {
+      console.error('Error deleting photo:', error);
+      setErrors(prev => [...prev, 'Failed to delete photo']);
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
+  const handleSetPrimaryPhoto = async (photoId: string) => {
+    if (!property?.id) return;
+
+    try {
+      await PropertyPhotoService.setPrimaryPhoto(photoId, property.id);
+      // Reload photos to update primary status
+      await loadPhotos();
+    } catch (error) {
+      console.error('Error setting primary photo:', error);
+      setErrors(prev => [...prev, 'Failed to set primary photo']);
+    }
+  };
 
   // Update form data when property changes
   useEffect(() => {
-    if (property) {
+    if (property && isOpen) {
+      // Fetch property_data from database to get structured address
+      const loadPropertyData = async () => {
+        try {
+          const { data: propertyRecord, error } = await supabase
+            .from('properties')
+            .select('property_data, address')
+            .eq('id', property.id)
+            .single();
+
+          if (error) {
+            console.error('Error loading property data:', error);
+          }
+
+          const propertyData = propertyRecord?.property_data || {};
+          
+          // Try to parse structured address from property_data
+          let addressLine1 = '';
+          let addressLine2 = '';
+          let city = '';
+          let postcode = '';
+          
+          if (propertyData.address_line_1) {
+            addressLine1 = propertyData.address_line_1;
+            addressLine2 = propertyData.address_line_2 || '';
+            city = propertyData.city || '';
+            postcode = propertyData.postcode || '';
+          } else if (propertyRecord?.address || property.address) {
+            // Fallback: try to parse from full address string
+            const fullAddress = propertyRecord?.address || property.address || '';
+            const addressParts = fullAddress.split(',').map(s => s.trim());
+            if (addressParts.length >= 2) {
+              addressLine1 = addressParts[0];
+              if (addressParts.length >= 3) {
+                addressLine2 = addressParts[1];
+                city = addressParts[addressParts.length - 2] || '';
+                postcode = addressParts[addressParts.length - 1] || '';
+              } else {
+                city = addressParts[addressParts.length - 2] || '';
+                postcode = addressParts[addressParts.length - 1] || '';
+              }
+            } else {
+              addressLine1 = fullAddress;
+            }
+          }
+          
+          setAddressFields({
+            addressLine1,
+            addressLine2,
+            city,
+            postcode
+          });
+        } catch (err) {
+          console.error('Error in loadPropertyData:', err);
+        }
+      };
+
+      loadPropertyData();
+      
       setFormData({
         ...property,
         // Ensure all fields have proper defaults
@@ -177,7 +372,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
       });
       setErrors([]);
     }
-  }, [property]);
+  }, [property, isOpen]);
 
   const handleInputChange = (field: keyof SimplifiedProperty, value: any) => {
     setFormData(prev => {
@@ -201,6 +396,20 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
   };
 
   const handleSave = async () => {
+    // Validate address fields
+    if (!addressFields.addressLine1.trim()) {
+      setErrors(['Address Line 1 is required']);
+      return;
+    }
+    if (!addressFields.city.trim()) {
+      setErrors(['City is required']);
+      return;
+    }
+    if (!addressFields.postcode.trim()) {
+      setErrors([`${currentOrganization?.country_code === 'US' ? 'ZIP Code' : 'Postcode'} is required`]);
+      return;
+    }
+    
     const validationErrors = validatePropertyData(formData);
     
     if (validationErrors.length > 0) {
@@ -208,10 +417,31 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
       return;
     }
 
+    // Build full address string for backward compatibility
+    const fullAddress = [
+      addressFields.addressLine1,
+      addressFields.addressLine2,
+      addressFields.city,
+      addressFields.postcode
+    ].filter(Boolean).join(', ');
+
+    // Update formData with full address and structured address fields
+    const updatedFormData = {
+      ...formData,
+      address: fullAddress,
+      // Store structured address in a way that can be passed to the save function
+      // We'll need to update the save function to handle this
+    };
+
     setIsSaving(true);
     
     try {
-      await onSave(formData);
+      // Pass structured address fields along with formData
+      await onSave({
+        ...updatedFormData,
+        // Add structured address fields that will be saved to property_data
+        _addressFields: addressFields
+      } as any);
       onClose();
     } catch (error) {
       console.error('Error saving property:', error);
@@ -219,15 +449,6 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -374,18 +595,61 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                   </p>
                 </div>
 
-                {/* Address */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Address <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                    placeholder="Enter full property address..."
-                  />
+                {/* Structured Address Fields */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Address Line 1 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={addressFields.addressLine1}
+                      onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine1: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder={currentOrganization?.country_code === 'US' ? 'e.g., 123 Main Street' : 'e.g., 123 High Street'}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Address Line 2 <span className="text-gray-400 font-normal">(optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={addressFields.addressLine2}
+                      onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine2: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Apartment, suite, unit, etc."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        City <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addressFields.city}
+                        onChange={(e) => setAddressFields(prev => ({ ...prev, city: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder={currentOrganization?.country_code === 'US' ? 'New York' : currentOrganization?.country_code === 'GR' ? 'Athens' : 'London'}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {currentOrganization?.country_code === 'US' ? 'ZIP Code' : 'Postcode'} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addressFields.postcode}
+                        onChange={(e) => setAddressFields(prev => ({ ...prev, postcode: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder={currentOrganization?.country_code === 'US' ? '10001' : currentOrganization?.country_code === 'GR' ? '106 82' : 'SW1A 1AA'}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Property Type */}
@@ -813,7 +1077,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Monthly Rent (£)
+                                  Monthly Rent
                                 </label>
                                 <input
                                   type="number"
@@ -855,7 +1119,169 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
               </div>
             )}
 
-            {/* SECTION 6: Property Documents */}
+            {/* SECTION 6: Property Photos */}
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <PhotoIcon className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-base font-semibold text-gray-900">Property Photos</h3>
+                </div>
+                {/* Add Photos Button */}
+                <label className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                  <PhotoIcon className="w-4 h-4 mr-2" />
+                  {uploadingPhotos ? 'Uploading...' : 'Add Photos'}
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    disabled={uploadingPhotos}
+                    className="sr-only"
+                  />
+                </label>
+              </div>
+              
+              {loadingPhotos ? (
+                <div className="text-center py-8">
+                  <ArrowPathIcon className="w-8 h-8 text-gray-400 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Loading photos...</p>
+                </div>
+              ) : photos.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                  <PhotoIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-gray-600 mb-1">No photos available</p>
+                  <p className="text-xs text-gray-500 mb-4">Click "Add Photos" above to upload property images</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Main Photo Display */}
+                  {selectedPhotoIndex !== null && selectedPhotoIndex < photos.length && photos[selectedPhotoIndex] && (
+                    <div className="relative bg-gray-900 rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                      <img
+                        src={photos[selectedPhotoIndex].url || ''}
+                        alt={photos[selectedPhotoIndex].caption || `Photo ${selectedPhotoIndex + 1}`}
+                        className="w-full h-full object-contain"
+                      />
+                      {/* Primary Badge and Set Primary Button */}
+                      <div className="absolute top-2 left-2 flex items-center space-x-2">
+                        {photos[selectedPhotoIndex].isPrimary ? (
+                          <div className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium flex items-center space-x-1">
+                            <StarIconSolid className="w-3 h-3" />
+                            <span>Primary</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleSetPrimaryPhoto(photos[selectedPhotoIndex].id)}
+                            className="bg-gray-800 bg-opacity-70 hover:bg-opacity-90 text-white px-2 py-1 rounded text-xs font-medium flex items-center space-x-1 transition-all"
+                            title="Set as primary photo"
+                          >
+                            <StarIcon className="w-3 h-3" />
+                            <span>Set Primary</span>
+                          </button>
+                        )}
+                      </div>
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => handleDeletePhoto(photos[selectedPhotoIndex].id)}
+                        disabled={deletingPhotoId === photos[selectedPhotoIndex].id}
+                        className="absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition-all disabled:opacity-50"
+                        title="Delete photo"
+                      >
+                        {deletingPhotoId === photos[selectedPhotoIndex].id ? (
+                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <TrashIcon className="w-4 h-4" />
+                        )}
+                      </button>
+                      {photos.length > 1 && (
+                        <>
+                          <button
+                            onClick={() => setSelectedPhotoIndex(selectedPhotoIndex > 0 ? selectedPhotoIndex - 1 : photos.length - 1)}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-full transition-all"
+                          >
+                            <ChevronLeftIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedPhotoIndex(selectedPhotoIndex < photos.length - 1 ? selectedPhotoIndex + 1 : 0)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-75 text-white p-2 rounded-full transition-all"
+                          >
+                            <ChevronRightIcon className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Thumbnail Grid */}
+                  {photos.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-700 mb-2">
+                        {photos.length} {photos.length === 1 ? 'photo' : 'photos'}
+                      </p>
+                      <div className="grid grid-cols-4 gap-2">
+                        {photos.map((photo, index) => (
+                          <div
+                            key={photo.id}
+                            className={`relative group aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                              selectedPhotoIndex === index
+                                ? 'border-blue-600 ring-2 ring-blue-200'
+                                : 'border-gray-200'
+                            }`}
+                          >
+                            <button
+                              onClick={() => setSelectedPhotoIndex(index)}
+                              className="w-full h-full"
+                            >
+                              <img
+                                src={photo.url || ''}
+                                alt={`Thumbnail ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                            {/* Primary Badge */}
+                            {photo.isPrimary ? (
+                              <div className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-1 py-0.5 rounded flex items-center">
+                                <StarIconSolid className="w-2.5 h-2.5 mr-0.5" />
+                                <span>P</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSetPrimaryPhoto(photo.id);
+                                }}
+                                className="absolute top-1 left-1 bg-gray-800 bg-opacity-70 hover:bg-opacity-90 text-white p-1 rounded-full transition-all opacity-0 group-hover:opacity-100"
+                                title="Set as primary photo"
+                              >
+                                <StarIcon className="w-3 h-3" />
+                              </button>
+                            )}
+                            {/* Delete Button on Thumbnail */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePhoto(photo.id);
+                              }}
+                              disabled={deletingPhotoId === photo.id}
+                              className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                              title="Delete photo"
+                            >
+                              {deletingPhotoId === photo.id ? (
+                                <ArrowPathIcon className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <TrashIcon className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* SECTION 7: Property Documents */}
             <div className="bg-white border border-gray-200 rounded-lg p-5">
               <div className="flex items-center space-x-2 mb-4">
                 <DocumentTextIcon className="w-5 h-5 text-teal-600" />
@@ -863,12 +1289,6 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
               </div>
               
               <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-xs text-blue-800">
-                    <strong>Note:</strong> Store property-specific documents here. Compliance certificates and tenant lease documents are managed separately in their respective sections.
-                  </p>
-                </div>
-
                 {/* Upload New Document */}
                 <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                   <h4 className="text-sm font-semibold text-gray-900 mb-3">Upload New Document</h4>
@@ -985,23 +1405,6 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                     </p>
                   </div>
                 )}
-
-                {/* Country-Specific Document Types Reference */}
-                <details className="bg-gray-50 border border-gray-200 rounded-lg">
-                  <summary className="px-4 py-3 cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
-                    View all document types for {property.countryCode === 'UK' ? 'UK' : property.countryCode === 'GR' ? 'Greece' : 'USA'}
-                  </summary>
-                  <div className="px-4 pb-4 pt-2">
-                    <div className="space-y-2">
-                      {availableDocumentTypes.map(docType => (
-                        <div key={docType.id} className="border-l-2 border-gray-300 pl-3 py-1">
-                          <p className="text-sm font-medium text-gray-900">{docType.name}</p>
-                          <p className="text-xs text-gray-600">{docType.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </details>
               </div>
             </div>
           </div>
@@ -1119,6 +1522,7 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
           </div>
         </>
       )}
+
     </>
   );
 };

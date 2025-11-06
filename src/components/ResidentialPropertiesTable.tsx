@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -14,8 +14,11 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   CurrencyPoundIcon,
-  TrashIcon
+  TrashIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
+import { PropertyPhotoViewer } from './PropertyPhotoViewer';
+import { PropertyPhotoService } from '../services/PropertyPhotoService';
 import { SimplifiedProperty, SimplifiedTenant, getOccupancyDisplay } from '../utils/simplifiedDataTransforms';
 import { useCurrency } from '../hooks/useCurrency';
 
@@ -81,6 +84,9 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [photoViewerProperty, setPhotoViewerProperty] = useState<SimplifiedProperty | null>(null);
+  const [primaryPhotoUrls, setPrimaryPhotoUrls] = useState<Map<string, string>>(new Map());
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
 
   // Create a map for quick tenant lookup by property
   const tenantsByProperty = useMemo(() => {
@@ -91,6 +97,34 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
     });
     return map;
   }, [tenants]);
+
+  // Load primary photos for all properties
+  useEffect(() => {
+    const loadPrimaryPhotos = async () => {
+      const photoMap = new Map<string, string>();
+      
+      // Load primary photos for all properties in parallel
+      const photoPromises = safeProperties.map(async (property) => {
+        try {
+          const primaryPhoto = await PropertyPhotoService.getPrimaryPhoto(property.id);
+          if (primaryPhoto?.url) {
+            photoMap.set(property.id, primaryPhoto.url);
+          }
+        } catch (error) {
+          console.error(`Error loading primary photo for property ${property.id}:`, error);
+        }
+      });
+
+      await Promise.all(photoPromises);
+      setPrimaryPhotoUrls(photoMap);
+      // Reset failed images when loading new photos
+      setFailedImageIds(new Set());
+    };
+
+    if (safeProperties.length > 0) {
+      loadPrimaryPhotos();
+    }
+  }, [safeProperties]);
 
   // Checkbox handlers
   const toggleRowSelection = useCallback((propertyId: string) => {
@@ -174,6 +208,41 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
       size: 300,
     },
     {
+      id: 'photos',
+      header: 'Photos',
+      cell: info => {
+        const property = info.row.original;
+        const primaryPhotoUrl = primaryPhotoUrls.get(property.id);
+        const hasFailed = failedImageIds.has(property.id);
+        const shouldShowImage = primaryPhotoUrl && !hasFailed;
+        
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPhotoViewerProperty(property);
+            }}
+            className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors overflow-hidden"
+            title="View property photos"
+          >
+            {shouldShowImage ? (
+              <img
+                src={primaryPhotoUrl}
+                alt={`${property.address} - Primary photo`}
+                className="w-full h-full object-cover"
+                onError={() => {
+                  setFailedImageIds(prev => new Set(prev).add(property.id));
+                }}
+              />
+            ) : (
+              <PhotoIcon className="w-5 h-5" />
+            )}
+          </button>
+        );
+      },
+      size: 80,
+    },
+    {
       accessorKey: 'propertyType',
       header: 'Type',
       cell: info => (
@@ -213,7 +282,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
     },
     {
       id: 'rent_info',
-      header: 'Rent',
+      header: 'Rent/Month',
       cell: info => {
         const property = info.row.original;
         const propertyTenants = tenantsByProperty.get(property.id) || [];
@@ -286,7 +355,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
       filterFn: 'equals',
       size: 140,
     },
-  ], [tenantsByProperty, selectedRows, safeProperties, toggleAllRows, toggleRowSelection]);
+  ], [tenantsByProperty, selectedRows, safeProperties, toggleAllRows, toggleRowSelection, primaryPhotoUrls, failedImageIds]);
 
   const table = useReactTable({
     data: safeProperties,
@@ -305,10 +374,11 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
     globalFilterFn: 'includesString',
   });
 
+
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200">
+    <div className="bg-white rounded-lg shadow border border-gray-200 flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
       {/* Header */}
-      <div className="px-4 py-4 border-b border-gray-200">
+      <div className="px-4 py-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Properties</h3>
@@ -376,9 +446,9 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map(header => (
@@ -436,6 +506,16 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
               );
             })}
           </tbody>
+          {/* End of Table Indicator */}
+          {table.getRowModel().rows.length > 0 && (
+            <tfoot className="sticky bottom-0 bg-gray-50 z-10">
+              <tr>
+                <td colSpan={9} className="px-4 py-3 text-center text-xs text-gray-500 border-t border-gray-200">
+                  End of table • {table.getRowModel().rows.length} {table.getRowModel().rows.length === 1 ? 'property' : 'properties'} shown
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 
@@ -460,6 +540,16 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
             Add Property
           </button>
         </div>
+      )}
+
+      {/* Property Photo Viewer */}
+      {photoViewerProperty && (
+        <PropertyPhotoViewer
+          propertyId={photoViewerProperty.id}
+          propertyName={photoViewerProperty.address}
+          isOpen={!!photoViewerProperty}
+          onClose={() => setPhotoViewerProperty(null)}
+        />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
-import { MapPinIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, ArrowsPointingOutIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface PropertyMapProps {
   properties: SimplifiedProperty[];
@@ -31,6 +31,10 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   const [isLoading, setIsLoading] = useState(false); // Start false to allow immediate render
   const [error, setError] = useState<string | null>(null);
   const [propertiesWithCoords, setPropertiesWithCoords] = useState<PropertyWithCoordinates[]>([]);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenMapRef = useRef<HTMLDivElement>(null);
+  const fullscreenMapInstanceRef = useRef<any>(null);
+  const fullscreenMarkersRef = useRef<any[]>([]);
 
   // Get Google Maps API key from environment (check multiple possible names)
   const apiKey = import.meta.env.VITE_GOOGLE_MAP_API 
@@ -194,6 +198,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           center,
           zoom,
           mapTypeId: googleMaps.MapTypeId.ROADMAP,
+          fullscreenControl: false, // Disable default fullscreen control
           styles: [
             {
               featureType: 'poi',
@@ -208,6 +213,9 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         // Clear existing markers
         markersRef.current.forEach(marker => marker.setMap(null));
         markersRef.current = [];
+
+        // Track if a marker was just clicked to prevent map click from closing info window
+        let markerJustClicked = false;
 
         // Add markers for properties with coordinates
         propertiesWithValidCoords.forEach((property) => {
@@ -247,6 +255,9 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           });
 
           marker.addListener('click', () => {
+            // Set flag to prevent map click from closing this info window
+            markerJustClicked = true;
+            
             // Close other info windows
             markersRef.current.forEach(m => {
               if ((m as any).infoWindow) {
@@ -264,6 +275,46 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
           // Store info window reference
           (marker as any).infoWindow = infoWindow;
           markersRef.current.push(marker);
+        });
+
+        // Close info windows when clicking on the map
+        map.addListener('click', () => {
+          // Only close if a marker wasn't just clicked
+          if (!markerJustClicked) {
+            markersRef.current.forEach(m => {
+              if ((m as any).infoWindow) {
+                (m as any).infoWindow.close();
+              }
+            });
+          }
+          // Reset flag after a short delay
+          markerJustClicked = false;
+        });
+        
+        // Also listen to clicks on the map container for better reliability
+        googleMaps.event.addListenerOnce(map, 'idle', () => {
+          const mapDiv = mapRef.current;
+          if (mapDiv) {
+            const handleMapClick = (e: MouseEvent) => {
+              const target = e.target as HTMLElement;
+              // Close info windows if clicking on the map canvas, but not on info windows or controls
+              const isInfoWindow = target.closest('.gm-style-iw') || target.closest('.gm-style-iw-c');
+              const isControl = target.closest('.gm-control') || target.closest('.gm-fullscreen-control');
+              
+              if (!isInfoWindow && !isControl) {
+                markersRef.current.forEach(m => {
+                  if ((m as any).infoWindow) {
+                    (m as any).infoWindow.close();
+                  }
+                });
+              }
+            };
+            
+            // Add click listener with a small delay to ensure map is fully rendered
+            setTimeout(() => {
+              mapDiv.addEventListener('click', handleMapClick, true);
+            }, 100);
+          }
         });
 
         // Fit bounds if we have multiple properties
@@ -358,6 +409,246 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
     }
   }, [selectedProperty, propertiesWithCoords]);
 
+  // Handle ESC key to close fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isFullscreen]);
+
+  // Initialize fullscreen map when modal opens
+  useEffect(() => {
+    if (!isFullscreen || !apiKey) return;
+
+    const initFullscreenMap = async () => {
+      try {
+        // Wait for fullscreenMapRef to be available (DOM needs to render first)
+        let retries = 0;
+        while (!fullscreenMapRef.current && retries < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          retries++;
+        }
+        
+        if (!fullscreenMapRef.current) return;
+
+        // Use existing loader instance if available
+        let google: any;
+        if (loaderInstanceRef.current) {
+          try {
+            google = await loaderInstanceRef.current.load();
+          } catch (e) {
+            loaderInstanceRef.current = new Loader({
+              apiKey,
+              version: 'weekly',
+              libraries: ['places']
+            });
+            google = await loaderInstanceRef.current.load();
+          }
+        } else {
+          loaderInstanceRef.current = new Loader({
+            apiKey,
+            version: 'weekly',
+            libraries: ['places']
+          });
+          google = await loaderInstanceRef.current.load();
+        }
+
+        if (!google || !google.maps || !google.maps.Map) return;
+
+        const googleMaps = google.maps;
+        
+        // Use the same properties with coordinates
+        const propertiesWithValidCoords = propertiesWithCoords.filter(p => p.lat && p.lng);
+        
+        // Default center (London, UK)
+        let center = { lat: 51.5074, lng: -0.1278 };
+        let zoom = 10;
+
+        if (propertiesWithValidCoords.length > 0) {
+          if (propertiesWithValidCoords.length === 1) {
+            center = { lat: propertiesWithValidCoords[0].lat!, lng: propertiesWithValidCoords[0].lng! };
+            zoom = 15;
+          }
+        }
+
+        const fullscreenMap = new googleMaps.Map(fullscreenMapRef.current, {
+          center,
+          zoom,
+          mapTypeId: googleMaps.MapTypeId.ROADMAP,
+          fullscreenControl: false,
+          styles: [
+            {
+              featureType: 'poi',
+              elementType: 'labels',
+              stylers: [{ visibility: 'off' }]
+            }
+          ]
+        });
+
+        fullscreenMapInstanceRef.current = fullscreenMap;
+
+        // Clear existing fullscreen markers
+        fullscreenMarkersRef.current.forEach(marker => marker.setMap(null));
+        fullscreenMarkersRef.current = [];
+
+        // Track if a marker was just clicked to prevent map click from closing info window
+        let fullscreenMarkerJustClicked = false;
+
+        // Add markers for properties with coordinates
+        propertiesWithValidCoords.forEach((property) => {
+          const marker = new googleMaps.Marker({
+            position: { lat: property.lat!, lng: property.lng! },
+            map: fullscreenMap,
+            title: property.address,
+            icon: {
+              path: googleMaps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: property.status === 'sold' ? '#6B7280' : 
+                        property.tenantCount > 0 ? '#10B981' : '#F59E0B',
+              fillOpacity: 1,
+              strokeColor: '#FFFFFF',
+              strokeWeight: 2
+            }
+          });
+
+          const infoWindow = new googleMaps.InfoWindow({
+            content: `
+              <div class="p-2 min-w-[200px]">
+                <h3 class="font-semibold text-gray-900 mb-1">${property.propertyName || property.address}</h3>
+                <p class="text-sm text-gray-600 mb-2">${property.address}</p>
+                <div class="flex items-center justify-between text-xs">
+                  <span class="px-2 py-1 rounded-full ${
+                    property.status === 'sold' ? 'bg-gray-100 text-gray-800' :
+                    property.tenantCount > 0 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  }">
+                    ${property.status === 'sold' ? 'Sold' : 
+                      property.tenantCount > 0 ? `Occupied (${property.tenantCount})` : 'Vacant'}
+                  </span>
+                  <span class="text-gray-600">£${property.targetRent}/month</span>
+                </div>
+              </div>
+            `
+          });
+
+          marker.addListener('click', () => {
+            // Set flag to prevent map click from closing this info window
+            fullscreenMarkerJustClicked = true;
+            
+            fullscreenMarkersRef.current.forEach(m => {
+              if ((m as any).infoWindow) {
+                (m as any).infoWindow.close();
+              }
+            });
+            
+            infoWindow.open(fullscreenMap, marker);
+            
+            if (onPropertySelect) {
+              onPropertySelect(property);
+            }
+          });
+
+          (marker as any).infoWindow = infoWindow;
+          fullscreenMarkersRef.current.push(marker);
+        });
+
+        // Close info windows when clicking on the fullscreen map
+        fullscreenMap.addListener('click', () => {
+          // Only close if a marker wasn't just clicked
+          if (!fullscreenMarkerJustClicked) {
+            fullscreenMarkersRef.current.forEach(m => {
+              if ((m as any).infoWindow) {
+                (m as any).infoWindow.close();
+              }
+            });
+          }
+          // Reset flag after a short delay
+          fullscreenMarkerJustClicked = false;
+        });
+        
+        // Also listen to clicks on the fullscreen map container for better reliability
+        googleMaps.event.addListenerOnce(fullscreenMap, 'idle', () => {
+          const fullscreenMapDiv = fullscreenMapRef.current;
+          if (fullscreenMapDiv) {
+            const handleFullscreenMapClick = (e: MouseEvent) => {
+              const target = e.target as HTMLElement;
+              // Close info windows if clicking on the map canvas, but not on info windows or controls
+              const isInfoWindow = target.closest('.gm-style-iw') || target.closest('.gm-style-iw-c');
+              const isControl = target.closest('.gm-control') || target.closest('.gm-fullscreen-control');
+              
+              if (!isInfoWindow && !isControl) {
+                fullscreenMarkersRef.current.forEach(m => {
+                  if ((m as any).infoWindow) {
+                    (m as any).infoWindow.close();
+                  }
+                });
+              }
+            };
+            
+            // Add click listener with a small delay to ensure map is fully rendered
+            setTimeout(() => {
+              fullscreenMapDiv.addEventListener('click', handleFullscreenMapClick, true);
+            }, 100);
+          }
+        });
+
+        // Fit bounds if we have multiple properties
+        if (propertiesWithValidCoords.length > 1) {
+          const bounds = new googleMaps.LatLngBounds();
+          propertiesWithValidCoords.forEach(property => {
+            bounds.extend({ lat: property.lat!, lng: property.lng! });
+          });
+          fullscreenMap.fitBounds(bounds);
+          
+          const listener = googleMaps.event.addListener(fullscreenMap, 'idle', () => {
+            if (fullscreenMap.getZoom()! > 16) fullscreenMap.setZoom(16);
+            googleMaps.event.removeListener(listener);
+          });
+        }
+
+        // Update selected property in fullscreen map
+        if (selectedProperty) {
+          const selectedPropertyWithCoords = propertiesWithValidCoords.find(p => p.id === selectedProperty.id);
+          if (selectedPropertyWithCoords && selectedPropertyWithCoords.lat && selectedPropertyWithCoords.lng) {
+            fullscreenMap.panTo({
+              lat: selectedPropertyWithCoords.lat,
+              lng: selectedPropertyWithCoords.lng
+            });
+            
+            const marker = fullscreenMarkersRef.current.find(m => m.getTitle() === selectedPropertyWithCoords.address);
+            if (marker && (marker as any).infoWindow) {
+              (marker as any).infoWindow.open(fullscreenMap, marker);
+            }
+          }
+        }
+
+      } catch (error) {
+        console.error('Error initializing fullscreen map:', error);
+      }
+    };
+
+    initFullscreenMap();
+
+    // Cleanup function
+    return () => {
+      // Clear fullscreen markers
+      fullscreenMarkersRef.current.forEach(marker => {
+        if ((marker as any).infoWindow) {
+          (marker as any).infoWindow.close();
+        }
+        marker.setMap(null);
+      });
+      fullscreenMarkersRef.current = [];
+      fullscreenMapInstanceRef.current = null;
+    };
+  }, [isFullscreen, propertiesWithCoords, selectedProperty, apiKey, onPropertySelect]);
+
   if (error) {
     return (
       <div className={`bg-white rounded-lg border border-gray-200 ${className}`} style={{ height }}>
@@ -425,16 +716,63 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   }
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden ${className}`} style={{ height }}>
-      {isLoading && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-            <p className="text-sm text-gray-600">Loading map...</p>
+    <>
+      <div className={`bg-white rounded-lg border border-gray-200 overflow-hidden relative ${className}`} style={{ height }}>
+        {isLoading && (
+          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              <p className="text-sm text-gray-600">Loading map...</p>
+            </div>
+          </div>
+        )}
+        <div ref={mapRef} className="w-full h-full" />
+        {/* Custom Fullscreen Button */}
+        <button
+          onClick={() => setIsFullscreen(true)}
+          className="absolute top-2 right-2 bg-white hover:bg-gray-50 border border-gray-300 rounded-md p-2 shadow-md z-10 transition-colors"
+          title="Toggle fullscreen view"
+          aria-label="Toggle fullscreen view"
+        >
+          <ArrowsPointingOutIcon className="w-5 h-5 text-gray-700" />
+        </button>
+      </div>
+
+      {/* Fullscreen Modal */}
+      {isFullscreen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex flex-col"
+          onClick={(e) => {
+            // Close modal when clicking on the backdrop (outside the map container)
+            if (e.target === e.currentTarget) {
+              setIsFullscreen(false);
+            }
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 bg-gray-900 bg-opacity-95">
+            <h2 className="text-lg font-semibold text-white">Property Map</h2>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="text-white hover:text-gray-300 px-4 py-2 rounded-md hover:bg-gray-800 transition-colors flex items-center space-x-2"
+                aria-label="Exit fullscreen"
+              >
+                <XMarkIcon className="w-5 h-5" />
+                <span className="text-sm">Exit Fullscreen</span>
+              </button>
+            </div>
+          </div>
+          
+          {/* Map Container */}
+          <div 
+            className="flex-1 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div ref={fullscreenMapRef} className="w-full h-full" />
           </div>
         </div>
       )}
-      <div ref={mapRef} className="w-full h-full" />
-    </div>
+    </>
   );
 };

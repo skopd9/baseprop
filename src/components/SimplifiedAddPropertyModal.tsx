@@ -563,7 +563,7 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
 
           <div>
             <label htmlFor="purchasePrice" className="block text-sm font-medium text-gray-700 mb-1">
-              Purchase Price (£) <span className="text-gray-400">(optional)</span>
+              Purchase Price ({currencySymbol}) <span className="text-gray-400">(optional)</span>
             </label>
             <input
               type="number"

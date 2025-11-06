@@ -403,40 +403,6 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
             
             return (
               <div key={country} className="space-y-4">
-                {/* Country Header */}
-                <div className="bg-white rounded-lg shadow border border-gray-200">
-                  <div className="px-4 py-3 border-b border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{getCountryFlag(country)}</span>
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">{countryInfo.name}</h3>
-                          <div className="flex items-center space-x-4 mt-1">
-                            <span className="text-sm text-gray-500">
-                              {countryProperties.length} {countryProperties.length === 1 ? 'property' : 'properties'}
-                            </span>
-                            {stats && stats.valid > 0 && (
-                              <span className="text-sm text-green-600">{stats.valid} valid</span>
-                            )}
-                            {stats && stats.expiring > 0 && (
-                              <span className="text-sm text-yellow-600">{stats.expiring} expiring</span>
-                            )}
-                            {stats && stats.expired > 0 && (
-                              <span className="text-sm text-red-600">{stats.expired} expired</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setShowRequirementsModal(true)}
-                        className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-                      >
-                        View Requirements
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                
                 {/* Properties in this country */}
                 <div className="space-y-4">
                   {countryProperties.map((property) => {

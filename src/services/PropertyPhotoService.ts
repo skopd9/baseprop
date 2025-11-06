@@ -245,9 +245,25 @@ export class PropertyPhotoService {
 
   /**
    * Get a signed URL for a photo
+   * Handles both real storage paths and placeholder URLs
    */
   private static async getPhotoUrl(storagePath: string): Promise<string> {
     try {
+      // Check if this is a placeholder URL (starts with "placeholder:")
+      if (storagePath.startsWith('placeholder:')) {
+        // Handle format: "placeholder:{property_id}:{url}" or "placeholder:{url}"
+        const withoutPrefix = storagePath.replace('placeholder:', '');
+        // If it contains a colon after the prefix, it's the new format with property_id
+        const parts = withoutPrefix.split(':');
+        if (parts.length > 1 && parts[0].includes('-')) {
+          // New format: property_id:url - extract just the URL (everything after first colon)
+          return withoutPrefix.substring(withoutPrefix.indexOf(':') + 1);
+        }
+        // Old format: just the URL
+        return withoutPrefix;
+      }
+
+      // Otherwise, get signed URL from storage
       const { data, error } = await supabase.storage
         .from(STORAGE_BUCKET)
         .createSignedUrl(storagePath, 3600); // 1 hour expiry

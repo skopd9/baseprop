@@ -41,7 +41,7 @@ export const ExpensesSummaryWidget: React.FC<ExpensesSummaryWidgetProps> = ({ on
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col h-[400px]">
         <div className="animate-pulse">
           <div className="h-4 bg-gray-200 rounded w-1/3 mb-4"></div>
           <div className="h-8 bg-gray-200 rounded w-1/2 mb-4"></div>
@@ -55,8 +55,8 @@ export const ExpensesSummaryWidget: React.FC<ExpensesSummaryWidgetProps> = ({ on
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col h-[400px]">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-orange-100 rounded-lg">
             <ReceiptPercentIcon className="w-5 h-5 text-orange-600" />
@@ -88,8 +88,8 @@ export const ExpensesSummaryWidget: React.FC<ExpensesSummaryWidgetProps> = ({ on
           </button>
         </div>
       ) : (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-700">Recent Expenses</h4>
+        <div className="space-y-3 overflow-y-auto pr-2 flex-1 min-h-0">
+          <h4 className="text-sm font-medium text-gray-700 flex-shrink-0">Recent Expenses</h4>
           <div className="space-y-2">
             {recentExpenses.map((expense) => (
               <div key={expense.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
@@ -111,7 +111,7 @@ export const ExpensesSummaryWidget: React.FC<ExpensesSummaryWidgetProps> = ({ on
           {recentExpenses.length >= 5 && (
             <button
               onClick={onViewExpenses}
-              className="w-full text-center text-blue-600 hover:text-blue-700 text-sm font-medium py-2"
+              className="w-full text-center text-blue-600 hover:text-blue-700 text-sm font-medium py-2 flex-shrink-0"
             >
               View all expenses →
             </button>

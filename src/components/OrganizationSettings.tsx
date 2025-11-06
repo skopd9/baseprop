@@ -51,6 +51,8 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
 
   useEffect(() => {
     if (isOpen && currentOrganization) {
+      setSuccess('');
+      setError('');
       loadData();
       loadSettings();
     }
@@ -261,7 +263,6 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
       if (!user) throw new Error('User not authenticated');
 
       await OrganizationService.updateMemberRole(currentOrganization.id, memberId, newRole, user.id);
-      setSuccess(`Member role updated to ${newRole}`);
       await loadData();
       await refreshOrganizations();
     } catch (err: any) {

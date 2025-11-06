@@ -13,6 +13,7 @@ import {
 import { SimplifiedProperty, SimplifiedTenant, getOccupancyStatus } from '../utils/simplifiedDataTransforms';
 import { ExpensesSummaryWidget } from './ExpensesSummaryWidget';
 import { PropertyMap } from './PropertyMap';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface SimplifiedDashboardProps {
   properties: SimplifiedProperty[];
@@ -41,6 +42,8 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
   selectedProperty,
   onPropertySelect
 }) => {
+  const { formatCurrency } = useCurrency();
+  
   // State for collapsible categories
   const [expandedCategories, setExpandedCategories] = useState<{
     rent: boolean;
@@ -143,15 +146,6 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
     ...urgentItemsByCategory.vacancies
   ];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="pt-3 sm:pt-4 px-4 sm:px-6 pb-4 sm:pb-6 max-w-7xl mx-auto">
@@ -250,8 +244,8 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
 
         {/* Three Column Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">          {/* Urgent Items List - Grouped by Category */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 flex flex-col h-[400px]">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h2 className="text-base sm:text-lg font-semibold text-gray-900">Items Needing Attention</h2>
               <div className="flex items-center space-x-2">
                 <span className="text-xs sm:text-sm font-medium text-gray-600">{urgentItems.length}</span>
@@ -260,7 +254,7 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
             </div>
             
             {urgentItems.length > 0 ? (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+              <div className="space-y-3 overflow-y-auto pr-2 flex-1 min-h-0">
                 {/* Overdue Rent Category */}
                 {urgentItemsByCategory.rent.length > 0 && (
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -375,13 +369,13 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
           </div>
 
           {/* Property Status Overview */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 flex flex-col h-[400px]">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
               <h2 className="text-base sm:text-lg font-semibold text-gray-900">Property Status</h2>
               <HomeIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
             </div>
             
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-3 sm:space-y-4 overflow-y-auto pr-2 flex-1 min-h-0">
               {/* Occupied Properties */}
               <div className="flex items-center justify-between p-2 sm:p-3 bg-green-50 rounded-lg">
                 <div className="flex items-center space-x-2 sm:space-x-3">

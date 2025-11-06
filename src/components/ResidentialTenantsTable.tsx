@@ -24,6 +24,7 @@ import { SimplifiedTenant } from '../utils/simplifiedDataTransforms';
 import { SimpleTenantOnboardingService } from '../services/SimpleTenantOnboardingService';
 import { EnhancedTenantOnboardingModal } from './EnhancedTenantOnboardingModal';
 import { TenantDetailsModal } from './TenantDetailsModal';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface ResidentialTenantsTableProps {
   tenants: SimplifiedTenant[];
@@ -34,15 +35,6 @@ interface ResidentialTenantsTableProps {
   onDeleteTenants?: (tenants: SimplifiedTenant[]) => void;
   onTenantUpdate: (tenant: SimplifiedTenant) => void; // Add callback for tenant updates
 }
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
 
 const formatDate = (date: Date) => {
   return new Intl.DateTimeFormat('en-GB', {
@@ -68,6 +60,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
   onDeleteTenants,
   onTenantUpdate,
 }) => {
+  const { formatCurrency } = useCurrency();
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'name', desc: false }
   ]);
@@ -134,6 +127,15 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
     }
   }, [onDeleteTenants, selectedRows, tenants]);
 
+  const handleTenantHeaderClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const firstTenant = tenants && tenants.length > 0 ? tenants[0] : null;
+    if (firstTenant) {
+      setSelectedTenantForDetails(firstTenant);
+      setShowDetailsModal(true);
+    }
+  }, [tenants]);
+
   const columns = useMemo<ColumnDef<SimplifiedTenant>[]>(() => [
     {
       id: 'select',
@@ -166,7 +168,15 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
     },
     {
       accessorKey: 'name',
-      header: 'Tenant',
+      enableSorting: false,
+      header: () => (
+        <span 
+          className="hover:text-blue-600 transition-colors cursor-pointer"
+          onClick={handleTenantHeaderClick}
+        >
+          Tenant
+        </span>
+      ),
       cell: info => {
         const tenant = info.row.original;
         return (
@@ -177,7 +187,14 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-gray-900 truncate">
+              <div 
+                className="text-sm font-medium text-gray-900 truncate cursor-pointer hover:text-blue-600 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedTenantForDetails(tenant);
+                  setShowDetailsModal(true);
+                }}
+              >
                 {tenant.name}
               </div>
               <div className="text-xs text-gray-500">
@@ -329,7 +346,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
       },
       size: 100,
     },
-  ], [selectedRows, tenants, toggleAllRows, toggleRowSelection]);
+  ], [selectedRows, tenants, toggleAllRows, toggleRowSelection, handleTenantHeaderClick]);
 
   const table = useReactTable({
     data: tenants || [],
@@ -349,9 +366,9 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
   });
 
   return (
-    <div className="bg-white rounded-lg shadow border border-gray-200">
+    <div className="bg-white rounded-lg shadow border border-gray-200 flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
       {/* Header */}
-      <div className="px-4 py-4 border-b border-gray-200">
+      <div className="px-4 py-4 border-b border-gray-200 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Tenants</h3>
@@ -410,9 +427,9 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map(header => (
@@ -420,7 +437,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
                     key={header.id}
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
                     style={{ width: header.getSize() }}
-                    onClick={header.column.getToggleSortingHandler()}
+                    onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
                   >
                     <div className="flex items-center space-x-1">
                       <span>
@@ -470,6 +487,16 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
               );
             })}
           </tbody>
+          {/* End of Table Indicator */}
+          {table.getRowModel().rows.length > 0 && (
+            <tfoot className="sticky bottom-0 bg-gray-50 z-10">
+              <tr>
+                <td colSpan={8} className="px-4 py-3 text-center text-xs text-gray-500 border-t border-gray-200">
+                  End of table • {table.getRowModel().rows.length} {table.getRowModel().rows.length === 1 ? 'tenant' : 'tenants'} shown
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 

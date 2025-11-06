@@ -358,6 +358,20 @@ export class SimplifiedPropertyService {
         return null;
       }
 
+      // Handle structured address fields if provided
+      const addressFields = (updates as any)._addressFields;
+      let fullAddress = updates.address;
+      
+      if (addressFields) {
+        // Build full address from structured fields
+        fullAddress = [
+          addressFields.addressLine1,
+          addressFields.addressLine2,
+          addressFields.city,
+          addressFields.postcode
+        ].filter(Boolean).join(', ');
+      }
+
       // Merge updates with existing property data
       const updatedPropertyData = {
         ...currentProperty.property_data,
@@ -390,6 +404,13 @@ export class SimplifiedPropertyService {
           rooms: updates.rooms,
           units: updates.rooms?.length || 1
         }),
+        // Structured address fields
+        ...(addressFields && {
+          address_line_1: addressFields.addressLine1,
+          address_line_2: addressFields.addressLine2 || null,
+          city: addressFields.city,
+          postcode: addressFields.postcode
+        }),
       };
 
       // Prepare minimal core field updates
@@ -399,18 +420,18 @@ export class SimplifiedPropertyService {
       };
 
       // Only update core fields that we know exist
-      if (updates.address) {
-        coreUpdates.address = updates.address;
+      if (fullAddress) {
+        coreUpdates.address = fullAddress;
         // Only update name if propertyName is not explicitly set
         if (!updates.propertyName) {
-          coreUpdates.name = `Property at ${updates.address}`;
+          coreUpdates.name = `Property at ${fullAddress}`;
         }
       }
       
       if (updates.propertyName !== undefined) {
         // If propertyName is explicitly provided, use it
         // Empty string means user wants to clear the custom name
-        coreUpdates.name = updates.propertyName || (updates.address ? `Property at ${updates.address}` : currentProperty.name);
+        coreUpdates.name = updates.propertyName || (fullAddress ? `Property at ${fullAddress}` : currentProperty.name);
       }
 
       if (updates.status) {
