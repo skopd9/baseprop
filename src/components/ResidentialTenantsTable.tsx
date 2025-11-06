@@ -336,7 +336,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
   });
 
   // Calculate summary stats
-  const totalRent = tenants.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
   const expiringLeases = tenants.filter(t => {
     const threeMonthsFromNow = new Date();
     threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
@@ -394,23 +393,18 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
       </div>
 
       {/* Summary Stats */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center space-x-6">
-            <div className="flex items-center space-x-2">
-              <CurrencyPoundIcon className="w-4 h-4 text-green-600" />
-              <span className="text-gray-600">Total Monthly Rent:</span>
-              <span className="font-medium text-gray-900">{formatCurrency(totalRent)}</span>
-            </div>
-            {expiringLeases > 0 && (
+      {expiringLeases > 0 && (
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
                 <CalendarIcon className="w-4 h-4 text-yellow-600" />
                 <span className="text-yellow-600">{expiringLeases} lease{expiringLeases > 1 ? 's' : ''} expiring soon</span>
               </div>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto">

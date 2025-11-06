@@ -32,9 +32,9 @@ export class RepairService {
    * Get all repairs for the current organization
    * Fetches repairs by joining with properties (which are filtered by organization via RLS)
    */
-  static async getRepairs(): Promise<Repair[]> {
+  static async getRepairs(organizationId?: string): Promise<Repair[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('repairs')
         .select(`
           *,
@@ -47,7 +47,14 @@ export class RepairService {
             id,
             name
           )
-        `)
+        `);
+      
+      // Filter by organization if provided (either directly or via properties)
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+      
+      const { data, error } = await query
         .order('reported_date', { ascending: false });
 
       if (error) {

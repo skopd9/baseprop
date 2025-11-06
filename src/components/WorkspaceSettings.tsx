@@ -4,15 +4,15 @@ import { OrganizationService, OrganizationMember, OrganizationInvitation } from 
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 import { supabase } from '../lib/supabase';
 
-interface OrganizationSettingsProps {
+interface WorkspaceSettingsProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
 type TabType = 'settings' | 'members' | 'invitations';
 
-export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOpen, onClose }) => {
-  const { currentOrganization, currentUserRole, refreshOrganizations, switchOrganization, userOrganizations, createOrganization } = useOrganization();
+export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, onClose }) => {
+  const { currentOrganization, currentUserRole, refreshOrganizations, switchOrganization, userOrganizations } = useOrganization();
   const [activeTab, setActiveTab] = useState<TabType>('settings');
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);

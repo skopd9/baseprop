@@ -18,8 +18,9 @@ import {
 import { SimplifiedDashboard } from './SimplifiedDashboard';
 import { ResidentialPropertiesTable } from './ResidentialPropertiesTable';
 import { ResidentialTenantsTable } from './ResidentialTenantsTable';
-import { OrganizationSettings } from './OrganizationSettings';
+import { WorkspaceSettings } from './WorkspaceSettings';
 import { UserSettings } from './UserSettings';
+import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 import { OnboardingWizard } from './OnboardingWizard';
 import { GetStarted } from './GetStarted';
 import { useOrganization } from '../contexts/OrganizationContext';
@@ -130,7 +131,10 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showOrgSettings, setShowOrgSettings] = useState(false);
   const [showUserSettings, setShowUserSettings] = useState(false);
+  const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
+  const [workspaceSelectorOpen, setWorkspaceSelectorOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const workspaceSelectorRef = useRef<HTMLDivElement>(null);
 
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showPropertyEditModal, setShowPropertyEditModal] = useState(false);
@@ -177,22 +181,33 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
     }
   }, [currentOrganization]);
 
-  // Close user menu when clicking outside
+  // Close user menu and workspace selector when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+      // Close user menu if clicking outside
+      if (userMenuOpen && userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setUserMenuOpen(false);
+      }
+      // Close workspace selector if clicking outside
+      if (workspaceSelectorOpen) {
+        const target = event.target as Node;
+        const workspaceButton = document.querySelector('[data-workspace-selector]');
+        const workspaceDropdown = document.querySelector('[data-workspace-dropdown]');
+        if (workspaceButton && !workspaceButton.contains(target) && 
+            workspaceDropdown && !workspaceDropdown.contains(target)) {
+          setWorkspaceSelectorOpen(false);
+        }
       }
     };
 
-    if (userMenuOpen) {
+    if (userMenuOpen || workspaceSelectorOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [userMenuOpen]);
+  }, [userMenuOpen, workspaceSelectorOpen]);
 
 
 
@@ -609,10 +624,10 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white transform ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+      } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col border-r border-gray-200`}>
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
           <h1 className="text-xl font-bold text-gray-900">Base Prop</h1>
           <button
             onClick={() => {
@@ -629,7 +644,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
           </button>
         </div>
 
-        <nav className="mt-6 px-3">
+        <nav className="mt-6 px-3 flex-1 overflow-y-auto">
           <div className="space-y-1">
             {navigationItems.map((item) => {
               const Icon = item.icon;
@@ -664,64 +679,45 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
           </div>
         </nav>
 
-        {/* Get Started - positioned at bottom, separate from main nav */}
-        <div className="absolute bottom-20 left-0 right-0 px-3 pb-3 border-t border-gray-200 bg-white">
-          <div className="pt-3">
-            <button
-              onClick={() => {
-                if (showPropertyEditModal) {
-                  setShowPropertyEditModal(false);
-                  setSelectedProperty(null);
-                }
-                setCurrentView('onboarding');
-                setSidebarOpen(false);
-              }}
-              className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                currentView === 'onboarding'
-                  ? 'bg-green-100 text-green-700 border-r-2 border-green-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <QuestionMarkCircleIcon className={`mr-3 h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'}`} />
-              <div className="text-left">
+        {/* Get Started - positioned above user profile section */}
+        <div className="mt-auto px-3 pt-3 pb-3 border-t border-gray-200 bg-white">
+          <button
+            onClick={() => {
+              if (showPropertyEditModal) {
+                setShowPropertyEditModal(false);
+                setSelectedProperty(null);
+              }
+              setCurrentView('onboarding');
+              setSidebarOpen(false);
+            }}
+            className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+              currentView === 'onboarding'
+                ? 'bg-green-100 text-green-700 border-r-2 border-green-700'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            <QuestionMarkCircleIcon className={`mr-3 h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'}`} />
+            <div className="text-left">
               <div className="font-medium">Onboarding Wizard</div>
               <div className="text-xs text-gray-500">Portfolio setup</div>
-              </div>
-            </button>
-          </div>
+            </div>
+          </button>
         </div>
 
         {/* User Profile Section at Bottom */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
-          {/* Organization Selector (if multiple orgs) */}
-          {userOrganizations.length > 1 && (
-            <div className="mb-3">
-              <select
-                value={currentOrganization?.id || ''}
-                onChange={(e) => switchOrganization(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {userOrganizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
+        <div className="mt-auto p-4 border-t border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3 flex-1 min-w-0">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold shadow-sm">
-                {currentOrganization?.name.charAt(0).toUpperCase() || 'O'}
+                {currentOrganization?.name.charAt(0).toUpperCase() || 'W'}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {orgLoading ? 'Loading...' : currentOrganization?.name || (orgError ? 'Error loading' : 'No organization')}
+                  {orgLoading ? 'Loading...' : currentOrganization?.name || (orgError ? 'Error loading' : 'No workspace')}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
                   {orgError ? (
-                    <span className="text-red-600" title={orgError}>Error loading organizations</span>
+                    <span className="text-red-600" title={orgError}>Error loading workspaces</span>
                   ) : (
                     `${userOrganizations.length} ${userOrganizations.length === 1 ? 'workspace' : 'workspaces'}`
                   )}
@@ -757,7 +753,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                     className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     <Cog6ToothIcon className="w-4 h-4 mr-2 text-gray-500" />
-                    Organization Settings
+                    Workspace Settings
                   </button>
                   <div className="border-t border-gray-100 my-1"></div>
                   <button
@@ -777,22 +773,92 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
-        <div className="bg-white shadow-sm border-b border-gray-200 lg:hidden">
+        <div className="bg-white border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between h-16 px-4">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-md text-gray-400 hover:text-gray-600"
+              className="p-2 rounded-md text-gray-400 hover:text-gray-600 lg:hidden"
             >
               <Bars3Icon className="w-6 h-6" />
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">
-              {currentNavItem?.name || 'Dashboard'}
-            </h1>
-            <div className="w-10" /> {/* Spacer for centering */}
+            <div className="flex-1" /> {/* Spacer */}
+            
+            {/* Workspace Switcher - Top Right */}
+            <div className="relative ml-auto">
+              <button
+                data-workspace-selector
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setWorkspaceSelectorOpen(!workspaceSelectorOpen);
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                  {currentOrganization?.name.charAt(0).toUpperCase() || 'W'}
+                </div>
+                <span className="hidden sm:block text-gray-700 font-medium max-w-[120px] truncate">
+                  {currentOrganization?.name || 'No workspace'}
+                </span>
+                <ChevronDownIcon className={`w-4 h-4 text-gray-500 transition-transform ${workspaceSelectorOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {/* Workspace Dropdown - Top Right */}
+              {workspaceSelectorOpen && (
+              <div 
+                data-workspace-dropdown
+                className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
+                onClick={(e) => e.stopPropagation()}
+              >
+                  {/* Create New Workspace */}
+                  <button
+                    onClick={() => {
+                      setShowCreateWorkspace(true);
+                      setWorkspaceSelectorOpen(false);
+                    }}
+                    className="w-full flex items-center px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors border-b border-gray-100"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create New Workspace
+                  </button>
+                  
+                  {/* Workspace List */}
+                  {userOrganizations.length > 0 ? (
+                    <div className="max-h-64 overflow-y-auto">
+                      {userOrganizations.map((org) => (
+                        <button
+                          key={org.id}
+                          onClick={() => {
+                            switchOrganization(org.id);
+                            setWorkspaceSelectorOpen(false);
+                          }}
+                          className={`w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors ${
+                            currentOrganization?.id === org.id ? 'bg-blue-50 text-blue-700' : ''
+                          }`}
+                        >
+                          {currentOrganization?.id === org.id && (
+                            <svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          <span className="truncate flex-1 text-left">{org.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="px-4 py-2 text-sm text-gray-500 text-center">
+                      No workspaces yet
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Organization Error Banner */}
+        {/* Workspace Error Banner */}
         {orgError && (
           <div className="bg-red-50 border-l-4 border-red-500 px-6 py-4">
             <div className="flex items-start">
@@ -803,7 +869,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
               </div>
               <div className="ml-3 flex-1">
                 <h3 className="text-sm font-medium text-red-800">
-                  Error Loading Organizations
+                  Error Loading Workspaces
                 </h3>
                 <div className="mt-2 text-sm text-red-700">
                   <p>{orgError}</p>
@@ -814,7 +880,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         )}
 
         {/* Main content area */}
-        <main className="flex-1 overflow-auto lg:pt-16">
+        <main className="flex-1 overflow-auto">
           {renderCurrentView()}
         </main>
       </div>
@@ -902,10 +968,19 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         onClose={() => setSuccessMessage(null)}
       />
 
-      {/* Organization Settings Modal */}
-      <OrganizationSettings
+      {/* Workspace Settings Modal */}
+      <WorkspaceSettings
         isOpen={showOrgSettings}
         onClose={() => setShowOrgSettings(false)}
+      />
+
+      {/* Create Workspace Modal */}
+      <CreateWorkspaceModal
+        isOpen={showCreateWorkspace}
+        onClose={() => setShowCreateWorkspace(false)}
+        onSuccess={() => {
+          // Workspace will be switched automatically by the modal
+        }}
       />
 
       {/* User Settings Modal */}

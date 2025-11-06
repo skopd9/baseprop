@@ -12,6 +12,7 @@ import {
 import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTransforms';
 import { RepairService, Repair as RepairServiceType } from '../services/RepairService';
 import { RepairDetailsModal } from './RepairDetailsModal';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 interface RepairWorkflowsProps {
   properties: SimplifiedProperty[];
@@ -32,6 +33,7 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
   tenants,
   onLogRepair
 }) => {
+  const { currentOrganization } = useOrganization();
   const [repairs, setRepairs] = useState<Repair[]>([]);
   const [originalRepairs, setOriginalRepairs] = useState<RepairServiceType[]>([]); // Store original DB format
   const [isLoading, setIsLoading] = useState(true);
@@ -49,15 +51,19 @@ export const RepairWorkflows: React.FC<RepairWorkflowsProps> = ({
     notes: ''
   });
 
-  // Load repairs on mount
+  // Load repairs on mount and when organization changes
   useEffect(() => {
-    loadRepairs();
-  }, []);
+    if (currentOrganization?.id) {
+      loadRepairs();
+    }
+  }, [currentOrganization?.id]);
 
   const loadRepairs = async () => {
+    if (!currentOrganization?.id) return;
+    
     setIsLoading(true);
     try {
-      const repairsData = await RepairService.getRepairs();
+      const repairsData = await RepairService.getRepairs(currentOrganization.id);
       // Store original repairs for modal access
       setOriginalRepairs(repairsData);
       // Transform repairs to match UI expectations

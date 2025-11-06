@@ -114,17 +114,37 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
         throw new Error('Deposit amount cannot be negative');
       }
 
+      // Only pass database-compatible fields (exclude computed fields like propertyAddress, rentStatus, daysOverdue)
+      const updateData: Partial<SimplifiedTenant> = {
+        name: editedTenant.name,
+        email: editedTenant.email,
+        phone: editedTenant.phone,
+        leaseStart: editedTenant.leaseStart,
+        leaseEnd: editedTenant.leaseEnd,
+        monthlyRent: editedTenant.monthlyRent,
+        depositAmount: editedTenant.depositAmount,
+        depositWeeks: editedTenant.depositWeeks,
+        rentDueDay: editedTenant.rentDueDay,
+        onboardingStatus: editedTenant.onboardingStatus,
+        onboardingProgress: editedTenant.onboardingProgress,
+        onboardingNotes: editedTenant.onboardingNotes,
+        onboardingCompletedAt: editedTenant.onboardingCompletedAt,
+        onboardingData: editedTenant.onboardingData,
+      };
+
+      console.log('📤 Sending update data:', JSON.stringify(updateData, null, 2));
+
       // Update tenant in database
       const success = await SimplifiedTenantService.updateTenantOnboarding(
         editedTenant.id,
-        editedTenant
+        updateData
       );
 
       if (success) {
         setSuccessMessage('Tenant details updated successfully!');
         setIsEditMode(false);
         
-        // Notify parent component
+        // Notify parent component with the full edited tenant (including UI fields)
         if (onTenantUpdate) {
           onTenantUpdate(editedTenant);
         }
@@ -134,18 +154,32 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
           setSuccessMessage(null);
         }, 3000);
       } else {
-        throw new Error('Failed to update tenant');
+        throw new Error('Failed to update tenant - Check browser console for details');
       }
     } catch (err) {
-      console.error('Error saving tenant:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      console.error('❌ Error saving tenant:', err);
+      setError(err instanceof Error ? err.message : 'Failed to save changes - Check browser console for details');
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleInputChange = (field: keyof SimplifiedTenant, value: any) => {
-    setEditedTenant(prev => prev ? { ...prev, [field]: value } : null);
+    setEditedTenant(prev => {
+      if (!prev) return null;
+      
+      const updated = { ...prev, [field]: value };
+      
+      // Auto-calculate deposit_amount when monthly_rent or deposit_weeks changes
+      if (field === 'monthlyRent' || field === 'depositWeeks') {
+        if (updated.monthlyRent && updated.monthlyRent > 0 && updated.depositWeeks && updated.depositWeeks > 0) {
+          // Calculate: monthly_rent * (deposit_weeks / 4.33)
+          updated.depositAmount = Math.round((updated.monthlyRent * updated.depositWeeks / 4.33) * 100) / 100;
+        }
+      }
+      
+      return updated;
+    });
   };
 
   const onboardingData = tenant.onboardingData;
@@ -367,20 +401,48 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Deposit Amount (£)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Deposit Amount (£)
+                  {isEditMode && editedTenant.depositWeeks && editedTenant.monthlyRent && (
+                    <span className="ml-2 text-xs text-blue-600 font-normal">(Auto-calculated)</span>
+                  )}
+                </label>
                 {isEditMode ? (
-                  <input
-                    type="number"
-                    value={editedTenant.depositAmount}
-                    onChange={(e) => handleInputChange('depositAmount', parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    step="1"
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={editedTenant.depositAmount || 0}
+                      onChange={(e) => {
+                        // Only allow manual entry if deposit_weeks is not set
+                        if (!editedTenant.depositWeeks) {
+                          handleInputChange('depositAmount', parseFloat(e.target.value) || 0);
+                        }
+                      }}
+                      readOnly={!!(editedTenant.depositWeeks && editedTenant.monthlyRent)}
+                      className={`w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        editedTenant.depositWeeks && editedTenant.monthlyRent 
+                          ? 'bg-gray-50 text-gray-600 cursor-not-allowed' 
+                          : ''
+                      }`}
+                      min="0"
+                      step="1"
+                      title={editedTenant.depositWeeks && editedTenant.monthlyRent 
+                        ? 'Deposit is automatically calculated from monthly rent and deposit weeks' 
+                        : 'Enter deposit amount manually'}
+                    />
+                    {editedTenant.depositWeeks && editedTenant.monthlyRent && (
+                      <div className="absolute right-3 top-2 text-xs text-gray-400">
+                        Auto
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <p className="text-sm font-medium text-gray-900 flex items-center">
                     <CurrencyPoundIcon className="w-4 h-4 mr-1 text-gray-400" />
-                    {formatCurrency(displayTenant.depositAmount)}
+                    {formatCurrency(displayTenant.depositAmount || 0)}
+                    {displayTenant.depositWeeks && displayTenant.monthlyRent && (
+                      <span className="ml-2 text-xs text-gray-400">(auto-calculated)</span>
+                    )}
                   </p>
                 )}
               </div>
@@ -388,15 +450,22 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Deposit (Weeks)</label>
                   {isEditMode ? (
-                    <select
-                      value={editedTenant.depositWeeks || 4}
-                      onChange={(e) => handleInputChange('depositWeeks', parseInt(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      {[1, 2, 3, 4, 5].map(weeks => (
-                        <option key={weeks} value={weeks}>{weeks} weeks</option>
-                      ))}
-                    </select>
+                    <>
+                      <select
+                        value={editedTenant.depositWeeks || 4}
+                        onChange={(e) => handleInputChange('depositWeeks', parseInt(e.target.value))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        {[1, 2, 3, 4, 5].map(weeks => (
+                          <option key={weeks} value={weeks}>{weeks} weeks</option>
+                        ))}
+                      </select>
+                      {editedTenant.monthlyRent && editedTenant.depositWeeks && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Amount: £{Math.round((editedTenant.monthlyRent * 12) / 52 * editedTenant.depositWeeks)} ({editedTenant.depositWeeks} weeks)
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <p className="text-sm text-gray-900">{displayTenant.depositWeeks} weeks</p>
                   )}

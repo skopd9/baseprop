@@ -177,8 +177,13 @@ export const OrganizationProvider: React.FC<OrganizationProviderProps> = ({ chil
     try {
       const org = await OrganizationService.createOrganization(name, userId, settings);
       
-      // Refresh organizations list
+      // Refresh organizations list and wait for it to complete
       await loadOrganizations();
+      
+      // Auto-switch to the new organization
+      setCurrentOrganization(org);
+      setCurrentUserRole('owner'); // Creator is always owner
+      localStorage.setItem('currentOrganizationId', org.id);
       
       return org;
     } catch (err) {

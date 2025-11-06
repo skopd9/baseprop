@@ -84,8 +84,8 @@ export const EnhancedTenantOnboardingModal: React.FC<EnhancedTenantOnboardingMod
     startDate: tenant.leaseStart ? tenant.leaseStart.toISOString().split('T')[0] : '',
     endDate: tenant.leaseEnd ? tenant.leaseEnd.toISOString().split('T')[0] : '',
     monthlyRent: tenant.monthlyRent || Math.round(property.targetRent / (property.propertyType === 'hmo' ? property.bedrooms : 1)),
-    depositWeeks: 4,
-    rentDueDate: 1,
+    depositWeeks: tenant.depositWeeks || 4,
+    rentDueDate: tenant.rentDueDay || 1,
   });
 
   // Reset lease info when tenant changes (especially important when opening modal for new tenant)
@@ -94,10 +94,10 @@ export const EnhancedTenantOnboardingModal: React.FC<EnhancedTenantOnboardingMod
       startDate: tenant.leaseStart ? tenant.leaseStart.toISOString().split('T')[0] : '',
       endDate: tenant.leaseEnd ? tenant.leaseEnd.toISOString().split('T')[0] : '',
       monthlyRent: tenant.monthlyRent || Math.round(property.targetRent / (property.propertyType === 'hmo' ? property.bedrooms : 1)),
-      depositWeeks: 4,
-      rentDueDate: 1,
+      depositWeeks: tenant.depositWeeks || 4,
+      rentDueDate: tenant.rentDueDay || 1,
     });
-  }, [tenant.id, tenant.leaseStart, tenant.leaseEnd, tenant.monthlyRent, property.targetRent, property.propertyType, property.bedrooms]);
+  }, [tenant.id, tenant.leaseStart, tenant.leaseEnd, tenant.monthlyRent, tenant.depositWeeks, tenant.rentDueDay, property.targetRent, property.propertyType, property.bedrooms]);
 
   const [creditChecks, setCreditChecks] = useState<CreditCheck[]>([
     {

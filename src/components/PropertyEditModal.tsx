@@ -1004,33 +1004,6 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
                 </details>
               </div>
             </div>
-
-            {/* SECTION 7: Occupancy Information (Read-only) */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center space-x-2 mb-3">
-                <InformationCircleIcon className="w-5 h-5 text-gray-600" />
-                <h3 className="text-base font-semibold text-gray-900">Current Occupancy</h3>
-              </div>
-              
-              <div className="flex items-center justify-between bg-white rounded-lg p-4 border border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <UserGroupIcon className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Active Tenants</p>
-                    <p className="text-2xl font-bold text-gray-900">{formData.tenantCount}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">
-                    {formData.tenantCount === 0 ? 'No active tenants' : 
-                     formData.tenantCount === 1 ? '1 active tenant' : 
-                     `${formData.tenantCount} active tenants`}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 

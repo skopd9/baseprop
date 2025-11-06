@@ -13,6 +13,7 @@ import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTra
 import { EmailNotificationService } from '../services/EmailNotificationService';
 import { TenantPropertyService } from '../services/TenantPropertyService';
 import { supabase } from '../lib/supabase';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 interface InspectionWorkflowsProps {
     properties: SimplifiedProperty[];
@@ -44,6 +45,9 @@ export const InspectionWorkflows: React.FC<InspectionWorkflowsProps> = ({
     tenants,
     onBookInspection
 }) => {
+    // Get current organization from context (must be at top level)
+    const { currentOrganization } = useOrganization();
+    
     const [inspections, setInspections] = useState<Inspection[]>([]);
     const [showBookingForm, setShowBookingForm] = useState(false);
     const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
@@ -78,11 +82,15 @@ export const InspectionWorkflows: React.FC<InspectionWorkflowsProps> = ({
 
     // Load inspections from database
     useEffect(() => {
-        loadInspections();
-        loadTenantsByProperty();
-    }, [properties]);
+        if (currentOrganization?.id) {
+            loadInspections();
+            loadTenantsByProperty();
+        }
+    }, [properties, currentOrganization?.id]);
 
     const loadInspections = async () => {
+        if (!currentOrganization?.id) return;
+        
         try {
             const { data, error } = await supabase
                 .from('inspections')
@@ -91,6 +99,7 @@ export const InspectionWorkflows: React.FC<InspectionWorkflowsProps> = ({
                     properties(id, address, name),
                     tenants(id, name, email)
                 `)
+                .eq('organization_id', currentOrganization.id)
                 .order('scheduled_date', { ascending: true });
 
             if (error) {

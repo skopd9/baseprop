@@ -59,11 +59,18 @@ export const PAYMENT_METHODS = [
 ] as const;
 
 export class ExpenseService {
-  static async getExpenses(): Promise<Expense[]> {
+  static async getExpenses(organizationId?: string): Promise<Expense[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('expenses')
-        .select('*')
+        .select('*');
+      
+      // Filter by organization if provided
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+      
+      const { data, error } = await query
         .order('expense_date', { ascending: false });
 
       if (error) {
@@ -78,12 +85,19 @@ export class ExpenseService {
     }
   }
 
-  static async getExpensesByProperty(propertyId: string): Promise<Expense[]> {
+  static async getExpensesByProperty(propertyId: string, organizationId?: string): Promise<Expense[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('expenses')
         .select('*')
-        .eq('property_id', propertyId)
+        .eq('property_id', propertyId);
+      
+      // Filter by organization if provided
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+      
+      const { data, error } = await query
         .order('expense_date', { ascending: false });
 
       if (error) {
@@ -188,7 +202,7 @@ export class ExpenseService {
     }
   }
 
-  static async getExpensesSummary(year?: number): Promise<{
+  static async getExpensesSummary(year?: number, organizationId?: string): Promise<{
     totalExpenses: number;
     taxDeductibleExpenses: number;
     expensesByCategory: Record<string, number>;
@@ -196,6 +210,11 @@ export class ExpenseService {
   }> {
     try {
       let query = supabase.from('expenses').select('*');
+      
+      // Filter by organization if provided
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
       
       if (year) {
         const startDate = `${year}-01-01`;

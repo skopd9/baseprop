@@ -254,94 +254,267 @@ export class SimplifiedTenantService {
   // Update tenant with onboarding completion
   static async updateTenantOnboarding(tenantId: string, updates: Partial<SimplifiedTenant>): Promise<boolean> {
     try {
+      // Try to get tenant_data for backward compatibility, but don't fail if it doesn't work
+      let existingTenantData: any = {};
+      
+      try {
+        const { data: tenantData, error: getError } = await supabase
+          .from('tenants')
+          .select('tenant_data')
+          .eq('id', tenantId)
+          .maybeSingle();
+
+        if (!getError && tenantData && tenantData.tenant_data) {
+          existingTenantData = tenantData.tenant_data;
+          console.log('✓ Fetched existing tenant_data');
+        } else if (getError) {
+          console.warn('⚠️ Could not fetch tenant_data (non-critical):', getError.message);
+        }
+      } catch (fetchErr) {
+        console.warn('⚠️ Error fetching tenant_data (non-critical):', fetchErr);
+      }
+
       // Prepare update object with both column-level and JSONB data
       const updateData: any = {
         updated_at: new Date().toISOString(),
       };
 
-      // Update basic tenant info
-      if (updates.name !== undefined) {
+      // IMPORTANT: Only include organization_id if we successfully fetched it
+      // Don't try to set it if we don't have it - let RLS handle it
+      // Note: We should NOT update organization_id anyway, so we'll omit it
+
+      // Update basic tenant info - only include defined values
+      if (updates.name !== undefined && updates.name !== null) {
         updateData.name = updates.name;
       }
-      if (updates.email !== undefined) {
+      if (updates.email !== undefined && updates.email !== null) {
         updateData.email = updates.email;
       }
-      if (updates.phone !== undefined) {
+      if (updates.phone !== undefined && updates.phone !== null) {
         updateData.phone = updates.phone;
       }
 
-      // Update main columns
-      if (updates.leaseStart) {
-        updateData.lease_start = updates.leaseStart.toISOString().split('T')[0];
+      // Update main columns - only include defined values and valid dates
+      if (updates.leaseStart !== undefined && updates.leaseStart !== null) {
+        try {
+          // Handle both Date objects and string dates
+          const leaseStartDate = updates.leaseStart instanceof Date 
+            ? updates.leaseStart 
+            : new Date(updates.leaseStart);
+          // Only add if it's a valid date
+          if (!isNaN(leaseStartDate.getTime())) {
+            updateData.lease_start = leaseStartDate.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          console.warn('Invalid lease start date:', updates.leaseStart);
+        }
       }
-      if (updates.leaseEnd) {
-        updateData.lease_end = updates.leaseEnd.toISOString().split('T')[0];
+      if (updates.leaseEnd !== undefined && updates.leaseEnd !== null) {
+        try {
+          // Handle both Date objects and string dates
+          const leaseEndDate = updates.leaseEnd instanceof Date 
+            ? updates.leaseEnd 
+            : new Date(updates.leaseEnd);
+          // Only add if it's a valid date
+          if (!isNaN(leaseEndDate.getTime())) {
+            updateData.lease_end = leaseEndDate.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          console.warn('Invalid lease end date:', updates.leaseEnd);
+        }
       }
-      if (updates.monthlyRent !== undefined) {
+      // Track if we're updating rent or deposit weeks - if so, don't send deposit_amount (let trigger calculate)
+      const isUpdatingRentOrWeeks = (updates.monthlyRent !== undefined && updates.monthlyRent !== null) ||
+                                    (updates.depositWeeks !== undefined && updates.depositWeeks !== null);
+      
+      if (updates.monthlyRent !== undefined && updates.monthlyRent !== null) {
         updateData.monthly_rent = updates.monthlyRent;
       }
-      if (updates.depositAmount !== undefined) {
+      
+      // deposit_weeks - UK max is 5 weeks, auto-calculates deposit_amount via trigger
+      if (updates.depositWeeks !== undefined && updates.depositWeeks !== null) {
+        if (typeof updates.depositWeeks === 'number' && updates.depositWeeks >= 1 && updates.depositWeeks <= 5) {
+          updateData.deposit_weeks = updates.depositWeeks;
+        }
+      }
+      
+      // deposit_amount is AUTO-CALCULATED by database trigger when monthly_rent or deposit_weeks changes
+      // Only send deposit_amount if:
+      // 1. It's explicitly set to a non-zero value AND
+      // 2. We're NOT updating monthly_rent or deposit_weeks (manual override only)
+      // Otherwise, let the trigger calculate it automatically
+      if (!isUpdatingRentOrWeeks && 
+          updates.depositAmount !== undefined && 
+          updates.depositAmount !== null && 
+          updates.depositAmount > 0) {
+        // Manual override - user wants a specific deposit amount (only when not changing rent/weeks)
         updateData.deposit_amount = updates.depositAmount;
       }
-      if (updates.depositWeeks !== undefined) {
-        updateData.deposit_weeks = updates.depositWeeks;
-      }
-      if (updates.rentDueDay !== undefined) {
+      // If we're updating rent or weeks, deposit_amount will be auto-calculated by the trigger
+      if (updates.rentDueDay !== undefined && updates.rentDueDay !== null) {
         updateData.rent_due_day = updates.rentDueDay;
       }
 
-      // Update onboarding status fields
-      if (updates.onboardingStatus !== undefined) {
+      // Update onboarding status fields - only include defined values
+      if (updates.onboardingStatus !== undefined && updates.onboardingStatus !== null) {
         updateData.onboarding_status = updates.onboardingStatus;
       }
-      if (updates.onboardingProgress !== undefined) {
+      if (updates.onboardingProgress !== undefined && updates.onboardingProgress !== null) {
         updateData.onboarding_progress = updates.onboardingProgress;
       }
-      if (updates.onboardingNotes !== undefined) {
+      if (updates.onboardingNotes !== undefined && updates.onboardingNotes !== null) {
         updateData.onboarding_notes = updates.onboardingNotes;
       }
-      if (updates.onboardingCompletedAt) {
-        updateData.onboarding_completed_at = updates.onboardingCompletedAt.toISOString();
+      if (updates.onboardingCompletedAt !== undefined && updates.onboardingCompletedAt !== null) {
+        try {
+          // Handle both Date objects and string dates
+          const completedDate = updates.onboardingCompletedAt instanceof Date 
+            ? updates.onboardingCompletedAt 
+            : new Date(updates.onboardingCompletedAt);
+          // Only add if it's a valid date
+          if (!isNaN(completedDate.getTime())) {
+            updateData.onboarding_completed_at = completedDate.toISOString();
+          }
+        } catch (e) {
+          console.warn('Invalid onboarding completed date:', updates.onboardingCompletedAt);
+        }
       }
 
-      // Update onboarding data (comprehensive JSONB)
-      if (updates.onboardingData) {
+      // Update onboarding data (comprehensive JSONB) - only if provided
+      if (updates.onboardingData !== undefined && updates.onboardingData !== null) {
         updateData.onboarding_data = updates.onboardingData;
       }
 
       // Also update tenant_data for backward compatibility
-      const { data: currentTenant, error: fetchError } = await supabase
-        .from('tenants')
-        .select('tenant_data')
-        .eq('id', tenantId)
-        .single();
-
-      if (!fetchError && currentTenant) {
+      // Always update tenant_data (we have existingTenantData initialized to {})
+      {
+        // Handle date conversions for tenant_data JSONB
+        let leaseStartStr = existingTenantData.lease_start_date;
+        if (updates.leaseStart !== undefined && updates.leaseStart !== null) {
+          try {
+            const leaseStartDate = updates.leaseStart instanceof Date 
+              ? updates.leaseStart 
+              : new Date(updates.leaseStart);
+            if (!isNaN(leaseStartDate.getTime())) {
+              leaseStartStr = leaseStartDate.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.warn('Invalid lease start date for tenant_data:', updates.leaseStart);
+          }
+        }
+        
+        let leaseEndStr = existingTenantData.lease_end_date;
+        if (updates.leaseEnd !== undefined && updates.leaseEnd !== null) {
+          try {
+            const leaseEndDate = updates.leaseEnd instanceof Date 
+              ? updates.leaseEnd 
+              : new Date(updates.leaseEnd);
+            if (!isNaN(leaseEndDate.getTime())) {
+              leaseEndStr = leaseEndDate.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.warn('Invalid lease end date for tenant_data:', updates.leaseEnd);
+          }
+        }
+        
         updateData.tenant_data = {
-          ...currentTenant.tenant_data,
-          lease_start_date: updates.leaseStart?.toISOString().split('T')[0] || currentTenant.tenant_data?.lease_start_date,
-          lease_end_date: updates.leaseEnd?.toISOString().split('T')[0] || currentTenant.tenant_data?.lease_end_date,
-          monthly_rent: updates.monthlyRent || currentTenant.tenant_data?.monthly_rent,
-          deposit_amount: updates.depositAmount || currentTenant.tenant_data?.deposit_amount,
-          onboarding_status: updates.onboardingStatus || currentTenant.tenant_data?.onboarding_status,
-          onboarding_progress: updates.onboardingProgress || currentTenant.tenant_data?.onboarding_progress,
-          onboarding_notes: updates.onboardingNotes || currentTenant.tenant_data?.onboarding_notes,
+          ...existingTenantData,
+          ...(leaseStartStr && { lease_start_date: leaseStartStr }),
+          ...(leaseEndStr && { lease_end_date: leaseEndStr }),
+          ...(updates.monthlyRent !== undefined && { monthly_rent: updates.monthlyRent }),
+          // deposit_amount is now auto-calculated by database trigger, so we don't store it in tenant_data
+          // Only include if it's a manual override (non-zero)
+          ...(updates.depositAmount !== undefined && updates.depositAmount > 0 && { deposit_amount: updates.depositAmount }),
+          ...(updates.onboardingStatus && { onboarding_status: updates.onboardingStatus }),
+          ...(updates.onboardingProgress !== undefined && { onboarding_progress: updates.onboardingProgress }),
+          ...(updates.onboardingNotes !== undefined && { onboarding_notes: updates.onboardingNotes }),
         };
       }
 
-      const { error } = await supabase
-        .from('tenants')
-        .update(updateData)
-        .eq('id', tenantId);
+      console.log('📝 Final update data to be sent to Supabase:', JSON.stringify(updateData, null, 2));
+      
+      // Make the update request
+      try {
+        const updateResponse = await supabase
+          .from('tenants')
+          .update(updateData)
+          .eq('id', tenantId)
+          .select();
 
-      if (error) {
-        console.error('Error updating tenant onboarding:', error);
+        const { data: result, error } = updateResponse;
+
+        if (error) {
+          // Log comprehensive error information
+          console.error('❌ ========== SUPABASE UPDATE ERROR ==========');
+          console.error('❌ Error object:', error);
+          console.error('❌ Error message:', error.message);
+          console.error('❌ Error details:', error.details);
+          console.error('❌ Error hint:', error.hint);
+          console.error('❌ Error code:', error.code);
+          
+          // Try to get more info from the response
+          const errorAny = error as any;
+          console.error('❌ Full error (any):', errorAny);
+          
+          if (errorAny.response) {
+            console.error('❌ Response:', errorAny.response);
+            console.error('❌ Response data:', errorAny.response?.data);
+            console.error('❌ Response status:', errorAny.response?.status);
+          }
+          if (errorAny.status) {
+            console.error('❌ HTTP Status:', errorAny.status);
+          }
+          if (errorAny.statusText) {
+            console.error('❌ Status Text:', errorAny.statusText);
+          }
+          
+          // Try to stringify the entire error
+          try {
+            console.error('❌ Error JSON:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+          } catch (e) {
+            console.error('❌ Could not stringify error:', e);
+          }
+          
+          // Log the actual data we tried to send
+          console.error('❌ Data that caused error:', JSON.stringify(updateData, null, 2));
+          console.error('❌ Tenant ID:', tenantId);
+          console.error('❌ ===========================================');
+          
+          return false;
+        }
+
+        if (!result || result.length === 0) {
+          console.error('❌ Update succeeded but no rows returned - possible RLS issue');
+          console.error('❌ This usually means RLS policies are blocking the update');
+          return false;
+        }
+
+        console.log('✅ Tenant updated successfully!', result);
+        return true;
+      } catch (updateError) {
+        // Catch any exceptions during the update
+        console.error('❌ ========== EXCEPTION DURING UPDATE ==========');
+        console.error('❌ Exception:', updateError);
+        console.error('❌ Exception type:', typeof updateError);
+        console.error('❌ Exception constructor:', updateError?.constructor?.name);
+        
+        if (updateError instanceof Error) {
+          console.error('❌ Error message:', updateError.message);
+          console.error('❌ Error stack:', updateError.stack);
+        }
+        
+        try {
+          console.error('❌ Exception JSON:', JSON.stringify(updateError, Object.getOwnPropertyNames(updateError), 2));
+        } catch (e) {
+          console.error('❌ Could not stringify exception');
+        }
+        
+        console.error('❌ Data that caused exception:', JSON.stringify(updateData, null, 2));
+        console.error('❌ ===========================================');
         return false;
       }
-
-      return true;
     } catch (error) {
-      console.error('Error in updateTenantOnboarding:', error);
+      console.error('❌ Exception in updateTenantOnboarding:', error);
       return false;
     }
   }

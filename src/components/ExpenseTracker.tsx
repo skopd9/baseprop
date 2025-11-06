@@ -65,19 +65,23 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
   });
 
   useEffect(() => {
-    loadExpenses();
-  }, []);
+    if (currentOrganization?.id) {
+      loadExpenses();
+    }
+  }, [currentOrganization?.id]);
 
   useEffect(() => {
-    if (showSummary) {
+    if (showSummary && currentOrganization?.id) {
       loadSummary();
     }
-  }, [showSummary, filterYear]);
+  }, [showSummary, filterYear, currentOrganization?.id]);
 
   const loadExpenses = async () => {
+    if (!currentOrganization?.id) return;
+    
     setIsLoading(true);
     try {
-      const expensesData = await ExpenseService.getExpenses();
+      const expensesData = await ExpenseService.getExpenses(currentOrganization.id);
       setExpenses(expensesData);
     } catch (error) {
       console.error('Error loading expenses:', error);
@@ -87,8 +91,10 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
   };
 
   const loadSummary = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const summaryData = await ExpenseService.getExpensesSummary(parseInt(filterYear));
+      const summaryData = await ExpenseService.getExpensesSummary(parseInt(filterYear), currentOrganization.id);
       setSummary(summaryData);
     } catch (error) {
       console.error('Error loading summary:', error);

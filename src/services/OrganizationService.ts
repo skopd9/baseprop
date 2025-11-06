@@ -42,25 +42,42 @@ export class OrganizationService {
    */
   static async createOrganization(name: string, userId: string, settings?: Record<string, any>): Promise<Organization> {
     try {
+      // Verify the user is authenticated and userId matches auth.uid()
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('User not authenticated');
+      }
+      
+      // Ensure userId matches the authenticated user
+      if (user.id !== userId) {
+        console.warn('userId parameter does not match authenticated user, using auth.uid() instead');
+      }
+      
+      // Use the authenticated user's ID to ensure RLS policy works
+      const authenticatedUserId = user.id;
+      
       // Create organization
       const { data: org, error: orgError } = await supabase
         .from('organizations')
         .insert({
           name,
-          created_by: userId,
+          created_by: authenticatedUserId,
           settings: settings || {}
         })
         .select()
         .single();
 
-      if (orgError) throw orgError;
+      if (orgError) {
+        console.error('Error creating organization:', orgError);
+        throw orgError;
+      }
 
       // Add creator as owner
       const { error: memberError } = await supabase
         .from('organization_members')
         .insert({
           organization_id: org.id,
-          user_id: userId,
+          user_id: authenticatedUserId,
           role: 'owner',
           status: 'active',
           joined_at: new Date().toISOString()
@@ -80,6 +97,12 @@ export class OrganizationService {
    */
   static async getUserOrganizations(userId: string): Promise<Array<Organization & { role: string; joined_at: string }>> {
     try {
+      // First verify user is authenticated
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user || user.id !== userId) {
+        throw new Error('User not authenticated');
+      }
+
       const { data, error } = await supabase
         .from('organization_members')
         .select(`
@@ -98,6 +121,12 @@ export class OrganizationService {
         .eq('status', 'active');
 
       if (error) {
+        // If it's a 403 or permission error, return empty array (user has no organizations)
+        if (error.code === '42501' || error.message.includes('permission') || error.message.includes('policy')) {
+          console.warn('Permission error fetching organizations (user may have no organizations yet):', error.message);
+          return [];
+        }
+        
         console.error('Error getting user organizations (Supabase error):', {
           message: error.message,
           details: error.details,
@@ -536,6 +565,182 @@ export class OrganizationService {
       return data?.role || null;
     } catch (error) {
       return null;
+    }
+  }
+
+  /**
+   * Update organization name
+   */
+  static async updateOrganizationName(orgId: string, newName: string, userId: string): Promise<void> {
+    try {
+      // Verify user is owner
+      const isOwner = await this.isOrganizationOwner(orgId, userId);
+      if (!isOwner) {
+        throw new Error('Only workspace owners can rename the workspace');
+      }
+
+      // Validate name
+      if (!newName || newName.trim().length === 0) {
+        throw new Error('Workspace name cannot be empty');
+      }
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          name: newName.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orgId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating organization name:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete an organization (with safety checks)
+   */
+  static async deleteOrganization(orgId: string, userId: string): Promise<void> {
+    try {
+      // Verify user is owner
+      const isOwner = await this.isOrganizationOwner(orgId, userId);
+      if (!isOwner) {
+        throw new Error('Only workspace owners can delete the workspace');
+      }
+
+      // Check if this is the user's last workspace
+      const userOrgs = await this.getUserOrganizations(userId);
+      if (userOrgs.length <= 1) {
+        throw new Error('Cannot delete your last workspace. Please create another workspace first.');
+      }
+
+      // Delete the organization (CASCADE will handle related data)
+      const { error } = await supabase
+        .from('organizations')
+        .delete()
+        .eq('id', orgId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error deleting organization:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update organization settings
+   */
+  static async updateOrganizationSettings(orgId: string, settings: Record<string, any>, userId: string): Promise<void> {
+    try {
+      // Verify user is owner
+      const isOwner = await this.isOrganizationOwner(orgId, userId);
+      if (!isOwner) {
+        throw new Error('Only workspace owners can update workspace settings');
+      }
+
+      // Get current organization to merge settings
+      const org = await this.getOrganization(orgId);
+      if (!org) {
+        throw new Error('Workspace not found');
+      }
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({
+          settings: { ...org.settings, ...settings },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orgId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating organization settings:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Transfer ownership of an organization
+   */
+  static async transferOwnership(orgId: string, newOwnerId: string, currentOwnerId: string): Promise<void> {
+    try {
+      // Verify current user is owner
+      const isOwner = await this.isOrganizationOwner(orgId, currentOwnerId);
+      if (!isOwner) {
+        throw new Error('Only workspace owners can transfer ownership');
+      }
+
+      // Verify new owner is a member
+      const newOwnerRole = await this.getUserRole(orgId, newOwnerId);
+      if (!newOwnerRole) {
+        throw new Error('New owner must be a member of the workspace');
+      }
+
+      // Update roles: make new owner an owner, make current owner a member
+      const { error: newOwnerError } = await supabase
+        .from('organization_members')
+        .update({ role: 'owner' })
+        .eq('organization_id', orgId)
+        .eq('user_id', newOwnerId);
+
+      if (newOwnerError) throw newOwnerError;
+
+      const { error: oldOwnerError } = await supabase
+        .from('organization_members')
+        .update({ role: 'member' })
+        .eq('organization_id', orgId)
+        .eq('user_id', currentOwnerId);
+
+      if (oldOwnerError) throw oldOwnerError;
+
+      // Update organization created_by
+      const { error: orgError } = await supabase
+        .from('organizations')
+        .update({
+          created_by: newOwnerId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orgId);
+
+      if (orgError) throw orgError;
+    } catch (error) {
+      console.error('Error transferring ownership:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update member role
+   */
+  static async updateMemberRole(orgId: string, userId: string, newRole: 'owner' | 'member', currentUserId: string): Promise<void> {
+    try {
+      // Verify current user is owner
+      const isOwner = await this.isOrganizationOwner(orgId, currentUserId);
+      if (!isOwner) {
+        throw new Error('Only workspace owners can change member roles');
+      }
+
+      // Don't allow changing your own role if you're the only owner
+      if (userId === currentUserId && newRole === 'member') {
+        const members = await this.getOrganizationMembers(orgId);
+        const ownerCount = members.filter(m => m.role === 'owner').length;
+        if (ownerCount <= 1) {
+          throw new Error('Cannot remove yourself as owner. Transfer ownership to another member first.');
+        }
+      }
+
+      const { error } = await supabase
+        .from('organization_members')
+        .update({ role: newRole })
+        .eq('organization_id', orgId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating member role:', error);
+      throw error;
     }
   }
 }
