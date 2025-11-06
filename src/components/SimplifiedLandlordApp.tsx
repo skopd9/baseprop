@@ -264,6 +264,50 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
     setShowDeleteConfirmModal(true);
   };
 
+  const handleDeleteProperties = async (propertiesToDelete: SimplifiedProperty[]) => {
+    if (propertiesToDelete.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${propertiesToDelete.length} propert${propertiesToDelete.length === 1 ? 'y' : 'ies'}? This will also delete all associated tenants.`;
+    if (!window.confirm(confirmMessage)) return;
+    
+    setIsDeleting(true);
+    try {
+      let successCount = 0;
+      const errors: string[] = [];
+      
+      for (const property of propertiesToDelete) {
+        const result = await SimplifiedPropertyService.deletePropertyWithTenants(property.id);
+        if (result.success) {
+          successCount++;
+        } else {
+          errors.push(`Failed to delete ${property.address}`);
+        }
+      }
+      
+      // Remove successfully deleted properties from local state
+      setProperties(prev => prev.filter(p => !propertiesToDelete.some(toDelete => toDelete.id === p.id)));
+      
+      // Refresh tenants
+      const updatedTenants = await SimplifiedTenantService.getAllTenants();
+      setTenants(updatedTenants);
+      
+      if (selectedProperty && propertiesToDelete.some(p => p.id === selectedProperty.id)) {
+        setSelectedProperty(null);
+      }
+      
+      if (successCount === propertiesToDelete.length) {
+        setSuccessMessage(`Successfully deleted ${successCount} propert${successCount === 1 ? 'y' : 'ies'}`);
+      } else {
+        setSuccessMessage(`Deleted ${successCount} of ${propertiesToDelete.length} properties. ${errors.join(', ')}`);
+      }
+    } catch (error) {
+      console.error('Error deleting properties:', error);
+      setSuccessMessage('Failed to delete properties. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!propertyToDelete) return;
     
@@ -368,6 +412,60 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   const handleDeleteTenant = (tenant: SimplifiedTenant) => {
     setTenantToDelete(tenant);
     setShowTenantDeleteModal(true);
+  };
+
+  const handleDeleteTenants = async (tenantsToDelete: SimplifiedTenant[]) => {
+    if (tenantsToDelete.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${tenantsToDelete.length} tenant${tenantsToDelete.length === 1 ? '' : 's'}?`;
+    if (!window.confirm(confirmMessage)) return;
+    
+    setIsDeleting(true);
+    try {
+      let successCount = 0;
+      const errors: string[] = [];
+      
+      for (const tenant of tenantsToDelete) {
+        const success = await SimplifiedTenantService.deleteTenant(tenant.id);
+        if (success) {
+          successCount++;
+        } else {
+          errors.push(`Failed to delete ${tenant.name}`);
+        }
+      }
+      
+      // Remove successfully deleted tenants from local state
+      setTenants(prev => prev.filter(t => !tenantsToDelete.some(toDelete => toDelete.id === t.id)));
+      
+      // Update property statuses if needed
+      const affectedPropertyIds = [...new Set(tenantsToDelete.map(t => t.propertyId))];
+      setProperties(prev => prev.map(property => {
+        if (affectedPropertyIds.includes(property.id)) {
+          const remainingTenants = tenants.filter(
+            t => t.propertyId === property.id && !tenantsToDelete.some(toDelete => toDelete.id === t.id)
+          );
+          if (remainingTenants.length === 0) {
+            return { ...property, status: 'vacant' as const };
+          }
+        }
+        return property;
+      }));
+      
+      if (selectedTenant && tenantsToDelete.some(t => t.id === selectedTenant.id)) {
+        setSelectedTenant(null);
+      }
+      
+      if (successCount === tenantsToDelete.length) {
+        setSuccessMessage(`Successfully deleted ${successCount} tenant${successCount === 1 ? '' : 's'}`);
+      } else {
+        setSuccessMessage(`Deleted ${successCount} of ${tenantsToDelete.length} tenants. ${errors.join(', ')}`);
+      }
+    } catch (error) {
+      console.error('Error deleting tenants:', error);
+      setSuccessMessage('Failed to delete tenants. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleTenantUpdate = async (updatedTenant: SimplifiedTenant) => {
@@ -507,8 +605,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                 selectedProperty={selectedProperty}
                 onPropertySelect={handlePropertySelect}
                 onAddProperty={handleAddProperty}
-                onDeleteProperty={handleDeleteProperty}
-                onMarkAsSold={handleMarkAsSold}
+                onDeleteProperties={handleDeleteProperties}
               />
             </div>
           </div>
@@ -523,7 +620,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                 selectedTenant={selectedTenant}
                 onTenantSelect={setSelectedTenant}
                 onAddTenant={handleAddTenant}
-                onDeleteTenant={handleDeleteTenant}
+                onDeleteTenants={handleDeleteTenants}
                 onTenantUpdate={handleTenantUpdate}
               />
             </div>

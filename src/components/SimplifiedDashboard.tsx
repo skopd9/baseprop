@@ -157,7 +157,6 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
       <div className="pt-3 sm:pt-4 px-4 sm:px-6 pb-4 sm:pb-6 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-4 sm:mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Property Dashboard</h1>
           <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">Welcome back! Here's what's happening with your properties.</p>
         </div>
 
@@ -261,7 +260,7 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
             </div>
             
             {urgentItems.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
                 {/* Overdue Rent Category */}
                 {urgentItemsByCategory.rent.length > 0 && (
                   <div className="border border-gray-200 rounded-lg overflow-hidden">

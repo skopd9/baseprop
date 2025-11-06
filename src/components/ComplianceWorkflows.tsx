@@ -53,7 +53,6 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
   const [compliance, setCompliance] = useState<ComplianceItem[]>(mockCompliance);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [showRequirementsModal, setShowRequirementsModal] = useState(false);
-  const [selectedRequirementsCountry, setSelectedRequirementsCountry] = useState<CountryCode>('UK');
   const [expandedProperties, setExpandedProperties] = useState<Set<string>>(new Set());
   const [updateForm, setUpdateForm] = useState({
     propertyId: '',
@@ -429,10 +428,7 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
                         </div>
                       </div>
                       <button
-                        onClick={() => {
-                          setShowRequirementsModal(true);
-                          setSelectedRequirementsCountry(country);
-                        }}
+                        onClick={() => setShowRequirementsModal(true)}
                         className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                       >
                         View Requirements
@@ -614,10 +610,10 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">
-                  Compliance Requirements
+                  {countryConfig.name} Compliance Requirements
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Required documents and certificates by country
+                  Required documents and certificates for rental properties
                 </p>
               </div>
               <button
@@ -628,46 +624,13 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
               </button>
             </div>
 
-            {/* Country Tabs */}
-            <div className="border-b border-gray-200 px-6">
-              <nav className="-mb-px flex space-x-8">
-                {(['UK', 'US', 'GR'] as CountryCode[]).map((country) => {
-                  const config = getCountryConfig(country);
-                  return (
-                    <button
-                      key={country}
-                      onClick={() => setSelectedRequirementsCountry(country)}
-                      className={`
-                        py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                        ${selectedRequirementsCountry === country
-                          ? 'border-green-500 text-green-600'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                        }
-                      `}
-                    >
-                      {config.name}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
             {/* Modal Content */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="space-y-6">
-                {/* Requirements List for Selected Country */}
+                {/* Requirements List */}
                 <div>
-                  <div className="mb-6">
-                    <h3 className="text-xl font-bold text-gray-900">
-                      {getCountryConfig(selectedRequirementsCountry).name} Compliance Requirements
-                    </h3>
-                    <p className="text-gray-600 mt-1">
-                      Required documents and certificates for rental properties
-                    </p>
-                  </div>
-
                   <div className="space-y-4">
-                    {getComplianceRequirements(selectedRequirementsCountry, false).map((req) => (
+                    {getComplianceRequirements(countryCode, false).map((req) => (
                       <div 
                         key={req.id}
                         className="border border-gray-200 rounded-lg p-5 hover:border-green-300 transition-colors"
@@ -718,7 +681,7 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
                   <div className="mt-6 bg-blue-50 rounded-lg p-4 border border-blue-200">
                     <p className="text-sm text-blue-800">
                       <strong>💡 Tip:</strong> Keep all certificates and records for at least 2 years after the tenancy ends.
-                      {selectedRequirementsCountry === 'UK' && ' Provide copies to tenants within 28 days of completion.'}
+                      {countryCode === 'UK' && ' Provide copies to tenants within 28 days of completion.'}
                     </p>
                   </div>
                 </div>

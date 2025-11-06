@@ -17,6 +17,7 @@ import {
   PencilIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedTenant } from '../utils/simplifiedDataTransforms';
+import { useCurrency } from '../hooks/useCurrency';
 import { SimplifiedTenantService } from '../services/SimplifiedTenantService';
 
 interface TenantDetailsModalProps {
@@ -34,6 +35,7 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
   onTenantUpdate,
   onStartOnboarding,
 }) => {
+  const { formatCurrency } = useCurrency();
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,15 +52,6 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
   }, [tenant]);
 
   if (!isOpen || !tenant || !editedTenant) return null;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const formatDate = (date: Date | string | undefined) => {
     if (!date) return 'Not set';
@@ -367,7 +360,7 @@ export const TenantDetailsModal: React.FC<TenantDetailsModalProps> = ({
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Monthly Rent (£)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Monthly Rent</label>
                 {isEditMode ? (
                   <input
                     type="number"

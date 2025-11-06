@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -14,10 +14,10 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   CurrencyPoundIcon,
-  TrashIcon,
-  CheckCircleIcon
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant, getOccupancyDisplay } from '../utils/simplifiedDataTransforms';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface ResidentialPropertiesTableProps {
   properties: SimplifiedProperty[];
@@ -25,8 +25,7 @@ interface ResidentialPropertiesTableProps {
   selectedProperty: SimplifiedProperty | null;
   onPropertySelect: (property: SimplifiedProperty) => void;
   onAddProperty: () => void;
-  onDeleteProperty?: (property: SimplifiedProperty) => void;
-  onMarkAsSold?: (property: SimplifiedProperty) => void;
+  onDeleteProperties?: (properties: SimplifiedProperty[]) => void;
 }
 
 const getStatusColor = (status: string) => {
@@ -44,15 +43,6 @@ const getStatusColor = (status: string) => {
     default:
       return 'bg-gray-100 text-gray-800 border-gray-200';
   }
-};
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency: 'GBP',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
 };
 
 const propertyTypes = [
@@ -77,9 +67,10 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
   selectedProperty,
   onPropertySelect,
   onAddProperty,
-  onDeleteProperty,
-  onMarkAsSold,
+  onDeleteProperties,
 }) => {
+  const { formatCurrency, currencySymbol } = useCurrency();
+  
   // Safety checks: ensure arrays are valid
   const safeProperties = Array.isArray(properties) ? properties : [];
   const safeTenants = Array.isArray(tenants) ? tenants : [];
@@ -89,6 +80,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   // Create a map for quick tenant lookup by property
   const tenantsByProperty = useMemo(() => {
@@ -100,14 +92,71 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
     return map;
   }, [tenants]);
 
+  // Checkbox handlers
+  const toggleRowSelection = useCallback((propertyId: string) => {
+    setSelectedRows(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(propertyId)) {
+        newSelected.delete(propertyId);
+      } else {
+        newSelected.add(propertyId);
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const toggleAllRows = useCallback(() => {
+    if (selectedRows.size === safeProperties.length && safeProperties.length > 0) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(safeProperties.map(p => p.id)));
+    }
+  }, [selectedRows.size, safeProperties]);
+
+  const handleBulkDelete = useCallback(() => {
+    if (onDeleteProperties && selectedRows.size > 0) {
+      const propertiesToDelete = safeProperties.filter(p => selectedRows.has(p.id));
+      onDeleteProperties(propertiesToDelete);
+      setSelectedRows(new Set());
+    }
+  }, [onDeleteProperties, selectedRows, safeProperties]);
+
   const columns = useMemo<ColumnDef<SimplifiedProperty>[]>(() => [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={selectedRows.size === safeProperties.length && safeProperties.length > 0}
+          onChange={toggleAllRows}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      cell: ({ row }) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedRows.has(row.original.id)}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleRowSelection(row.original.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        </div>
+      ),
+      size: 50,
+    },
     {
       accessorKey: 'propertyReference',
       header: 'Ref',
       cell: info => (
-        <span className="text-sm font-medium text-gray-900">
-          {info.getValue() as number}
-        </span>
+        <div onClick={(e) => e.stopPropagation()}>
+          <span className="text-sm font-medium text-gray-900">
+            {info.getValue() as number}
+          </span>
+        </div>
       ),
       size: 60,
     },
@@ -188,7 +237,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
             )}
             {property.propertyType === 'hmo' && property.unitDetails && (
               <div className="text-xs text-gray-500">
-                {property.unitDetails.length} units: £{Math.round(property.targetRent / property.unitDetails.length)}/unit avg
+                {property.unitDetails.length} units: {currencySymbol}{Math.round(property.targetRent / property.unitDetails.length)}/unit avg
               </div>
             )}
           </div>
@@ -237,44 +286,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
       filterFn: 'equals',
       size: 140,
     },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => {
-        const property = row.original;
-        
-        return (
-          <div className="flex items-center space-x-1">
-            {property.status !== 'sold' && onMarkAsSold && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMarkAsSold(property);
-                }}
-                className="p-1 rounded-md hover:bg-green-50 text-green-600 hover:text-green-700"
-                title="Mark as Sold"
-              >
-                <CheckCircleIcon className="w-4 h-4" />
-              </button>
-            )}
-            {onDeleteProperty && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteProperty(property);
-                }}
-                className="p-1 rounded-md hover:bg-red-50 text-red-600 hover:text-red-700"
-                title="Delete Property"
-              >
-                <TrashIcon className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        );
-      },
-      size: 80,
-    },
-  ], [tenantsByProperty]);
+  ], [tenantsByProperty, selectedRows, safeProperties, toggleAllRows, toggleRowSelection]);
 
   const table = useReactTable({
     data: safeProperties,
@@ -306,6 +318,17 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* Bulk Delete Button */}
+            {selectedRows.size > 0 && onDeleteProperties && (
+              <button
+                onClick={handleBulkDelete}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <TrashIcon className="w-4 h-4 mr-2" />
+                Delete ({selectedRows.size})
+              </button>
+            )}
+
             {/* Search */}
             <input
               type="text"

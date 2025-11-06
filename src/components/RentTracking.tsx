@@ -8,6 +8,7 @@ import {
   HomeIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTransforms';
+import { useCurrency } from '../hooks/useCurrency';
 import { RentPaymentService } from '../services/RentPaymentService';
 import { RentPayment } from '../types/index';
 
@@ -37,6 +38,7 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
   properties,
   tenants
 }) => {
+  const { formatCurrency, currencySymbol } = useCurrency();
   const [rentRecords, setRentRecords] = useState<RentRecord[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<RentRecord | null>(null);
@@ -104,15 +106,6 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
       setIsLoading(false);
     }
   }, [tenants, properties]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('en-GB', {
@@ -384,7 +377,7 @@ export const RentTracking: React.FC<RentTrackingProps> = ({
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">£</span>
+                    <span className="text-gray-500 sm:text-sm">{currencySymbol}</span>
                   </div>
                   <input
                     type="number"

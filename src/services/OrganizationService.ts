@@ -121,6 +121,7 @@ export class OrganizationService {
             id,
             name,
             created_by,
+            country_code,
             settings,
             created_at,
             updated_at

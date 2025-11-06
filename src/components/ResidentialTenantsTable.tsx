@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -18,7 +18,6 @@ import {
   ChevronDownIcon,
   CurrencyPoundIcon,
   CalendarIcon,
-  ClipboardDocumentListIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedTenant } from '../utils/simplifiedDataTransforms';
@@ -32,7 +31,7 @@ interface ResidentialTenantsTableProps {
   selectedTenant: SimplifiedTenant | null;
   onTenantSelect: (tenant: SimplifiedTenant) => void;
   onAddTenant: () => void;
-  onDeleteTenant: (tenant: SimplifiedTenant) => void;
+  onDeleteTenants?: (tenants: SimplifiedTenant[]) => void;
   onTenantUpdate: (tenant: SimplifiedTenant) => void; // Add callback for tenant updates
 }
 
@@ -66,7 +65,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
   selectedTenant,
   onTenantSelect,
   onAddTenant,
-  onDeleteTenant,
+  onDeleteTenants,
   onTenantUpdate,
 }) => {
   const [sorting, setSorting] = useState<SortingState>([
@@ -74,6 +73,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
   ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [selectedTenantForOnboarding, setSelectedTenantForOnboarding] = useState<SimplifiedTenant | null>(null);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -103,14 +103,74 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
     setShowDetailsModal(true);
   };
 
+  // Checkbox handlers
+  const toggleRowSelection = useCallback((tenantId: string) => {
+    setSelectedRows(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(tenantId)) {
+        newSelected.delete(tenantId);
+      } else {
+        newSelected.add(tenantId);
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const toggleAllRows = useCallback(() => {
+    const safeTenants = tenants || [];
+    if (selectedRows.size === safeTenants.length && safeTenants.length > 0) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(safeTenants.map(t => t.id)));
+    }
+  }, [selectedRows.size, tenants]);
+
+  const handleBulkDelete = useCallback(() => {
+    const safeTenants = tenants || [];
+    if (onDeleteTenants && selectedRows.size > 0) {
+      const tenantsToDelete = safeTenants.filter(t => selectedRows.has(t.id));
+      onDeleteTenants(tenantsToDelete);
+      setSelectedRows(new Set());
+    }
+  }, [onDeleteTenants, selectedRows, tenants]);
+
   const columns = useMemo<ColumnDef<SimplifiedTenant>[]>(() => [
+    {
+      id: 'select',
+      header: ({ table }) => {
+        const safeTenants = tenants || [];
+        return (
+          <input
+            type="checkbox"
+            checked={selectedRows.size === safeTenants.length && safeTenants.length > 0}
+            onChange={toggleAllRows}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        );
+      },
+      cell: ({ row }) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedRows.has(row.original.id)}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleRowSelection(row.original.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        </div>
+      ),
+      size: 50,
+    },
     {
       accessorKey: 'name',
       header: 'Tenant',
       cell: info => {
         const tenant = info.row.original;
         return (
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex-shrink-0">
               <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                 <UserIcon className="w-4 h-4 text-blue-600" />
@@ -269,54 +329,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
       },
       size: 100,
     },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: info => {
-        const tenant = info.row.original;
-        const isOnboardingComplete = tenant.onboardingStatus === 'completed';
-        
-        return (
-          <div className="flex items-center space-x-2">
-            {!isOnboardingComplete ? (
-              <button
-                onClick={(e) => handleOnboardingAction(e, tenant)}
-                className={`inline-flex items-center px-2 py-1 border rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  tenant.onboardingStatus === 'not_started' 
-                    ? 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 focus:ring-blue-500' 
-                    : 'border-orange-300 text-orange-700 bg-orange-50 hover:bg-orange-100 focus:ring-orange-500'
-                }`}
-                title={`${tenant.onboardingStatus === 'not_started' ? 'Start' : 'Continue'} Onboarding for ${tenant.name}`}
-              >
-                <ClipboardDocumentListIcon className="w-3 h-3 mr-1" />
-                {tenant.onboardingStatus === 'not_started' ? 'Start Onboarding' : 'Continue'}
-              </button>
-            ) : (
-              <button
-                onClick={(e) => handleViewDetails(e, tenant)}
-                className="inline-flex items-center px-2 py-1 border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                title={`View details for ${tenant.name}`}
-              >
-                <UserIcon className="w-3 h-3 mr-1" />
-                View Details
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteTenant(tenant);
-              }}
-              className="inline-flex items-center px-2 py-1 border border-red-300 text-red-700 bg-red-50 hover:bg-red-100 rounded text-xs font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              title={`Delete ${tenant.name}`}
-            >
-              <TrashIcon className="w-3 h-3" />
-            </button>
-          </div>
-        );
-      },
-      size: 180,
-    },
-  ], []);
+  ], [selectedRows, tenants, toggleAllRows, toggleRowSelection]);
 
   const table = useReactTable({
     data: tenants || [],
@@ -348,6 +361,17 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
           </div>
           
           <div className="flex items-center space-x-4">
+            {/* Bulk Delete Button */}
+            {selectedRows.size > 0 && onDeleteTenants && (
+              <button
+                onClick={handleBulkDelete}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <TrashIcon className="w-4 h-4 mr-2" />
+                Delete ({selectedRows.size})
+              </button>
+            )}
+
             {/* Search */}
             <input
               type="text"

@@ -314,8 +314,14 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50">
-        <div className="bg-white rounded-lg sm:rounded-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50"
+        onClick={onClose}
+      >
+        <div 
+          className="bg-white rounded-lg sm:rounded-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
           <div className="p-4 sm:p-6 border-b border-gray-200">
             <div className="flex items-start sm:items-center justify-between gap-2">

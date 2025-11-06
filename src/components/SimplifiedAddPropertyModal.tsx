@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { XMarkIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, HomeIcon, PhotoIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
 import { supabase } from '../lib/supabase';
 import { useOrganization } from '../contexts/OrganizationContext';
+import { useCurrency } from '../hooks/useCurrency';
+import { PropertyPhotoService } from '../services/PropertyPhotoService';
 
 interface SimplifiedAddPropertyModalProps {
   isOpen: boolean;
@@ -18,6 +20,7 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
   propertyToEdit,
 }) => {
   const { currentOrganization } = useOrganization();
+  const { currencySymbol } = useCurrency();
   const [formData, setFormData] = useState({
     addressLine1: '',
     addressLine2: '',
@@ -32,6 +35,9 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
 
   // Initialize form with property data if editing
   React.useEffect(() => {
@@ -64,8 +70,84 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         purchasePrice: 0,
         units: [],
       });
+      // Clear photos when opening modal
+      setPhotoFiles([]);
+      setPhotoPreviewUrls([]);
     }
   }, [isOpen, propertyToEdit]);
+
+  // Cleanup preview URLs when component unmounts or photos change
+  React.useEffect(() => {
+    return () => {
+      photoPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, [photoPreviewUrls]);
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    if (files.length === 0) return;
+
+    // Validate files
+    const validFiles: File[] = [];
+    const newPreviewUrls: string[] = [];
+
+    for (const file of files) {
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select only image files');
+        continue;
+      }
+
+      // Check file size (10MB max)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('Photos must be less than 10MB');
+        continue;
+      }
+
+      validFiles.push(file);
+      newPreviewUrls.push(URL.createObjectURL(file));
+    }
+
+    setPhotoFiles(prev => [...prev, ...validFiles]);
+    setPhotoPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    
+    // Clear any error messages if files are valid
+    if (validFiles.length > 0 && error?.includes('Photo')) {
+      setError(null);
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    // Revoke the object URL to free memory
+    URL.revokeObjectURL(photoPreviewUrls[index]);
+    
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index));
+    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadPhotosForProperty = async (propertyId: string, organizationId: string) => {
+    if (photoFiles.length === 0) return;
+
+    setUploadingPhotos(true);
+    try {
+      // Upload each photo
+      for (let i = 0; i < photoFiles.length; i++) {
+        await PropertyPhotoService.uploadPhoto({
+          propertyId,
+          organizationId,
+          file: photoFiles[i],
+          isPrimary: i === 0, // First photo is primary
+          displayOrder: i,
+        });
+      }
+    } catch (err) {
+      console.error('Error uploading photos:', err);
+      throw new Error('Failed to upload property photos');
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,6 +287,11 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         data = insertData;
       }
 
+      // Upload photos if any were selected
+      if (photoFiles.length > 0) {
+        await uploadPhotosForProperty(data.id, currentOrganization.id);
+      }
+
       // Transform to simplified format
       const simplifiedProperty: SimplifiedProperty = {
         id: data.id,
@@ -238,6 +325,8 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         purchasePrice: 0,
         units: [],
       });
+      setPhotoFiles([]);
+      setPhotoPreviewUrls([]);
       onClose();
     } catch (err) {
       console.error('Error adding property:', err);
@@ -451,7 +540,7 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
 
           <div>
             <label htmlFor="targetRent" className="block text-sm font-medium text-gray-700 mb-1">
-              Target Rent (£) {formData.propertyType === 'hmo' && <span className="text-gray-400">(calculated from units)</span>}
+              Target Rent ({currencySymbol}) {formData.propertyType === 'hmo' && <span className="text-gray-400">(calculated from units)</span>}
             </label>
             <input
               type="number"
@@ -487,6 +576,85 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="250000"
             />
+          </div>
+
+          {/* Property Photos Section */}
+          <div className="border-t border-gray-200 pt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="flex items-center space-x-2">
+                <PhotoIcon className="w-5 h-5 text-gray-500" />
+                <span>Property Photos <span className="text-gray-400">(optional)</span></span>
+              </div>
+            </label>
+            
+            {/* Photo Upload Button */}
+            <div className="mb-3">
+              <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <PhotoIcon className="w-5 h-5 mr-2 text-gray-500" />
+                Add Photos
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="sr-only"
+                />
+              </label>
+              <p className="mt-1 text-xs text-gray-500">
+                Upload images of your property (max 10MB per image)
+              </p>
+            </div>
+
+            {/* Photo Preview Grid */}
+            {photoPreviewUrls.length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {photoPreviewUrls.map((url, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={url}
+                      alt={`Property photo ${index + 1}`}
+                      className="w-full h-24 object-cover rounded-md border border-gray-200"
+                    />
+                    {index === 0 && (
+                      <div className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">
+                        Primary
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(index)}
+                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove photo"
+                    >
+                      <TrashIcon className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* No photos placeholder with sample images */}
+            {photoPreviewUrls.length === 0 && (
+              <div className="border-2 border-dashed border-gray-300 rounded-md p-4">
+                <div className="text-center">
+                  <PhotoIcon className="mx-auto h-12 w-12 text-gray-400" />
+                  <p className="mt-2 text-sm text-gray-600">No photos yet</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Add photos to make your property listing more attractive
+                  </p>
+                  
+                  {/* Show placeholder image preview */}
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 mb-2">Preview placeholder:</p>
+                    <img
+                      src={PropertyPhotoService.getPlaceholderImageUrl(formData.propertyType, 0)}
+                      alt="Placeholder preview"
+                      className="w-full h-32 object-cover rounded-md border border-gray-200"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {formData.propertyType === 'hmo' && (
@@ -528,7 +696,7 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Target Rent (£)</label>
+                          <label className="block text-xs text-gray-500 mb-1">Target Rent ({currencySymbol})</label>
                           <input
                             type="number"
                             value={unit.targetRent}
@@ -552,7 +720,7 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
                 {formData.units.length > 0 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
                     <p className="text-sm text-blue-700">
-                      <strong>Total Target Rent:</strong> £{formData.units.reduce((sum, unit) => sum + unit.targetRent, 0)}/month
+                      <strong>Total Target Rent:</strong> {currencySymbol}{formData.units.reduce((sum, unit) => sum + unit.targetRent, 0)}/month
                       <br />
                       <strong>Total Area:</strong> {formData.units.reduce((sum, unit) => sum + unit.area, 0)} sqm
                     </p>
@@ -572,13 +740,13 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || uploadingPhotos}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? (
+              {isSubmitting || uploadingPhotos ? (
                 <div className="flex items-center">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  {propertyToEdit ? 'Saving...' : 'Adding...'}
+                  {uploadingPhotos ? 'Uploading photos...' : propertyToEdit ? 'Saving...' : 'Adding...'}
                 </div>
               ) : (
                 propertyToEdit ? 'Save Changes' : 'Add Property'
