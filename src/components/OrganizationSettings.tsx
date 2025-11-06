@@ -88,8 +88,10 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
   const loadSettings = () => {
     if (!currentOrganization) return;
     setWorkspaceName(currentOrganization.name);
-    setCountry(currentOrganization.settings?.country || 'UK');
-    setCurrency(currentOrganization.settings?.default_currency || (currentOrganization.settings?.country === 'UK' ? 'GBP' : currentOrganization.settings?.country === 'GR' ? 'EUR' : 'USD'));
+    // Country is now from country_code column (immutable)
+    const orgCountry = currentOrganization.country_code || currentOrganization.settings?.country || 'UK';
+    setCountry(orgCountry);
+    setCurrency(currentOrganization.settings?.default_currency || (orgCountry === 'UK' ? 'GBP' : orgCountry === 'GR' ? 'EUR' : 'USD'));
   };
 
   const handleInvite = async (e: React.FormEvent) => {
@@ -194,10 +196,10 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      // Only save currency (country is immutable)
       await OrganizationService.updateOrganizationSettings(
         currentOrganization.id,
         {
-          country,
           default_currency: currency
         },
         user.id
@@ -462,54 +464,49 @@ export const OrganizationSettings: React.FC<OrganizationSettingsProps> = ({ isOp
                   )}
                 </div>
 
-                {/* Country */}
+                {/* Country - Read Only after creation */}
                 <div>
                   <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
-                    Default Country
+                    Workspace Country
                   </label>
-                  <select
-                    id="country"
-                    value={country}
-                    onChange={(e) => {
-                      setCountry(e.target.value);
-                      setCurrency(e.target.value === 'UK' ? 'GBP' : e.target.value === 'GR' ? 'EUR' : 'USD');
-                    }}
-                    disabled={!isOwner || isSavingSettings}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="UK">United Kingdom</option>
-                    <option value="GR">Greece</option>
-                    <option value="US">United States</option>
-                  </select>
+                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 flex items-center gap-2">
+                    <span className="text-2xl">
+                      {currentOrganization?.country_code === 'UK' ? '🇬🇧' : 
+                       currentOrganization?.country_code === 'US' ? '🇺🇸' : 
+                       currentOrganization?.country_code === 'GR' ? '🇬🇷' : '🌍'}
+                    </span>
+                    <span className="font-medium">
+                      {currentOrganization?.country_code === 'UK' ? 'United Kingdom' : 
+                       currentOrganization?.country_code === 'US' ? 'United States' : 
+                       currentOrganization?.country_code === 'GR' ? 'Greece' : 
+                       'Not Set'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    Workspace country cannot be changed after creation. All properties must be in the same country as the workspace.
+                  </p>
                 </div>
 
-                {/* Currency */}
+                {/* Currency - Read Only (set by country) */}
                 <div>
                   <label htmlFor="currency" className="block text-sm font-medium text-gray-700 mb-2">
                     Default Currency
                   </label>
-                  <select
-                    id="currency"
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    disabled={!isOwner || isSavingSettings}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="GBP">GBP (£)</option>
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                  </select>
+                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 flex items-center gap-2">
+                    <span className="font-medium">
+                      {currency === 'GBP' ? 'GBP (£)' : 
+                       currency === 'EUR' ? 'EUR (€)' : 
+                       currency === 'USD' ? 'USD ($)' : 
+                       currency}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Currency is automatically set based on workspace country
+                  </p>
                 </div>
-
-                {isOwner && (
-                  <button
-                    onClick={handleSaveSettings}
-                    disabled={isSavingSettings}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
-                  >
-                    {isSavingSettings ? 'Saving...' : 'Save Settings'}
-                  </button>
-                )}
 
                 {/* Danger Zone */}
                 {isOwner && (

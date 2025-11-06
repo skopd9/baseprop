@@ -81,15 +81,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ userId, user
 
       if (profileError) throw profileError;
 
-      // 2. Create organization
+      // 2. Create organization with country_code (immutable after creation)
       const orgName = formData.companyName || `${formData.fullName}'s Properties`;
       const { data: org, error: orgError } = await supabase
         .from('organizations')
         .insert({
           name: orgName,
           created_by: userId,
+          country_code: formData.country, // Locked country - cannot be changed after creation
           settings: {
-            country: formData.country,
+            country: formData.country, // Also store in settings for backward compatibility
             default_currency: formData.country === 'UK' ? 'GBP' : formData.country === 'GR' ? 'EUR' : 'USD'
           }
         })

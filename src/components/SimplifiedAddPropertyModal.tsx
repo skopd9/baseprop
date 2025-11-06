@@ -19,7 +19,10 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
 }) => {
   const { currentOrganization } = useOrganization();
   const [formData, setFormData] = useState({
-    address: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    postcode: '',
     propertyType: 'house' as 'house' | 'flat' | 'hmo',
     bedrooms: 2,
     bathrooms: 1,
@@ -33,8 +36,13 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
   // Initialize form with property data if editing
   React.useEffect(() => {
     if (isOpen && propertyToEdit) {
+      // Parse existing address or structured address from property_data
+      const propertyData = (propertyToEdit as any).property_data || {};
       setFormData({
-        address: propertyToEdit.address,
+        addressLine1: propertyData.address_line_1 || propertyToEdit.address || '',
+        addressLine2: propertyData.address_line_2 || '',
+        city: propertyData.city || '',
+        postcode: propertyData.postcode || '',
         propertyType: propertyToEdit.propertyType,
         bedrooms: propertyToEdit.bedrooms,
         bathrooms: propertyToEdit.bathrooms,
@@ -45,7 +53,10 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
     } else if (isOpen && !propertyToEdit) {
       // Reset form for new property
       setFormData({
-        address: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        postcode: '',
         propertyType: 'house',
         bedrooms: 2,
         bathrooms: 1,
@@ -63,8 +74,16 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
 
     try {
       // Validate required fields
-      if (!formData.address.trim()) {
-        throw new Error('Property address is required');
+      if (!formData.addressLine1.trim()) {
+        throw new Error('Address Line 1 is required');
+      }
+
+      if (!formData.city.trim()) {
+        throw new Error('City is required');
+      }
+
+      if (!formData.postcode.trim()) {
+        throw new Error('Postcode/ZIP Code is required');
       }
 
       if (formData.bedrooms < 0 || formData.bedrooms > 10) {
@@ -102,6 +121,14 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         }
       }
 
+      // Validate organization
+      if (!currentOrganization?.id) {
+        throw new Error('No organization selected. Please ensure you are part of an organization.');
+      }
+
+      // Get organization country code
+      const orgCountryCode = currentOrganization.country_code || 'UK';
+
       // Generate a unique asset register ID
       const assetRegisterId = `SIMP-${Date.now().toString().slice(-6)}`;
       
@@ -110,7 +137,15 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         ? formData.units.reduce((sum, unit) => sum + unit.targetRent, 0)
         : formData.targetRent;
 
-      // Prepare property data for database
+      // Build full address string for backward compatibility
+      const fullAddress = [
+        formData.addressLine1,
+        formData.addressLine2,
+        formData.city,
+        formData.postcode
+      ].filter(Boolean).join(', ');
+
+      // Prepare property data for database with structured address
       const propertyData = {
         property_type: 'residential',
         property_sub_type: formData.propertyType,
@@ -121,13 +156,13 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         units: formData.propertyType === 'hmo' ? formData.units : 1,
         unit_details: formData.propertyType === 'hmo' ? formData.units : null,
         tenant_count: 0,
-        is_simplified_demo: true, // Flag to identify demo properties
+        is_simplified_demo: true,
+        // Structured address fields
+        address_line_1: formData.addressLine1,
+        address_line_2: formData.addressLine2,
+        city: formData.city,
+        postcode: formData.postcode,
       };
-
-      // Validate organization
-      if (!currentOrganization?.id) {
-        throw new Error('No organization selected. Please ensure you are part of an organization.');
-      }
 
       let data;
       
@@ -136,8 +171,8 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         const { data: updateData, error: updateError } = await supabase
           .from('properties')
           .update({
-            name: `Property at ${formData.address}`,
-            address: formData.address,
+            name: `Property at ${fullAddress}`,
+            address: fullAddress,
             property_data: propertyData,
           })
           .eq('id', propertyToEdit.id)
@@ -149,16 +184,17 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         }
         data = updateData;
       } else {
-        // Insert new property
+        // Insert new property with organization's country code
         const { data: insertData, error: insertError } = await supabase
           .from('properties')
           .insert({
             asset_register_id: assetRegisterId,
-            name: `Property at ${formData.address}`,
-            address: formData.address,
-            status: 'vacant', // New properties start as vacant
+            name: `Property at ${fullAddress}`,
+            address: fullAddress,
+            status: 'vacant',
             property_data: propertyData,
             organization_id: currentOrganization.id,
+            country_code: orgCountryCode, // Auto-set from organization
           })
           .select()
           .single();
@@ -172,14 +208,16 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
       // Transform to simplified format
       const simplifiedProperty: SimplifiedProperty = {
         id: data.id,
-        address: formData.address,
+        propertyReference: data.property_reference || 0,
+        countryCode: data.country_code || orgCountryCode,
+        address: fullAddress,
         propertyType: formData.propertyType,
         bedrooms: formData.bedrooms,
         bathrooms: formData.bathrooms,
         targetRent: totalTargetRent,
         purchasePrice: formData.purchasePrice || undefined,
         tenantCount: propertyToEdit?.tenantCount || 0,
-        status: propertyToEdit?.status || 'vacant',
+        status: propertyToEdit?.status || 'under_management',
         units: formData.propertyType === 'hmo' ? formData.units : 1,
         unitDetails: formData.propertyType === 'hmo' ? formData.units : undefined,
       };
@@ -189,7 +227,10 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
       
       // Reset form and close modal
       setFormData({
-        address: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        postcode: '',
         propertyType: 'house',
         bedrooms: 2,
         bathrooms: 1,
@@ -289,20 +330,72 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-              Property Address *
-            </label>
-            <input
-              type="text"
-              id="address"
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., 123 Oak Street, Manchester M1 2AB"
-            />
+          {/* Structured Address Fields */}
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="addressLine1" className="block text-sm font-medium text-gray-700 mb-1">
+                Address Line 1 *
+              </label>
+              <input
+                type="text"
+                id="addressLine1"
+                name="addressLine1"
+                value={formData.addressLine1}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder={currentOrganization?.country_code === 'US' ? 'e.g., 123 Main Street' : 'e.g., 123 High Street'}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="addressLine2" className="block text-sm font-medium text-gray-700 mb-1">
+                Address Line 2 <span className="text-gray-400">(optional)</span>
+              </label>
+              <input
+                type="text"
+                id="addressLine2"
+                name="addressLine2"
+                value={formData.addressLine2}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Apartment, suite, unit, etc."
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                  City *
+                </label>
+                <input
+                  type="text"
+                  id="city"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={currentOrganization?.country_code === 'US' ? 'New York' : currentOrganization?.country_code === 'GR' ? 'Athens' : 'London'}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="postcode" className="block text-sm font-medium text-gray-700 mb-1">
+                  {currentOrganization?.country_code === 'US' ? 'ZIP Code' : 'Postcode'} *
+                </label>
+                <input
+                  type="text"
+                  id="postcode"
+                  name="postcode"
+                  value={formData.postcode}
+                  onChange={handleChange}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder={currentOrganization?.country_code === 'US' ? '10001' : currentOrganization?.country_code === 'GR' ? '106 82' : 'SW1A 1AA'}
+                />
+              </div>
+            </div>
           </div>
 
           <div>

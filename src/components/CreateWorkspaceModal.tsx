@@ -33,7 +33,8 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
     setIsCreating(true);
     try {
       const settings = {
-        country: country,
+        country: country, // Will be saved to country_code column
+        country_code: country, // Explicitly set for clarity
         default_currency: country === 'UK' ? 'GBP' : country === 'GR' ? 'EUR' : 'USD'
       };
 
@@ -113,7 +114,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
 
             <div>
               <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
-                Default Country
+                Workspace Country *
               </label>
               <select
                 id="country"
@@ -122,12 +123,15 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={isCreating}
               >
-                <option value="UK">United Kingdom</option>
-                <option value="GR">Greece</option>
-                <option value="US">United States</option>
+                <option value="UK">🇬🇧 United Kingdom</option>
+                <option value="GR">🇬🇷 Greece</option>
+                <option value="US">🇺🇸 United States</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                You can change this later in workspace settings
+                <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                <strong>Important:</strong> Country cannot be changed after workspace creation. All properties must be in the same country as the workspace.
               </p>
             </div>
           </div>

@@ -5,6 +5,7 @@ export interface Organization {
   id: string;
   name: string;
   created_by: string;
+  country_code?: string; // UK, US, or GR - locked after creation
   settings: Record<string, any>;
   created_at: string;
   updated_at: string;
@@ -56,14 +57,22 @@ export class OrganizationService {
       // Use the authenticated user's ID to ensure RLS policy works
       const authenticatedUserId = user.id;
       
-      // Create organization
+      // Create organization with country_code if provided in settings
+      const countryCode = settings?.country || settings?.country_code;
+      const insertData: any = {
+        name,
+        created_by: authenticatedUserId,
+        settings: settings || {}
+      };
+      
+      // Add country_code if provided (immutable after creation)
+      if (countryCode) {
+        insertData.country_code = countryCode;
+      }
+      
       const { data: org, error: orgError } = await supabase
         .from('organizations')
-        .insert({
-          name,
-          created_by: authenticatedUserId,
-          settings: settings || {}
-        })
+        .insert(insertData)
         .select()
         .single();
 
