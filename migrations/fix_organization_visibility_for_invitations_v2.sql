@@ -28,3 +28,4 @@ CREATE POLICY "Users can view organizations they're invited to"
 -- This is the correct way to get user email in RLS policies without querying auth.users
 
 
+

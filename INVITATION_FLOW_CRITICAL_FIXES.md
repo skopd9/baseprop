@@ -447,3 +447,4 @@ WHERE token = 'abc123';
 **Result:** Invitation flow now works end-to-end for both new and existing users! 🎉
 
 
+

@@ -442,3 +442,4 @@ WHERE id = 'your-tenant-id';
 **Need Help?** Check `RENT_PAYMENTS_RESCOPE.md` for detailed requirements and examples.
 
 
+

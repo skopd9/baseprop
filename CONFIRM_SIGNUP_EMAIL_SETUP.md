@@ -225,3 +225,4 @@ You now have templates for:
 **Need the magic link template too?** See `MAGIC_LINK_QUICK_SETUP.md`
 
 
+

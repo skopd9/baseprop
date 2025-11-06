@@ -255,3 +255,4 @@ This update fixes a critical bug where email invitations weren't working due to 
 The changes are frontend-only, backward compatible, and ready to deploy. 🚀
 
 
+

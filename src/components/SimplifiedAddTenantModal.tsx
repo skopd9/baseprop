@@ -12,6 +12,8 @@ interface SimplifiedAddTenantModalProps {
   onTenantAdded: (tenant: SimplifiedTenant) => void;
   properties: SimplifiedProperty[];
   existingTenants: SimplifiedTenant[];
+  isExistingTenant?: boolean; // Flag to indicate if this is an existing tenant
+  preselectedPropertyId?: string; // Pre-select a property
 }
 
 export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> = ({
@@ -20,6 +22,8 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
   onTenantAdded,
   properties,
   existingTenants,
+  isExistingTenant = false,
+  preselectedPropertyId = '',
 }) => {
   const { currentOrganization } = useOrganization();
   const [formData, setFormData] = useState({
@@ -27,13 +31,20 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
     surname: '',
     email: '',
     phone: '',
-    propertyId: '',
+    propertyId: preselectedPropertyId,
     unitNumber: '',
     roomId: '',
     roomName: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Update propertyId when preselectedPropertyId changes
+  React.useEffect(() => {
+    if (preselectedPropertyId && isOpen) {
+      setFormData(prev => ({ ...prev, propertyId: preselectedPropertyId }));
+    }
+  }, [preselectedPropertyId, isOpen]);
 
   // Get all properties - show all properties, user can decide if they want to add more tenants
   const availableProperties = useMemo(() => {
@@ -247,8 +258,14 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
               <UserIcon className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Add New Tenant</h3>
-              <p className="text-sm text-gray-500">Add a tenant and assign them to a property</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {isExistingTenant ? 'Add Existing Tenant' : 'Add New Tenant'}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {isExistingTenant 
+                  ? 'Add a tenant who is already living in the property'
+                  : 'Add a tenant and assign them to a property'}
+              </p>
             </div>
           </div>
           <button
@@ -338,6 +355,7 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
           {/* Property Assignment */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h4 className="text-sm font-medium text-gray-900 mb-3">Property Assignment</h4>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className={isHMO ? 'md:col-span-1' : 'md:col-span-2'}>
                 <label htmlFor="propertyId" className="block text-sm font-medium text-gray-700 mb-1">
@@ -419,26 +437,28 @@ export const SimplifiedAddTenantModal: React.FC<SimplifiedAddTenantModalProps> =
             )}
           </div>
 
-          {/* Note about lease information */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start space-x-2">
-              <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
-                <div className="w-2 h-2 bg-blue-600 rounded-full" />
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-blue-900 mb-1">Next Steps</h4>
-                <p className="text-sm text-blue-700">
-                  After adding this tenant, you'll be able to start the onboarding process which includes:
-                </p>
-                <ul className="text-sm text-blue-700 mt-2 ml-4 list-disc">
-                  <li>Adding lease information and terms</li>
-                  <li>Ordering credit reference checks</li>
-                  <li>Generating tenancy agreements</li>
-                  <li>Preparing for tenancy handover</li>
-                </ul>
+          {/* Note about lease information - only show for new tenants, not existing ones */}
+          {!isExistingTenant && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-start space-x-2">
+                <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center mt-0.5">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">Next Steps</h4>
+                  <p className="text-sm text-blue-700">
+                    After adding this tenant, you'll be able to start the onboarding process which includes:
+                  </p>
+                  <ul className="text-sm text-blue-700 mt-2 ml-4 list-disc">
+                    <li>Adding lease information and terms</li>
+                    <li>Ordering credit reference checks</li>
+                    <li>Generating tenancy agreements</li>
+                    <li>Preparing for tenancy handover</li>
+                  </ul>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button

@@ -342,8 +342,11 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
     
     setSuccessMessage('Tenant added successfully!');
     
-    // Navigate to tenants view to show the new tenant
-    setCurrentView('tenants');
+    // Only navigate to tenants view if NOT in the onboarding wizard
+    // During onboarding, we want to stay in the wizard
+    if (currentView !== 'onboarding') {
+      setCurrentView('tenants');
+    }
   };
 
   const handleDeleteTenant = (tenant: SimplifiedTenant) => {
@@ -449,12 +452,16 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
           <GetStarted
             properties={properties}
             tenants={tenants}
-            onAddProperty={handleAddProperty}
-            onAddTenant={handleAddTenant}
+            onAddProperty={handlePropertyAdded}
+            onAddTenant={handleTenantAdded}
             onViewRent={() => setCurrentView('rent')}
             onViewInspections={() => setCurrentView('inspections')}
             onLoadDemoData={loadDemoData}
             isLoadingDemo={isLoadingDemo}
+            onComplete={() => {
+              setSuccessMessage('Onboarding completed! Welcome to your dashboard.');
+              setCurrentView('dashboard');
+            }}
           />
         );
       
@@ -677,8 +684,8 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
             >
               <QuestionMarkCircleIcon className={`mr-3 h-5 w-5 ${currentView === 'onboarding' ? 'text-green-700' : 'text-gray-400'}`} />
               <div className="text-left">
-                <div className="font-medium">Get Started</div>
-                <div className="text-xs text-gray-500">Complete setup</div>
+              <div className="font-medium">Onboarding Wizard</div>
+              <div className="text-xs text-gray-500">Portfolio setup</div>
               </div>
             </button>
           </div>

@@ -2,18 +2,22 @@ import React, { useState } from 'react';
 import { XMarkIcon, HomeIcon } from '@heroicons/react/24/outline';
 import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
 import { supabase } from '../lib/supabase';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 interface SimplifiedAddPropertyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPropertyAdded: (property: SimplifiedProperty) => void;
+  propertyToEdit?: SimplifiedProperty; // Optional property to edit
 }
 
 export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProps> = ({
   isOpen,
   onClose,
   onPropertyAdded,
+  propertyToEdit,
 }) => {
+  const { currentOrganization } = useOrganization();
   const [formData, setFormData] = useState({
     address: '',
     propertyType: 'house' as 'house' | 'flat' | 'hmo',
@@ -25,6 +29,32 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize form with property data if editing
+  React.useEffect(() => {
+    if (isOpen && propertyToEdit) {
+      setFormData({
+        address: propertyToEdit.address,
+        propertyType: propertyToEdit.propertyType,
+        bedrooms: propertyToEdit.bedrooms,
+        bathrooms: propertyToEdit.bathrooms,
+        targetRent: propertyToEdit.targetRent,
+        purchasePrice: propertyToEdit.purchasePrice || 0,
+        units: propertyToEdit.unitDetails || [],
+      });
+    } else if (isOpen && !propertyToEdit) {
+      // Reset form for new property
+      setFormData({
+        address: '',
+        propertyType: 'house',
+        bedrooms: 2,
+        bathrooms: 1,
+        targetRent: 1200,
+        purchasePrice: 0,
+        units: [],
+      });
+    }
+  }, [isOpen, propertyToEdit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,21 +124,49 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         is_simplified_demo: true, // Flag to identify demo properties
       };
 
-      // Insert into database
-      const { data, error: insertError } = await supabase
-        .from('properties')
-        .insert({
-          asset_register_id: assetRegisterId,
-          name: `Property at ${formData.address}`,
-          address: formData.address,
-          status: 'active',
-          property_data: propertyData,
-        })
-        .select()
-        .single();
+      // Validate organization
+      if (!currentOrganization?.id) {
+        throw new Error('No organization selected. Please ensure you are part of an organization.');
+      }
 
-      if (insertError) {
-        throw insertError;
+      let data;
+      
+      if (propertyToEdit) {
+        // Update existing property
+        const { data: updateData, error: updateError } = await supabase
+          .from('properties')
+          .update({
+            name: `Property at ${formData.address}`,
+            address: formData.address,
+            property_data: propertyData,
+          })
+          .eq('id', propertyToEdit.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          throw updateError;
+        }
+        data = updateData;
+      } else {
+        // Insert new property
+        const { data: insertData, error: insertError } = await supabase
+          .from('properties')
+          .insert({
+            asset_register_id: assetRegisterId,
+            name: `Property at ${formData.address}`,
+            address: formData.address,
+            status: 'vacant', // New properties start as vacant
+            property_data: propertyData,
+            organization_id: currentOrganization.id,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          throw insertError;
+        }
+        data = insertData;
       }
 
       // Transform to simplified format
@@ -120,13 +178,13 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
         bathrooms: formData.bathrooms,
         targetRent: totalTargetRent,
         purchasePrice: formData.purchasePrice || undefined,
-        tenantCount: 0,
-        status: 'vacant',
+        tenantCount: propertyToEdit?.tenantCount || 0,
+        status: propertyToEdit?.status || 'vacant',
         units: formData.propertyType === 'hmo' ? formData.units : 1,
         unitDetails: formData.propertyType === 'hmo' ? formData.units : undefined,
       };
 
-      // Call the callback with the new property
+      // Call the callback with the property
       onPropertyAdded(simplifiedProperty);
       
       // Reset form and close modal
@@ -152,8 +210,10 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
     const { name, value } = e.target;
     setFormData(prev => ({ 
       ...prev, 
-      [name]: name === 'bedrooms' || name === 'bathrooms' || name === 'targetRent' || name === 'purchasePrice'
+      [name]: name === 'bedrooms' || name === 'bathrooms' || name === 'targetRent'
         ? parseInt(value) || 0 
+        : name === 'purchasePrice'
+        ? value === '' ? 0 : parseFloat(value) || 0
         : value 
     }));
   };
@@ -206,8 +266,12 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
               <HomeIcon className="w-6 h-6 text-blue-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Add New Property</h3>
-              <p className="text-sm text-gray-500">Add a residential property to your portfolio</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                {propertyToEdit ? 'Edit Property' : 'Add New Property'}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {propertyToEdit ? 'Update property details' : 'Add a residential property to your portfolio'}
+              </p>
             </div>
           </div>
           <button
@@ -323,10 +387,10 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
               type="number"
               id="purchasePrice"
               name="purchasePrice"
-              value={formData.purchasePrice}
+              value={formData.purchasePrice === 0 ? '' : formData.purchasePrice}
               onChange={handleChange}
               min="0"
-              step="1000"
+              step="any"
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="250000"
             />
@@ -405,12 +469,6 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
             </div>
           )}
 
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <p className="text-sm text-blue-700">
-              <strong>Note:</strong> The property will be created as vacant. You can add tenants later from the Tenants section.
-            </p>
-          </div>
-
           <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
             <button
               type="button"
@@ -427,10 +485,10 @@ export const SimplifiedAddPropertyModal: React.FC<SimplifiedAddPropertyModalProp
               {isSubmitting ? (
                 <div className="flex items-center">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Adding...
+                  {propertyToEdit ? 'Saving...' : 'Adding...'}
                 </div>
               ) : (
-                'Add Property'
+                propertyToEdit ? 'Save Changes' : 'Add Property'
               )}
             </button>
           </div>
