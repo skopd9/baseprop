@@ -43,6 +43,10 @@ function createInvitationEmailHtml(
           
           <p style="margin-bottom: 20px;"><strong>${inviterName}</strong> has invited you to join their organization on <strong>Base Prop</strong>.</p>
           
+          <div style="background-color: #dbeafe; border: 2px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 8px;">
+            <p style="margin: 0; color: #1e40af; font-weight: 600;">📍 Please log in to Base Prop to view and accept this invitation.</p>
+          </div>
+          
           <div style="background-color: #f0f9ff; border-left: 4px solid #6366f1; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <h2 style="margin-top: 0; color: #6366f1; font-size: 18px;">Organization Details</h2>
             <ul style="list-style: none; padding: 0; margin: 10px 0;">
@@ -61,7 +65,7 @@ function createInvitationEmailHtml(
           
           <div style="text-align: center; margin: 35px 0;">
             <a href="${acceptLink}" style="display: inline-block; background-color: #6366f1; color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(99, 102, 241, 0.25);">
-              Accept Invitation
+              Log In to Accept Invitation
             </a>
           </div>
           
@@ -78,9 +82,10 @@ function createInvitationEmailHtml(
           
           <h3 style="color: #6366f1; font-size: 16px; margin-top: 25px;">Next Steps</h3>
           <ol style="padding-left: 20px; font-size: 14px; color: #64748b;">
-            <li style="margin-bottom: 8px;">Click the "Accept Invitation" button above</li>
-            <li style="margin-bottom: 8px;">Sign in or create your free account</li>
-            <li style="margin-bottom: 8px;">Start collaborating with your team!</li>
+            <li style="margin-bottom: 8px;">Click the button above to visit Base Prop</li>
+            <li style="margin-bottom: 8px;">Log in to your account (or create one if you're new)</li>
+            <li style="margin-bottom: 8px;">Your invitation will appear in your notifications</li>
+            <li style="margin-bottom: 8px;">Accept the invitation and start collaborating!</li>
           </ol>
           
           <h3 style="color: #6366f1; font-size: 16px; margin-top: 25px;">Having trouble?</h3>
@@ -148,6 +153,8 @@ Hello!
 
 ${inviterName} has invited you to join their organization on Base Prop.
 
+📍 Please log in to Base Prop to view and accept this invitation.
+
 Organization Details:
 • Organization: ${organizationName}
 • Your Role: ${role.charAt(0).toUpperCase() + role.slice(1)}
@@ -156,15 +163,16 @@ Organization Details:
 What you'll be able to do:
 As a ${role}, you'll have ${role === 'owner' ? 'full administrative access to manage properties, tenants, and team members' : 'access to view and manage properties and tenants'}.
 
-Accept Your Invitation:
-Click here to accept: ${acceptLink}
+Log In to Accept Your Invitation:
+Click here: ${acceptLink}
 
 ⏰ This invitation will expire in 7 days. Make sure to accept it before then!
 
 Next Steps:
-1. Click the link above
-2. Sign in or create your free account
-3. Start collaborating with your team!
+1. Click the link above to visit Base Prop
+2. Log in to your account (or create one if you're new)
+3. Your invitation will appear in your notifications
+4. Accept the invitation and start collaborating!
 
 ---
 You received this invitation because ${inviterName} invited ${invitedEmail} to join ${organizationName} on Base Prop.
