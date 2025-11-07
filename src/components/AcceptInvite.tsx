@@ -16,10 +16,50 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
   const [showNameForm, setShowNameForm] = useState(false);
   const [fullName, setFullName] = useState('');
   const [showEmailSent, setShowEmailSent] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   useEffect(() => {
     loadInvitation();
   }, [token]);
+
+  const checkIfAccountExists = async (email: string): Promise<boolean> => {
+    try {
+      // Call serverless function to check if account exists
+      const response = await fetch('/.netlify/functions/check-user-exists', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      });
+
+      if (!response.ok) {
+        console.error('[Invite Flow] Error checking account existence:', response.statusText);
+        // If check fails, assume user doesn't exist (safer to proceed with signup)
+        return false;
+      }
+
+      const result = await response.json();
+      return result.exists || false;
+    } catch (error) {
+      console.error('[Invite Flow] Exception checking account existence:', error);
+      // If check fails, assume user doesn't exist (safer to proceed with signup)
+      return false;
+    }
+  };
+
+  const formatExpirationDate = (expiresAt?: string): string => {
+    if (!expiresAt) return 'soon';
+    
+    const date = new Date(expiresAt);
+    const now = new Date();
+    const daysLeft = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysLeft < 0) return 'expired';
+    if (daysLeft === 0) return 'today';
+    if (daysLeft === 1) return 'tomorrow';
+    return `in ${daysLeft} days`;
+  };
 
   const loadInvitation = async () => {
     setIsLoading(true);
@@ -65,11 +105,20 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       console.log('[Invite Flow] handleAcceptClick - User:', user?.id, user?.email);
       
       if (!user) {
-        // User not authenticated - show name collection form for sign-up
-        // They'll need to enter their name AND email to proceed
-        console.log('[Invite Flow] User not authenticated, showing name form');
-        setShowNameForm(true);
-        setFullName('');
+        // User not authenticated - check if their account exists
+        console.log('[Invite Flow] User not authenticated, checking if account exists for:', invitation.email);
+        const accountExists = await checkIfAccountExists(invitation.email);
+        
+        if (accountExists) {
+          // Existing user - show login prompt instead of magic link
+          console.log('[Invite Flow] Account exists, showing login prompt');
+          setShowLoginPrompt(true);
+        } else {
+          // New user - show name collection form for sign-up
+          console.log('[Invite Flow] New user, showing name form');
+          setShowNameForm(true);
+          setFullName('');
+        }
         return;
       }
 
@@ -305,7 +354,54 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl max-w-md w-full p-8">
-        {showEmailSent ? (
+        {showLoginPrompt ? (
+          // Login prompt for existing users
+          <div>
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                Please Log In
+              </h2>
+              <p className="text-gray-600">
+                You already have an account. Please log in to accept your invitation to{' '}
+                <span className="font-semibold">{invitation?.organization_name}</span>
+              </p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-blue-800 mb-2">
+                Once logged in, you'll see this invitation in your notifications.
+              </p>
+              <p className="text-xs text-blue-700">
+                Invitation expires: {formatExpirationDate(invitation?.expires_at)}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  // Clear invite token from URL but keep in localStorage
+                  window.history.replaceState({}, '', window.location.pathname);
+                  // Trigger login by going to home page
+                  window.location.href = '/';
+                }}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+              >
+                Go to Log In
+              </button>
+              <button
+                onClick={() => setShowLoginPrompt(false)}
+                className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        ) : showEmailSent ? (
           // Email sent confirmation
           <div className="text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
