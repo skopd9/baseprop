@@ -600,8 +600,8 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
                   </p>
                 </div>
 
-                {/* Leave Workspace Section - Only show if not sole owner */}
-                {(!isOwner || (isOwner && members.filter(m => m.role === 'owner').length > 1)) && userOrganizations.length > 1 && (
+                {/* Leave Workspace Section - Only show for members (not owners) */}
+                {!isOwner && userOrganizations.length > 1 && (
                   <div className="pt-6 border-t border-gray-200">
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">Leave Workspace</h3>
                     <p className="text-sm text-gray-600 mb-4">

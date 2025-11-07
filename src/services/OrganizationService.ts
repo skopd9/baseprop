@@ -591,21 +591,15 @@ export class OrganizationService {
 
   /**
    * Leave an organization (for current user)
-   * Validates that user isn't the last owner and has other workspaces
+   * Validates that user is not an owner and has other workspaces
    */
   static async leaveOrganization(orgId: string, userId: string): Promise<void> {
     try {
-      // Check if user is an owner
+      // Check if user is an owner - owners cannot leave
       const isOwner = await this.isOrganizationOwner(orgId, userId);
       
       if (isOwner) {
-        // Check if there are other owners
-        const members = await this.getOrganizationMembers(orgId);
-        const ownerCount = members.filter(m => m.role === 'owner').length;
-        
-        if (ownerCount <= 1) {
-          throw new Error('Cannot leave workspace. You are the only owner. Please transfer ownership or add another owner before leaving.');
-        }
+        throw new Error('Owners cannot leave a workspace. Please transfer ownership to another member first, then leave.');
       }
       
       // Check if user has other workspaces

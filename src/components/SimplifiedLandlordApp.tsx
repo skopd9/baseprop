@@ -44,6 +44,7 @@ import { TenantDeleteConfirmationModal } from './TenantDeleteConfirmationModal';
 import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTransforms';
 import { SimplifiedPropertyService } from '../services/SimplifiedPropertyService';
 import { SimplifiedTenantService } from '../services/SimplifiedTenantService';
+import { OrganizationService } from '../services/OrganizationService';
 import { DemoDataSeeder } from '../utils/demoDataSeeder';
 
 type ViewType = 'dashboard' | 'properties' | 'tenants' | 'inspections' | 'repairs' | 'compliance' | 'rent' | 'expenses' | 'onboarding';
@@ -924,8 +925,8 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                     <Cog6ToothIcon className="w-4 h-4 mr-2 text-gray-500" />
                     Workspace Settings
                   </button>
-                  {/* Leave Workspace (for members, or owners with multiple owners) */}
-                  {currentOrganization && userOrganizations.length > 1 && (
+                  {/* Leave Workspace (for members only, not owners) */}
+                  {currentOrganization && userOrganizations.length > 1 && currentUserRole === 'member' && (
                     <button
                       onClick={() => {
                         setUserMenuOpen(false);
