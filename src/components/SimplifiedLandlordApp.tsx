@@ -122,7 +122,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   userEmail = '',
   onOnboardingComplete
 }) => {
-  const { currentOrganization, userOrganizations, switchOrganization, refreshOrganizations, error: orgError, isLoading: orgLoading } = useOrganization();
+  const { currentOrganization, userOrganizations, currentUserRole, switchOrganization, refreshOrganizations, error: orgError, isLoading: orgLoading } = useOrganization();
   // Start on onboarding tab if user needs to complete onboarding
   const [currentView, setCurrentView] = useState<ViewType>(showOnboarding ? 'onboarding' : 'dashboard');
   const [properties, setProperties] = useState<SimplifiedProperty[]>([]);
