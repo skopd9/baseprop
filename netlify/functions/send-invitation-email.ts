@@ -134,8 +134,8 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Construct accept link
-    const acceptLink = `${baseUrl}/?invite=${invitationToken}`;
+    // Construct accept link - just link to home page, invitation will show in notifications
+    const acceptLink = baseUrl;
 
     // Create HTML email
     const html = createInvitationEmailHtml(

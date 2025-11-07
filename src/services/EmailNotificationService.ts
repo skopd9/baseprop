@@ -695,7 +695,8 @@ This is an automated notification. Please do not reply to this email.
   ): Promise<EmailSendResult> {
     try {
       const baseUrl = window.location.origin;
-      const acceptLink = `${baseUrl}/?invite=${invitationToken}`;
+      // Just link to home page - invitation will show in notifications after login
+      const acceptLink = baseUrl;
       
       // Check if we're in local development (Netlify Function may not be available)
       const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
