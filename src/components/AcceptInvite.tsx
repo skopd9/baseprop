@@ -62,9 +62,12 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
+      console.log('[Invite Flow] handleAcceptClick - User:', user?.id, user?.email);
+      
       if (!user) {
         // User not authenticated - show name collection form for sign-up
         // They'll need to enter their name AND email to proceed
+        console.log('[Invite Flow] User not authenticated, showing name form');
         setShowNameForm(true);
         setFullName('');
         return;
@@ -84,11 +87,23 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       }
 
       // Check if user has a name set
-      const { data: profileData } = await supabase
+      console.log('[Invite Flow] Checking user profile for existing name...');
+      const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select('full_name')
         .eq('id', user.id)
         .single();
+
+      if (profileError) {
+        console.error('[Invite Flow] Error fetching profile:', profileError);
+        // Profile might not exist yet - treat as no name
+        console.log('[Invite Flow] No profile found, showing name form');
+        setShowNameForm(true);
+        setFullName(user.email?.split('@')[0] || '');
+        return;
+      }
+
+      console.log('[Invite Flow] Profile data:', profileData);
 
       // If user doesn't have a name or it's just their email prefix, ask for their name
       const emailPrefix = user.email?.split('@')[0] || '';
@@ -96,16 +111,24 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
                           profileData.full_name.trim() !== '' && 
                           profileData.full_name !== emailPrefix;
 
+      console.log('[Invite Flow] Name validation:', {
+        fullName: profileData?.full_name,
+        emailPrefix,
+        hasValidName
+      });
+
       if (!hasValidName) {
         // Show name collection form
+        console.log('[Invite Flow] No valid name, showing name form');
         setShowNameForm(true);
         setFullName(profileData?.full_name || emailPrefix || '');
       } else {
         // User has a valid name, proceed directly
+        console.log('[Invite Flow] Valid name found, accepting invitation directly with name:', profileData.full_name);
         await acceptInvitationWithName(profileData.full_name);
       }
     } catch (err: any) {
-      console.error('Error in handleAcceptClick:', err);
+      console.error('[Invite Flow] Error in handleAcceptClick:', err);
       setError(err.message || 'Failed to process invitation.');
     }
   };
