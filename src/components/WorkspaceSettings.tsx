@@ -49,6 +49,14 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
   // Current user ID
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  // Copy link states
+  const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null);
+  const [resendingInvitationId, setResendingInvitationId] = useState<string | null>(null);
+
+  // Leave workspace state
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+
   useEffect(() => {
     if (isOpen && currentOrganization) {
       setSuccess('');
@@ -164,6 +172,53 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
     }
   };
 
+  const handleCopyInvitationLink = (token: string, invitationId: string) => {
+    const inviteUrl = `${window.location.origin}/?invite=${token}`;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopiedInvitationId(invitationId);
+      setTimeout(() => setCopiedInvitationId(null), 2000);
+    }).catch((err) => {
+      console.error('Failed to copy link:', err);
+      setError('Failed to copy invitation link');
+    });
+  };
+
+  const handleResendInvitation = async (invitation: OrganizationInvitation) => {
+    setResendingInvitationId(invitation.id);
+    setError('');
+    setSuccess('');
+
+    try {
+      // Resend by calling the same email sending function
+      // We'll need to add this to OrganizationService
+      const inviteUrl = `${window.location.origin}/?invite=${invitation.token}`;
+      
+      // Call the send-invitation-email function
+      const response = await fetch('/.netlify/functions/send-invitation-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: invitation.email,
+          organizationName: invitation.organization_name || currentOrganization?.name,
+          inviterName: 'Team Member', // We don't have this info easily available
+          role: invitation.role,
+          inviteLink: inviteUrl
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to resend invitation email');
+      }
+
+      setSuccess(`Invitation resent to ${invitation.email}`);
+    } catch (err: any) {
+      console.error('Error resending invitation:', err);
+      setError(err.message || 'Failed to resend invitation');
+    } finally {
+      setResendingInvitationId(null);
+    }
+  };
+
   const handleRenameWorkspace = async () => {
     if (!currentOrganization || !workspaceName.trim()) return;
 
@@ -248,6 +303,36 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
       setError(err.message || 'Failed to delete workspace');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const confirmLeaveWorkspace = async () => {
+    if (!currentOrganization) return;
+    
+    setIsLeaving(true);
+    setError('');
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+      
+      await OrganizationService.leaveOrganization(currentOrganization.id, user.id);
+      
+      // Switch to another workspace
+      const remainingOrgs = userOrganizations.filter(o => o.id !== currentOrganization.id);
+      if (remainingOrgs.length > 0) {
+        await switchOrganization(remainingOrgs[0].id);
+      }
+      
+      setShowLeaveConfirm(false);
+      onClose();
+      await refreshOrganizations();
+      setSuccess('You have left the workspace');
+    } catch (err: any) {
+      console.error('Error leaving workspace:', err);
+      setError(err.message || 'Failed to leave workspace');
+    } finally {
+      setIsLeaving(false);
     }
   };
 
@@ -515,6 +600,22 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
                   </p>
                 </div>
 
+                {/* Leave Workspace Section - Only show if not sole owner */}
+                {(!isOwner || (isOwner && members.filter(m => m.role === 'owner').length > 1)) && userOrganizations.length > 1 && (
+                  <div className="pt-6 border-t border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Leave Workspace</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      You can leave this workspace at any time. You will lose access to all data.
+                    </p>
+                    <button
+                      onClick={() => setShowLeaveConfirm(true)}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-semibold"
+                    >
+                      Leave Workspace
+                    </button>
+                  </div>
+                )}
+
                 {/* Danger Zone */}
                 {isOwner && (
                   <div className="pt-6 border-t border-gray-200">
@@ -687,33 +788,72 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
                   invitations.map((invitation) => (
                     <div
                       key={invitation.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                      className="flex flex-col gap-3 p-3 sm:p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm sm:text-base font-medium text-gray-900 truncate">{invitation.email}</div>
-                        <div className="text-xs sm:text-sm text-gray-600">
-                          Invited {new Date(invitation.created_at).toLocaleDateString()} • 
-                          Expires {new Date(invitation.expires_at).toLocaleDateString()}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm sm:text-base font-medium text-gray-900 truncate">{invitation.email}</div>
+                          <div className="text-xs sm:text-sm text-gray-600">
+                            Invited {new Date(invitation.created_at).toLocaleDateString()} • 
+                            Expires {new Date(invitation.expires_at).toLocaleDateString()}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
+                            invitation.role === 'owner'
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {invitation.role === 'owner' ? 'Owner' : 'Member'}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                        <span className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${
-                          invitation.role === 'owner'
-                            ? 'bg-purple-100 text-purple-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {invitation.role === 'owner' ? 'Owner' : 'Member'}
-                        </span>
-                        {isOwner && (
+                      
+                      {/* Action buttons */}
+                      {isOwner && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => handleCopyInvitationLink(invitation.token, invitation.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors font-medium"
+                          >
+                            {copiedInvitationId === invitation.id ? (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Copy Link
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleResendInvitation(invitation)}
+                            disabled={resendingInvitationId === invitation.id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm text-green-600 hover:text-green-700 hover:bg-green-50 rounded-md transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            {resendingInvitationId === invitation.id ? 'Resending...' : 'Resend Email'}
+                          </button>
                           <button
                             onClick={() => handleCancelInvitation(invitation.id, invitation.email)}
                             disabled={cancelingInvitationId === invitation.id}
-                            className="text-red-600 hover:text-red-700 text-xs sm:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                           >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                             {cancelingInvitationId === invitation.id ? 'Canceling...' : 'Cancel'}
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -796,6 +936,38 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
           // Workspace will be switched automatically
         }}
       />
+
+      {/* Leave Workspace Confirmation Modal */}
+      {showLeaveConfirm && currentOrganization && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-red-600 mb-4">Leave Workspace</h3>
+            <p className="text-sm text-gray-700 mb-4">
+              Are you sure you want to leave <strong>{currentOrganization.name}</strong>?
+            </p>
+            <p className="text-xs text-gray-600 mb-6">
+              You will lose access to all properties, tenants, and data in this workspace. 
+              You can be re-invited by an owner if needed.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                disabled={isLeaving}
+                className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLeaveWorkspace}
+                disabled={isLeaving}
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isLeaving ? 'Leaving...' : 'Leave Workspace'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

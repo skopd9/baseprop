@@ -128,12 +128,11 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
       let { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // User not authenticated - create account automatically and log them in
-        console.log('[Invite Flow] Creating account for new user:', invitation.email);
+        // User not authenticated - check if user exists and handle accordingly
+        console.log('[Invite Flow] User not authenticated, checking if account exists:', invitation.email);
         
         try {
-          // Call our serverless function to create the user with email pre-confirmed
-          console.log('[Invite Flow] Attempting auto-signup via serverless function');
+          // Call our serverless function to either create account or check if user exists
           const response = await fetch('/.netlify/functions/accept-invitation-signup', {
             method: 'POST',
             headers: {
@@ -147,53 +146,56 @@ export const AcceptInvite: React.FC<AcceptInviteProps> = ({ token, onSuccess, on
           });
 
           const result = await response.json();
-          console.log('[Invite Flow] Serverless function response:', { status: response.status, result });
 
-          if (!response.ok) {
-            // Check if user already exists
-            if (result.userExists) {
-              // User exists but not logged in - send magic link
-              console.log('[Invite Flow] User exists, sending magic link to:', invitation.email);
-              try {
-                const { auth } = await import('../lib/supabase');
-                const { error: magicLinkError } = await auth.signInWithMagicLink(invitation.email);
-                
-                if (magicLinkError) {
-                  console.error('[Invite Flow] Magic link error:', magicLinkError);
-                  
-                  // Handle rate limit error specifically
-                  if (magicLinkError.message?.includes('rate limit') || magicLinkError.message?.includes('429')) {
-                    setError(`Too many emails sent. Please wait a few minutes and try again, or sign in manually at the login page, then click the invitation link again.`);
-                  } else {
-                    setError(`Failed to send magic link: ${magicLinkError.message}. Please sign in manually first, then click the invitation link again.`);
-                  }
-                  setIsAccepting(false);
-                  return;
-                }
-                
-                console.log('[Invite Flow] Magic link sent successfully');
-                setError('');
-                setIsAccepting(false);
-                setShowEmailSent(true);
-                setShowNameForm(false);
-                localStorage.setItem('pendingInviteName', name.trim());
-                return;
-              } catch (magicLinkError: any) {
-                console.error('[Invite Flow] Exception sending magic link:', magicLinkError);
+          // Check if user already exists (before treating as error)
+          if (result.userExists) {
+            // Existing user - send magic link directly
+            console.log('[Invite Flow] Existing user detected, sending magic link to:', invitation.email);
+            try {
+              const { auth } = await import('../lib/supabase');
+              const { error: magicLinkError } = await auth.signInWithMagicLink(invitation.email);
+              
+              if (magicLinkError) {
+                console.error('[Invite Flow] Magic link error:', magicLinkError);
                 
                 // Handle rate limit error specifically
                 if (magicLinkError.message?.includes('rate limit') || magicLinkError.message?.includes('429')) {
                   setError(`Too many emails sent. Please wait a few minutes and try again, or sign in manually at the login page, then click the invitation link again.`);
                 } else {
-                  setError(`Unable to send magic link. Please try logging in manually first, then click the invitation link again.`);
+                  setError(`Failed to send magic link: ${magicLinkError.message}. Please sign in manually first, then click the invitation link again.`);
                 }
                 setIsAccepting(false);
                 return;
               }
+              
+              console.log('[Invite Flow] Magic link sent successfully');
+              setError('');
+              setIsAccepting(false);
+              setShowEmailSent(true);
+              setShowNameForm(false);
+              localStorage.setItem('pendingInviteName', name.trim());
+              return;
+            } catch (magicLinkError: any) {
+              console.error('[Invite Flow] Exception sending magic link:', magicLinkError);
+              
+              // Handle rate limit error specifically
+              if (magicLinkError.message?.includes('rate limit') || magicLinkError.message?.includes('429')) {
+                setError(`Too many emails sent. Please wait a few minutes and try again, or sign in manually at the login page, then click the invitation link again.`);
+              } else {
+                setError(`Unable to send magic link. Please try logging in manually first, then click the invitation link again.`);
+              }
+              setIsAccepting(false);
+              return;
             }
+          }
+
+          // If response not ok and user doesn't exist, it's a real error
+          if (!response.ok) {
             throw new Error(result.error || 'Failed to create account');
           }
 
+          // New user created successfully - set the session
+          console.log('[Invite Flow] New user created, setting session');
           // Set the session returned from the serverless function
           console.log('[Invite Flow] Setting session from serverless function');
           const { error: sessionError } = await supabase.auth.setSession({

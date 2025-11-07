@@ -117,6 +117,7 @@ export class OrganizationService {
         .select(`
           role,
           joined_at,
+          status,
           organizations (
             id,
             name,
@@ -128,7 +129,14 @@ export class OrganizationService {
           )
         `)
         .eq('user_id', userId)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .order('joined_at', { ascending: false });
+
+      console.log('[getUserOrganizations] Query result:', {
+        userId,
+        count: data?.length || 0,
+        organizations: data?.map(d => ({ name: d.organizations?.name, status: d.status }))
+      });
 
       if (error) {
         // If it's a 403 or permission error, return empty array (user has no organizations)
@@ -394,16 +402,24 @@ export class OrganizationService {
         .eq('organization_id', organizationId)
         .eq('user_id', userId)
         .eq('status', 'active')
+        .limit(1)
         .maybeSingle();
 
+      // Handle errors - treat as not a member
       if (error) {
-        console.error('Error checking membership:', error);
+        // Log specific error for debugging
+        console.error('[isUserMember] Error checking membership:', {
+          error: error.message,
+          code: error.code,
+          organizationId,
+          userId
+        });
         return false;
       }
 
       return !!data;
     } catch (error) {
-      console.error('Error checking membership:', error);
+      console.error('[isUserMember] Exception checking membership:', error);
       return false;
     }
   }
@@ -569,6 +585,39 @@ export class OrganizationService {
       if (error) throw error;
     } catch (error) {
       console.error('Error removing organization member:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Leave an organization (for current user)
+   * Validates that user isn't the last owner and has other workspaces
+   */
+  static async leaveOrganization(orgId: string, userId: string): Promise<void> {
+    try {
+      // Check if user is an owner
+      const isOwner = await this.isOrganizationOwner(orgId, userId);
+      
+      if (isOwner) {
+        // Check if there are other owners
+        const members = await this.getOrganizationMembers(orgId);
+        const ownerCount = members.filter(m => m.role === 'owner').length;
+        
+        if (ownerCount <= 1) {
+          throw new Error('Cannot leave workspace. You are the only owner. Please transfer ownership or add another owner before leaving.');
+        }
+      }
+      
+      // Check if user has other workspaces
+      const userOrgs = await this.getUserOrganizations(userId);
+      if (userOrgs.length <= 1) {
+        throw new Error('Cannot leave your last workspace. Please join or create another workspace first.');
+      }
+      
+      // Remove the member
+      await this.removeOrganizationMember(orgId, userId);
+    } catch (error) {
+      console.error('Error leaving organization:', error);
       throw error;
     }
   }

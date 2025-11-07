@@ -23,7 +23,7 @@ import { UserSettings } from './UserSettings';
 import { CreateWorkspaceModal } from './CreateWorkspaceModal';
 import { OnboardingWizard } from './OnboardingWizard';
 import { GetStarted } from './GetStarted';
-import { InvitationNotification } from './InvitationNotification';
+import { NotificationBell } from './NotificationBell';
 import { useOrganization } from '../contexts/OrganizationContext';
 
 import TenancyManagementModal from './TenancyManagementModal';
@@ -155,6 +155,10 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   
   // Demo data loading state
   const [isLoadingDemo, setIsLoadingDemo] = useState(false);
+
+  // Leave workspace state
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   // Load data from database on component mount
   useEffect(() => {
@@ -738,21 +742,36 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
     }
   };
 
+  const handleLeaveWorkspace = () => {
+    setShowLeaveConfirm(true);
+  };
+
+  const confirmLeaveWorkspace = async () => {
+    if (!currentOrganization || !userId) return;
+    
+    setIsLeaving(true);
+    try {
+      await OrganizationService.leaveOrganization(currentOrganization.id, userId);
+      
+      // Switch to another workspace
+      const remainingOrgs = userOrganizations.filter(o => o.id !== currentOrganization.id);
+      if (remainingOrgs.length > 0) {
+        await switchOrganization(remainingOrgs[0].id);
+      }
+      
+      setShowLeaveConfirm(false);
+      await refreshOrganizations();
+      setSuccessMessage(`You have left ${currentOrganization.name}`);
+    } catch (err: any) {
+      console.error('Error leaving workspace:', err);
+      alert(err.message || 'Failed to leave workspace');
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-white relative">
-      {/* Invitation Notification Banner - Fixed at top */}
-      {userEmail && (
-        <InvitationNotification
-          userEmail={userEmail}
-          onInvitationAccepted={() => {
-            // Refresh organizations to show the newly joined workspace
-            if (refreshOrganizations) {
-              refreshOrganizations();
-            }
-          }}
-        />
-      )}
-      
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -905,6 +924,21 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                     <Cog6ToothIcon className="w-4 h-4 mr-2 text-gray-500" />
                     Workspace Settings
                   </button>
+                  {/* Leave Workspace (for members, or owners with multiple owners) */}
+                  {currentOrganization && userOrganizations.length > 1 && (
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        handleLeaveWorkspace();
+                      }}
+                      className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                      Leave Workspace
+                    </button>
+                  )}
                   <div className="border-t border-gray-100 my-1"></div>
                   <button
                     onClick={onLogout}
@@ -933,8 +967,23 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
             </button>
             <div className="flex-1" /> {/* Spacer */}
             
-            {/* Workspace Switcher - Top Right */}
-            <div className="relative ml-auto">
+            {/* Right side: Notification Bell + Workspace Switcher */}
+            <div className="flex items-center gap-2 ml-auto">
+              {/* Notification Bell */}
+              {userEmail && (
+                <NotificationBell
+                  userEmail={userEmail}
+                  onInvitationAccepted={() => {
+                    // Refresh organizations to show the newly joined workspace
+                    if (refreshOrganizations) {
+                      refreshOrganizations();
+                    }
+                  }}
+                />
+              )}
+              
+              {/* Workspace Switcher */}
+              <div className="relative">
               <button
                 data-workspace-selector
                 onClick={(e) => {
@@ -1004,6 +1053,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
                   )}
                 </div>
               )}
+              </div>
             </div>
           </div>
         </div>
@@ -1138,6 +1188,38 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         isOpen={showUserSettings}
         onClose={() => setShowUserSettings(false)}
       />
+
+      {/* Leave Workspace Confirmation Modal */}
+      {showLeaveConfirm && currentOrganization && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-red-600 mb-4">Leave Workspace</h3>
+            <p className="text-sm text-gray-700 mb-4">
+              Are you sure you want to leave <strong>{currentOrganization.name}</strong>?
+            </p>
+            <p className="text-xs text-gray-600 mb-6">
+              You will lose access to all properties, tenants, and data in this workspace. 
+              You can be re-invited by an owner if needed.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                disabled={isLeaving}
+                className="flex-1 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg font-semibold hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmLeaveWorkspace}
+                disabled={isLeaving}
+                className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isLeaving ? 'Leaving...' : 'Leave Workspace'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

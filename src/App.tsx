@@ -258,16 +258,6 @@ function App({ onUserEmailChange = () => { } }: AppProps) {
   // Unauthenticated state - Landing Page
   return (
     <div className="bg-gradient-to-br from-blue-50 via-green-50 to-blue-50 min-h-screen flex flex-col">
-      {/* Invitation Banner - Shows when user has invite token */}
-      {inviteToken && (
-        <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-3 px-4 text-center text-sm font-medium shadow-md z-50">
-          <span className="inline-flex items-center">
-            <span className="mr-2">📧</span>
-            You have an organization invitation! Please sign in or create an account to accept it.
-          </span>
-        </div>
-      )}
-      
       {/* Alpha Launch Banner */}
       <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white py-2 px-4 text-center text-sm font-medium shadow-md z-50">
         <span className="inline-flex items-center">
