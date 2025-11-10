@@ -1635,122 +1635,134 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
               
               {(isWizardMode || expandedSections.documents) && (
                 <div className="space-y-4 transition-all duration-200 ease-in-out">
-                {/* Upload New Document */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Upload New Document</h4>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Document Type
-                      </label>
-                      <select
-                        value={selectedDocumentType}
-                        onChange={(e) => setSelectedDocumentType(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
-                      >
-                        <option value="">Select document type...</option>
-                        {availableDocumentTypes.map(docType => (
-                          <option key={docType.id} value={docType.id}>
-                            {docType.name}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedDocumentType && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {availableDocumentTypes.find(dt => dt.id === selectedDocumentType)?.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {selectedDocumentType && (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white">
-                        <ArrowUpTrayIcon className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                        <label className="cursor-pointer">
-                          <span className="text-blue-600 hover:text-blue-800 font-medium">
-                            Click to upload
-                          </span>
-                          <span className="text-gray-600"> or drag and drop</span>
-                          <input
-                            type="file"
-                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                          />
-                        </label>
-                        <p className="text-xs text-gray-500 mt-2">
-                          PDF, DOC, DOCX, JPG, PNG up to 10MB
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-700">
+                    <strong>Tip:</strong> Check off documents you have, upload files, and add notes. Maximum file size: 10MB per document.
+                  </p>
                 </div>
 
-                {/* Uploaded Documents List */}
-                {documents.length > 0 ? (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-gray-900">Uploaded Documents</h4>
-                    <div className="space-y-2">
-                      {documents.map(doc => {
-                        const docType = availableDocumentTypes.find(dt => dt.id === doc.documentTypeId);
-                        return (
-                          <div 
-                            key={doc.id}
-                            className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
-                          >
-                            <div className="flex items-center space-x-3 flex-1 min-w-0">
-                              <div className="p-2 bg-teal-100 rounded-lg flex-shrink-0">
-                                <PaperClipIcon className="w-4 h-4 text-teal-600" />
-                              </div>
+                {/* Document Checklist with Upload */}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  {availableDocumentTypes.map((docType) => {
+                    const uploadedDoc = documents.find(d => d.documentTypeId === docType.id);
+                    
+                    return (
+                      <div 
+                        key={docType.id} 
+                        className={`border rounded-lg p-4 transition-colors ${
+                          uploadedDoc
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={!!uploadedDoc}
+                            onChange={() => {
+                              if (uploadedDoc) {
+                                handleDeleteDocument(uploadedDoc.id);
+                              }
+                            }}
+                            className="mt-1 w-5 h-5 rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {doc.fileName}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {docType?.name} • {formatFileSize(doc.fileSize)} • {doc.uploadedAt.toLocaleDateString()}
-                                </p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {docType.name}
+                                  </span>
+                                  {uploadedDoc && (
+                                    <CheckIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">{docType.description}</p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-1 ml-3">
-                              <button
-                                type="button"
-                                onClick={() => handleViewDocument(doc)}
-                                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="View document"
-                              >
-                                <EyeIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadDocument(doc)}
-                                className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                title="Download document"
-                              >
-                                <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteDocument(doc.id)}
-                                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Delete document"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
+                            
+                            {/* Upload Section */}
+                            <div className="mt-3 space-y-2">
+                              {uploadedDoc ? (
+                                // Show uploaded file with actions
+                                <div className="flex items-center justify-between p-2 bg-white border border-green-200 rounded-md">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <DocumentTextIcon className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-medium text-gray-900 truncate">
+                                        {uploadedDoc.fileName}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {formatFileSize(uploadedDoc.fileSize)} • {uploadedDoc.uploadedAt.toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="View"
+                                    >
+                                      <EyeIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                      title="Download"
+                                    >
+                                      <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteDocument(uploadedDoc.id)}
+                                      className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Remove"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Show upload button
+                                <label className="block" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="file"
+                                    onChange={(e) => {
+                                      setSelectedDocumentType(docType.id);
+                                      handleFileUpload(e);
+                                    }}
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <div className="flex items-center justify-center px-3 py-2 border border-dashed border-blue-300 rounded-md cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                                    <DocumentTextIcon className="w-4 h-4 text-blue-600 mr-2" />
+                                    <span className="text-xs font-medium text-blue-600">
+                                      Upload Document
+                                    </span>
+                                  </div>
+                                </label>
+                              )}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary */}
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">Documents uploaded:</span>
+                    <span className="font-semibold text-green-600">
+                      {documents.length} / {availableDocumentTypes.length}
+                    </span>
                   </div>
-                ) : (
-                  <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                    <DocumentTextIcon className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm font-medium text-gray-600">No documents uploaded yet</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select a document type above to upload property documents
-                    </p>
-                  </div>
-                )}
+                </div>
               </div>
               )}
             </div>
@@ -2701,122 +2713,134 @@ export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
               
               {(isWizardMode || expandedSections.documents) && (
                 <div className="space-y-4 transition-all duration-200 ease-in-out">
-                {/* Upload New Document */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-3">Upload New Document</h4>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Document Type
-                      </label>
-                      <select
-                        value={selectedDocumentType}
-                        onChange={(e) => setSelectedDocumentType(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
-                      >
-                        <option value="">Select document type...</option>
-                        {availableDocumentTypes.map(docType => (
-                          <option key={docType.id} value={docType.id}>
-                            {docType.name}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedDocumentType && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {availableDocumentTypes.find(dt => dt.id === selectedDocumentType)?.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {selectedDocumentType && (
-                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-white">
-                        <ArrowUpTrayIcon className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                        <label className="cursor-pointer">
-                          <span className="text-blue-600 hover:text-blue-800 font-medium">
-                            Click to upload
-                          </span>
-                          <span className="text-gray-600"> or drag and drop</span>
-                          <input
-                            type="file"
-                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                          />
-                        </label>
-                        <p className="text-xs text-gray-500 mt-2">
-                          PDF, DOC, DOCX, JPG, PNG up to 10MB
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-700">
+                    <strong>Tip:</strong> Check off documents you have, upload files, and add notes. Maximum file size: 10MB per document.
+                  </p>
                 </div>
 
-                {/* Uploaded Documents List */}
-                {documents.length > 0 ? (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-gray-900">Uploaded Documents</h4>
-                    <div className="space-y-2">
-                      {documents.map(doc => {
-                        const docType = availableDocumentTypes.find(dt => dt.id === doc.documentTypeId);
-                        return (
-                          <div 
-                            key={doc.id}
-                            className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
-                          >
-                            <div className="flex items-center space-x-3 flex-1 min-w-0">
-                              <div className="p-2 bg-teal-100 rounded-lg flex-shrink-0">
-                                <PaperClipIcon className="w-4 h-4 text-teal-600" />
-                              </div>
+                {/* Document Checklist with Upload */}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  {availableDocumentTypes.map((docType) => {
+                    const uploadedDoc = documents.find(d => d.documentTypeId === docType.id);
+                    
+                    return (
+                      <div 
+                        key={docType.id} 
+                        className={`border rounded-lg p-4 transition-colors ${
+                          uploadedDoc
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={!!uploadedDoc}
+                            onChange={() => {
+                              if (uploadedDoc) {
+                                handleDeleteDocument(uploadedDoc.id);
+                              }
+                            }}
+                            className="mt-1 w-5 h-5 rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {doc.fileName}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {docType?.name} • {formatFileSize(doc.fileSize)} • {doc.uploadedAt.toLocaleDateString()}
-                                </p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {docType.name}
+                                  </span>
+                                  {uploadedDoc && (
+                                    <CheckIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">{docType.description}</p>
                               </div>
                             </div>
-                            <div className="flex items-center space-x-1 ml-3">
-                              <button
-                                type="button"
-                                onClick={() => handleViewDocument(doc)}
-                                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="View document"
-                              >
-                                <EyeIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadDocument(doc)}
-                                className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                title="Download document"
-                              >
-                                <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteDocument(doc.id)}
-                                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Delete document"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
+                            
+                            {/* Upload Section */}
+                            <div className="mt-3 space-y-2">
+                              {uploadedDoc ? (
+                                // Show uploaded file with actions
+                                <div className="flex items-center justify-between p-2 bg-white border border-green-200 rounded-md">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <DocumentTextIcon className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-medium text-gray-900 truncate">
+                                        {uploadedDoc.fileName}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {formatFileSize(uploadedDoc.fileSize)} • {uploadedDoc.uploadedAt.toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="View"
+                                    >
+                                      <EyeIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                      title="Download"
+                                    >
+                                      <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteDocument(uploadedDoc.id)}
+                                      className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Remove"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Show upload button
+                                <label className="block" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="file"
+                                    onChange={(e) => {
+                                      setSelectedDocumentType(docType.id);
+                                      handleFileUpload(e);
+                                    }}
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <div className="flex items-center justify-center px-3 py-2 border border-dashed border-blue-300 rounded-md cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                                    <DocumentTextIcon className="w-4 h-4 text-blue-600 mr-2" />
+                                    <span className="text-xs font-medium text-blue-600">
+                                      Upload Document
+                                    </span>
+                                  </div>
+                                </label>
+                              )}
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary */}
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">Documents uploaded:</span>
+                    <span className="font-semibold text-green-600">
+                      {documents.length} / {availableDocumentTypes.length}
+                    </span>
                   </div>
-                ) : (
-                  <div className="text-center py-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                    <DocumentTextIcon className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-                    <p className="text-sm font-medium text-gray-600">No documents uploaded yet</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select a document type above to upload property documents
-                    </p>
-                  </div>
-                )}
+                </div>
               </div>
               )}
             </div>

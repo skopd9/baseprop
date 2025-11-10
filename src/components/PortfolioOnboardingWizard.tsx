@@ -132,46 +132,67 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
   };
 
   const renderStepIndicator = () => {
+    const steps = [
+      { number: 1, label: 'Properties', icon: HomeIcon },
+      { number: 2, label: 'Tenants', icon: UserGroupIcon }
+    ];
+
     return (
       <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {[1, 2].map((step) => (
-            <React.Fragment key={step}>
-              <div className="flex items-center">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                    step < currentStep
-                      ? 'bg-green-500 text-white'
-                      : step === currentStep
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-600'
+        <div className="flex items-center justify-center gap-4">
+          {steps.map((step, index) => {
+            const isActive = step.number === currentStep;
+            const isCompleted = step.number < currentStep;
+            const StepIcon = step.icon;
+
+            return (
+              <React.Fragment key={step.number}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Only allow going back to previous steps
+                    if (step.number < currentStep || (step.number === currentStep)) {
+                      setCurrentStep(step.number);
+                    }
+                  }}
+                  disabled={step.number > currentStep}
+                  className={`flex flex-col items-center gap-2 ${
+                    step.number > currentStep ? 'cursor-not-allowed' : 'cursor-pointer'
                   }`}
                 >
-                  {step < currentStep ? (
-                    <CheckCircleIcon className="w-6 h-6" />
-                  ) : (
-                    step
-                  )}
-                </div>
-                <div className="ml-3 hidden sm:block">
                   <div
-                    className={`text-sm font-medium ${
-                      step === currentStep ? 'text-blue-600' : 'text-gray-500'
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                      isActive
+                        ? 'bg-blue-600 text-white'
+                        : isCompleted
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-200 text-gray-400'
                     }`}
                   >
-                    {step === 1 ? 'Properties' : 'Tenants'}
+                    <StepIcon className="w-6 h-6" />
                   </div>
-                </div>
-              </div>
-              {step < totalSteps && (
-                <div
-                  className={`flex-1 h-1 mx-4 ${
-                    step < currentStep ? 'bg-green-500' : 'bg-gray-200'
-                  }`}
-                />
-              )}
-            </React.Fragment>
-          ))}
+                  <span
+                    className={`text-xs font-medium ${
+                      isActive
+                        ? 'text-blue-600'
+                        : isCompleted
+                        ? 'text-green-600'
+                        : 'text-gray-400'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </button>
+                {index < steps.length - 1 && (
+                  <div
+                    className={`w-16 h-0.5 mt-[-20px] ${
+                      isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                    }`}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
     );
@@ -182,12 +203,12 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
     if (wizardAddedProperties.length > 0) {
       return (
         <div className="space-y-6">
-          <div className="text-center mb-8">
-            <HomeIcon className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <div className="text-center mb-6">
+            <HomeIcon className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+            <h2 className="text-lg font-bold text-gray-900 mb-2">
               Your Properties
             </h2>
-            <p className="text-gray-600">
+            <p className="text-sm text-gray-600">
               Review your properties and add more if needed
             </p>
           </div>
@@ -269,12 +290,12 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
     // Show method selection when no properties have been added yet
     return (
       <div className="space-y-6">
-        <div className="text-center mb-8">
-          <HomeIcon className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <div className="text-center mb-6">
+          <HomeIcon className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
             Add Your Properties
           </h2>
-          <p className="text-gray-600">
+          <p className="text-sm text-gray-600">
             Choose how you'd like to add your properties to the system
           </p>
         </div>
@@ -285,7 +306,7 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
             onClick={() => setShowBulkUploadModal(true)}
             className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
           >
-            <div className="flex items-center mb-4">
+            <div className="flex items-center">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200">
                 <DocumentArrowUpIcon className="w-6 h-6 text-blue-600" />
               </div>
@@ -293,13 +314,6 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                 <h3 className="text-lg font-semibold text-gray-900">Bulk Upload</h3>
                 <p className="text-sm text-gray-500">Upload Excel file</p>
               </div>
-            </div>
-            <p className="text-gray-600 text-sm">
-              Upload an Excel file with all your properties at once. Perfect for portfolios with multiple properties.
-            </p>
-            <div className="mt-4 text-xs text-gray-500">
-              <p>• Supports .xlsx, .xls, and .csv files</p>
-              <p>• AI-powered parsing coming soon</p>
             </div>
           </button>
 
@@ -311,7 +325,7 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
             }}
             className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
           >
-            <div className="flex items-center mb-4">
+            <div className="flex items-center">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200">
                 <PlusIcon className="w-6 h-6 text-blue-600" />
               </div>
@@ -319,13 +333,6 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                 <h3 className="text-lg font-semibold text-gray-900">Manual Entry</h3>
                 <p className="text-sm text-gray-500">Add one by one</p>
               </div>
-            </div>
-            <p className="text-gray-600 text-sm">
-              Add properties manually one at a time. Great for smaller portfolios or when you want to add details carefully.
-            </p>
-            <div className="mt-4 text-xs text-gray-500">
-              <p>• Full control over each property</p>
-              <p>• Add detailed information</p>
             </div>
           </button>
         </div>
@@ -338,12 +345,12 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
     if (wizardAddedTenants.length > 0) {
       return (
         <div className="space-y-6">
-          <div className="text-center mb-8">
-            <UserGroupIcon className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <div className="text-center mb-6">
+            <UserGroupIcon className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+            <h2 className="text-lg font-bold text-gray-900 mb-2">
               Your Tenants
             </h2>
-            <p className="text-gray-600">
+            <p className="text-sm text-gray-600">
               Review your tenants and add more if needed
             </p>
           </div>
@@ -443,13 +450,13 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
     // Show tenant selection when no tenants have been added yet
     return (
       <div className="space-y-6">
-        <div className="text-center mb-8">
-          <UserGroupIcon className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <div className="text-center mb-6">
+          <UserGroupIcon className="w-12 h-12 text-blue-600 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-gray-900 mb-2">
             Set Up Tenants
           </h2>
-          <p className="text-gray-600">
-            Add tenants for your new {wizardAddedProperties.length === 1 ? 'property' : 'properties'}. Choose between existing tenants or new tenants.
+          <p className="text-sm text-gray-600">
+            Add tenants for your new {wizardAddedProperties.length === 1 ? 'property' : 'properties'}
           </p>
         </div>
 
@@ -504,7 +511,7 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                 }}
                 className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
               >
-                <div className="flex items-center mb-4">
+                <div className="flex items-center">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200">
                     <UserGroupIcon className="w-6 h-6 text-blue-600" />
                   </div>
@@ -512,14 +519,6 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                     <h3 className="text-lg font-semibold text-gray-900">Existing Tenant</h3>
                     <p className="text-sm text-gray-500">Already in the property</p>
                   </div>
-                </div>
-                <p className="text-gray-600 text-sm mb-4">
-                  Add tenants who are already living in the property. Quick setup with basic information and existing tenancy details.
-                </p>
-                <div className="text-xs text-gray-500">
-                  <p>• Basic tenant information</p>
-                  <p>• Existing lease details</p>
-                  <p>• Property assignment</p>
                 </div>
               </button>
 
@@ -531,7 +530,7 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                 }}
                 className="p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
               >
-                <div className="flex items-center mb-4">
+                <div className="flex items-center">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4 group-hover:bg-blue-200">
                     <PlusIcon className="w-6 h-6 text-blue-600" />
                   </div>
@@ -539,14 +538,6 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                     <h3 className="text-lg font-semibold text-gray-900">New Tenant</h3>
                     <p className="text-sm text-gray-500">Full onboarding</p>
                   </div>
-                </div>
-                <p className="text-gray-600 text-sm mb-4">
-                  Add new tenants who need full onboarding. Includes credit checks, reference checks, and tenancy agreements.
-                </p>
-                <div className="text-xs text-gray-500">
-                  <p>• Credit checks & references</p>
-                  <p>• Tenancy agreement generation</p>
-                  <p>• Complete onboarding workflow</p>
                 </div>
               </button>
             </div>
@@ -564,16 +555,13 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+      <div className="max-w-lg mx-auto">
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Property Onboarding Wizard
+          <div className="mb-6 text-center">
+            <h1 className="text-xl font-bold text-gray-900">
+              Quick Setup
             </h1>
-            <p className="text-gray-600">
-              Follow this step-by-step guide to onboard your new property and set up tenants
-            </p>
           </div>
 
           {/* Step Indicator */}
@@ -684,37 +672,17 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
               </button>
             </div>
 
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors mb-4">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-4 opacity-50">
               <DocumentArrowUpIcon className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <label className="cursor-pointer">
-                <span className="text-blue-600 hover:text-blue-800 font-medium">
-                  Click to upload
+              <div>
+                <span className="text-gray-500 font-medium">
+                  Click to upload (Coming Soon)
                 </span>
-                <span className="text-gray-600"> or drag and drop</span>
-                <input
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleExcelUpload}
-                  className="hidden"
-                  disabled={isProcessingExcel}
-                />
-              </label>
-              <p className="text-xs text-gray-500 mt-2">
+                <span className="text-gray-400"> or drag and drop</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
                 Supports .xlsx, .xls, and .csv files
               </p>
-              {isProcessingExcel && (
-                <div className="mt-3">
-                  <div className="inline-block w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-sm text-gray-600 mt-2">Processing...</p>
-                </div>
-              )}
-              {excelFile && !isProcessingExcel && (
-                <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-xs text-blue-700">
-                    {excelFile.name}
-                  </p>
-                </div>
-              )}
             </div>
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
