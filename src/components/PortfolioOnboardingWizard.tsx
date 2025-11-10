@@ -311,7 +311,7 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                 <DocumentArrowUpIcon className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Bulk Upload</h3>
+                <h3 className="text-base font-semibold text-gray-900">Bulk Upload</h3>
                 <p className="text-sm text-gray-500">Upload Excel file</p>
               </div>
             </div>
@@ -330,7 +330,7 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                 <PlusIcon className="w-6 h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Manual Entry</h3>
+                <h3 className="text-base font-semibold text-gray-900">Manual Entry</h3>
                 <p className="text-sm text-gray-500">Add one by one</p>
               </div>
             </div>

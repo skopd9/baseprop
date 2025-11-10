@@ -467,7 +467,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       const errors: string[] = [];
       
       for (const tenant of tenantsToDelete) {
-        const success = await SimplifiedTenantService.deleteTenant(tenant.id);
+        const success = await SimplifiedTenantService.deleteSimplifiedTenant(tenant.id);
         if (success) {
           successCount++;
         } else {
