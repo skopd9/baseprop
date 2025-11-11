@@ -541,12 +541,6 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
                 </div>
               </button>
             </div>
-
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-700">
-                <strong>Optional:</strong> You can skip this step and add tenants later from the Tenants tab.
-              </p>
-            </div>
           </div>
         )}
       </div>
@@ -742,12 +736,11 @@ export const PortfolioOnboardingWizard: React.FC<PortfolioOnboardingWizardProps>
             setSelectedTenantType(null);
           }}
           onTenantAdded={(tenant) => {
-            // After creating tenant, just add them - don't redirect anywhere
+            // After creating tenant, just add them
+            // Don't close the modal - let the user see the completion screen
             handleTenantAdded(tenant);
-            setShowNewTenantOnboarding(false);
-            setSelectedTenantType(null);
+            setSelectedPropertyForTenant(null);
             setLastAddedProperty(null);
-            // Note: User can start full onboarding from the tenant table later
           }}
           properties={wizardAddedProperties}
           existingTenants={tenants}

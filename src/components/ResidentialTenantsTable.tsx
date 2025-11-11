@@ -553,10 +553,6 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
           // Update the selected tenant in the modal so it shows fresh data
           setSelectedTenantForDetails(updatedTenant);
         }}
-        onStartOnboarding={(tenant) => {
-          setSelectedTenantForOnboarding(tenant);
-          setShowOnboardingModal(true);
-        }}
       />
     </div>
   );
