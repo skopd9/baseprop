@@ -19,7 +19,7 @@ export const RegenerateInvoicesButton: React.FC<RegenerateInvoicesButtonProps> =
 
   const handleRegenerate = async () => {
     if (!confirm(
-      `This will delete all existing invoices for ${tenant.name} and create new ones with the correct invoice dates based on your current settings.\n\n` +
+      `This will delete all existing invoices for ${tenant.name} and create new ones based on their lease.\n\n` +
       `Are you sure you want to continue?`
     )) {
       return;
@@ -27,18 +27,45 @@ export const RegenerateInvoicesButton: React.FC<RegenerateInvoicesButtonProps> =
 
     setRegenerating(true);
     try {
-      // Get organization ID from first invoice or tenant
-      const organizationId = tenant.invoices[0]?.organizationId;
+      console.log('🔄 Starting invoice regeneration for:', tenant.name);
+      console.log('Tenant data:', {
+        id: tenant.id,
+        leaseStart: tenant.leaseStart,
+        leaseEnd: tenant.leaseEnd,
+        monthlyRent: tenant.monthlyRent,
+        rentDueDay: tenant.rentDueDay,
+        propertyId: tenant.propertyId,
+      });
+
+      // Validate required fields
+      if (!tenant.leaseStart || !tenant.monthlyRent) {
+        onSuccess('Tenant is missing lease start date or monthly rent. Please update tenant details first.');
+        return;
+      }
+
+      // Get organization ID from tenant
+      let organizationId = tenant.invoices[0]?.organizationId;
+      
+      // If no invoices, get organization ID from the tenant's property
+      if (!organizationId) {
+        console.log('No organization ID from invoices, fetching from tenant...');
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('organization_id')
+          .eq('id', tenant.id)
+          .single();
+        
+        organizationId = tenantData?.organization_id;
+        console.log('Organization ID from tenant:', organizationId);
+      }
+
       if (!organizationId) {
         onSuccess('Could not find organization ID');
         return;
       }
 
-      // Get invoice settings
-      const settings = await InvoiceService.getInvoiceSettings(organizationId);
-      const invoiceDateDaysBeforeRent = settings?.invoiceDateDaysBeforeRent ?? 7;
-
       // Delete all existing invoices for this tenant
+      console.log('Deleting existing invoices...');
       const { error: deleteError } = await supabase
         .from('invoices')
         .delete()
@@ -51,11 +78,19 @@ export const RegenerateInvoicesButton: React.FC<RegenerateInvoicesButtonProps> =
       }
 
       // Parse lease dates
-      const leaseStart = tenant.leaseStart ? new Date(tenant.leaseStart) : new Date();
+      const leaseStart = new Date(tenant.leaseStart);
       const leaseEnd = tenant.leaseEnd ? new Date(tenant.leaseEnd) : new Date(leaseStart.getTime() + 365 * 24 * 60 * 60 * 1000);
 
-      // Regenerate invoices with new settings
-      await InvoiceService.generateInvoiceSchedule({
+      console.log('Generating invoices with:', {
+        organizationId,
+        leaseStart: leaseStart.toISOString(),
+        leaseEnd: leaseEnd.toISOString(),
+        monthlyRent: tenant.monthlyRent,
+        rentDueDay: tenant.rentDueDay,
+      });
+
+      // Regenerate invoices
+      const newInvoices = await InvoiceService.generateInvoiceSchedule({
         organizationId,
         tenantId: tenant.id,
         propertyId: tenant.propertyId,
@@ -66,14 +101,18 @@ export const RegenerateInvoicesButton: React.FC<RegenerateInvoicesButtonProps> =
         leaseEnd,
         monthlyRent: tenant.monthlyRent,
         rentDueDay: tenant.rentDueDay,
-        invoiceDateDaysBeforeRent,
       });
 
-      onSuccess(`Successfully regenerated ${tenant.name}'s invoices with correct invoice dates!`);
-      onComplete();
+      console.log(`✅ Successfully generated ${newInvoices.length} invoices`);
+      onSuccess(`Successfully generated ${newInvoices.length} invoices for ${tenant.name}!`);
+      
+      // Wait a moment for DB to update, then refresh
+      setTimeout(() => {
+        onComplete();
+      }, 500);
     } catch (error) {
-      console.error('Error regenerating invoices:', error);
-      onSuccess('Failed to regenerate invoices');
+      console.error('❌ Error regenerating invoices:', error);
+      onSuccess(`Failed to regenerate invoices: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setRegenerating(false);
     }

@@ -134,9 +134,6 @@ export class SimplifiedTenantService {
         // Generate invoice schedule for the entire lease period
         const orgId = organizationId || property.organization_id;
         if (orgId) {
-          // Get invoice settings for the organization
-          const invoiceSettings = await InvoiceService.getInvoiceSettings(orgId);
-          
           await InvoiceService.generateInvoiceSchedule({
             organizationId: orgId,
             tenantId: data.id,
@@ -148,7 +145,6 @@ export class SimplifiedTenantService {
             leaseEnd: tenantData.leaseEnd,
             monthlyRent: tenantData.monthlyRent,
             rentDueDay: rentDueDay,
-            invoiceDateDaysBeforeRent: invoiceSettings?.invoiceDateDaysBeforeRent ?? 7,
           });
 
           // Add tenant email as primary invoice recipient
