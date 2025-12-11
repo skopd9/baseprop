@@ -1016,17 +1016,45 @@ export class InvoiceService {
       }
 
       // In production, call the Netlify function
+      // Transform data to match Netlify function's expected format
+      const emailPayload = {
+        // Invoice details
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceDate: invoice.invoiceDate,
+        dueDate: invoice.dueDate,
+        periodStart: invoice.periodStart,
+        periodEnd: invoice.periodEnd,
+        amount: invoice.totalAmount,
+        totalAmount: invoice.totalAmount,
+        lineItems: invoice.lineItems,
+        
+        // Tenant details
+        tenantName: invoice.tenantName || 'Tenant',
+        tenantEmail: invoice.tenantEmail || '',
+        propertyAddress: invoice.propertyAddress || '',
+        
+        // Company details (from settings)
+        companyName: settings?.companyName,
+        companyAddress: settings?.companyAddress,
+        companyEmail: settings?.companyEmail,
+        companyPhone: settings?.companyPhone,
+        paymentTerms: settings?.paymentTerms,
+        paymentInstructions: settings?.paymentInstructions,
+        footerNotes: settings?.footerNotes,
+        
+        // Recipients
+        recipients: emailList,
+        
+        // Optional PDF attachment (base64 encoded)
+        pdfAttachment: pdfBase64,
+      };
+
       const response = await fetch('/.netlify/functions/send-invoice-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          invoice,
-          emailList,
-          settings,
-          pdfBase64,
-        }),
+        body: JSON.stringify(emailPayload),
       });
 
       if (!response.ok) {
