@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { SimplifiedTenant, transformToSimplifiedTenant } from '../utils/simplifiedDataTransforms';
 import { RentPaymentService } from './RentPaymentService';
+import { InvoiceService } from './InvoiceService';
 
 // Simple tenant service that works with existing database structure
 export class SimplifiedTenantService {
@@ -110,7 +111,7 @@ export class SimplifiedTenantService {
       // Update property tenant count
       await this.updatePropertyTenantCount(tenantData.propertyId);
 
-      // Generate payment periods if lease dates and rent are provided
+      // Generate payment periods and invoice schedule if lease dates and rent are provided
       if (tenantData.leaseStart && tenantData.leaseEnd && tenantData.monthlyRent) {
         const rentDueDay = tenantData.rentDueDay || 1;
         const periods = RentPaymentService.generatePaymentPeriods(
@@ -129,6 +130,38 @@ export class SimplifiedTenantService {
           periods,
           'monthly'
         );
+
+        // Generate invoice schedule for the entire lease period
+        const orgId = organizationId || property.organization_id;
+        if (orgId) {
+          // Get invoice settings for the organization
+          const invoiceSettings = await InvoiceService.getInvoiceSettings(orgId);
+          
+          await InvoiceService.generateInvoiceSchedule({
+            organizationId: orgId,
+            tenantId: data.id,
+            propertyId: tenantData.propertyId,
+            tenantName: tenantData.name,
+            tenantEmail: tenantData.email,
+            propertyAddress: property?.address || 'Unknown Property',
+            leaseStart: tenantData.leaseStart,
+            leaseEnd: tenantData.leaseEnd,
+            monthlyRent: tenantData.monthlyRent,
+            rentDueDay: rentDueDay,
+            invoiceDateDaysBeforeRent: invoiceSettings?.invoiceDateDaysBeforeRent ?? 7,
+          });
+
+          // Add tenant email as primary invoice recipient
+          if (tenantData.email) {
+            await supabase.from('invoice_recipients').insert({
+              tenant_id: data.id,
+              email: tenantData.email,
+              name: tenantData.name,
+              is_primary: true,
+              is_active: true,
+            });
+          }
+        }
       }
 
       return simplifiedTenant;
