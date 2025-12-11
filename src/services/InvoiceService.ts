@@ -979,4 +979,152 @@ export class InvoiceService {
       updatedAt: data.updated_at,
     };
   }
+
+  // =====================================================
+  // Send Invoice Email
+  // =====================================================
+
+  static async sendInvoiceEmail(
+    invoice: Invoice,
+    emailList: string[],
+    settings: InvoiceSettings | null,
+    pdfBase64?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // In development, show a notification instead of actually sending
+      if (import.meta.env.DEV) {
+        this.showInvoiceDevNotification(invoice, emailList, pdfBase64);
+        
+        // Update the invoice as sent in the database
+        const now = new Date().toISOString();
+        const { error } = await supabase
+          .from('invoices')
+          .update({
+            status: 'sent',
+            sent_at: now,
+            sent_to: emailList,
+            updated_at: now,
+          })
+          .eq('id', invoice.id);
+
+        if (error) {
+          console.error('Error updating invoice as sent:', error);
+          return { success: false, error: error.message };
+        }
+
+        return { success: true };
+      }
+
+      // In production, call the Netlify function
+      const response = await fetch('/.netlify/functions/send-invoice-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          invoice,
+          emailList,
+          settings,
+          pdfBase64,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to send email' }));
+        return { success: false, error: errorData.error || 'Failed to send email' };
+      }
+
+      const data = await response.json();
+      
+      // Update the invoice as sent in the database
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('invoices')
+        .update({
+          status: 'sent',
+          sent_at: now,
+          sent_to: emailList,
+          updated_at: now,
+        })
+        .eq('id', invoice.id);
+
+      if (error) {
+        console.error('Error updating invoice as sent:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error sending invoice email:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  private static showInvoiceDevNotification(
+    invoice: Invoice,
+    emailList: string[],
+    pdfBase64?: string
+  ) {
+    const message = `
+📧 Invoice Email (Development Mode)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+To: ${emailList.join(', ')}
+Subject: Invoice ${invoice.invoiceNumber} - ${invoice.tenantName}
+
+Invoice Details:
+• Amount: £${invoice.totalAmount.toFixed(2)}
+• Due Date: ${invoice.dueDate}
+• Status: ${invoice.status}
+
+${pdfBase64 ? '📎 PDF Attachment: Included' : '📄 No PDF attachment'}
+
+In production, this will be sent via Resend API.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    `.trim();
+
+    console.log(message);
+    
+    // Show a styled notification in the browser
+    if (typeof window !== 'undefined') {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        max-width: 400px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      `;
+      notification.innerHTML = `
+        <div style="display: flex; align-items: start; gap: 12px;">
+          <div style="font-size: 24px;">📧</div>
+          <div style="flex: 1;">
+            <strong style="display: block; margin-bottom: 4px;">Invoice Email Sent (Dev Mode)</strong>
+            <div style="opacity: 0.9; font-size: 13px;">
+              To: ${emailList.join(', ')}<br/>
+              Invoice: ${invoice.invoiceNumber}<br/>
+              Amount: £${invoice.totalAmount.toFixed(2)}
+              ${pdfBase64 ? '<br/>📎 PDF attached' : ''}
+            </div>
+          </div>
+          <button onclick="this.parentElement.parentElement.remove()" 
+                  style="background: none; border: none; color: white; cursor: pointer; font-size: 20px; padding: 0; line-height: 1;">
+            ×
+          </button>
+        </div>
+      `;
+      document.body.appendChild(notification);
+      setTimeout(() => notification.remove(), 8000);
+    }
+  }
 }

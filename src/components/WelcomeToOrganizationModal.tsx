@@ -141,8 +141,8 @@ export const WelcomeToOrganizationModal: React.FC<WelcomeToOrganizationModalProp
               <span className="text-amber-600 font-semibold text-sm">1</span>
             </div>
             <div>
-              <h4 className="font-medium text-gray-900 text-sm">Rent Tracking</h4>
-              <p className="text-gray-600 text-sm">Monitor rent payments, mark as paid, and track overdue amounts</p>
+              <h4 className="font-medium text-gray-900 text-sm">Invoice Manager</h4>
+              <p className="text-gray-600 text-sm">Generate invoices, track payments, and mark as paid</p>
             </div>
           </div>
           <div className="flex items-start space-x-3">
@@ -304,6 +304,9 @@ export const WelcomeToOrganizationModal: React.FC<WelcomeToOrganizationModalProp
     </div>
   );
 };
+
+
+
 
 
 

@@ -50,8 +50,8 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({
     },
     {
       id: 'setup-rent',
-      title: 'Set Up Rent Tracking',
-      description: 'Configure rent amounts and payment schedules',
+      title: 'Manage Invoices',
+      description: 'View and manage rent invoices',
       icon: CurrencyPoundIcon,
       completed: tenants.some(t => t.monthlyRent > 0),
       action: onViewRent,
