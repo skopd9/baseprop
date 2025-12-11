@@ -15,7 +15,6 @@ export interface InvoiceSettings {
   footerNotes?: string;
   autoSendEnabled: boolean;
   daysBeforeDue: number;
-  invoiceDateDaysBeforeRent: number; // How many days before rent period to date the invoice
   sendReminderEnabled: boolean;
   reminderDaysAfter: number;
   createdAt: string;
@@ -136,7 +135,6 @@ export class InvoiceService {
         footer_notes: settings.footerNotes,
         auto_send_enabled: settings.autoSendEnabled || false,
         days_before_due: settings.daysBeforeDue || 7,
-        invoice_date_days_before_rent: settings.invoiceDateDaysBeforeRent ?? 7,
         send_reminder_enabled: settings.sendReminderEnabled || false,
         reminder_days_after: settings.reminderDaysAfter || 7,
         updated_at: new Date().toISOString(),
@@ -445,9 +443,7 @@ export class InvoiceService {
 
   static async approveInvoice(invoiceId: string, userId: string): Promise<boolean> {
     try {
-      console.log('🔵 Approving invoice:', { invoiceId, userId });
-      
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('invoices')
         .update({
           approval_status: 'approved',
@@ -456,29 +452,16 @@ export class InvoiceService {
           status: 'approved',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', invoiceId)
-        .select();
+        .eq('id', invoiceId);
 
       if (error) {
-        console.error('❌ Error approving invoice:', error);
-        console.error('Error details:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-        });
+        console.error('Error approving invoice:', error);
         return false;
       }
 
-      if (!data || data.length === 0) {
-        console.error('❌ No rows updated. Invoice might not exist or you lack permission.');
-        return false;
-      }
-
-      console.log('✅ Invoice approved successfully:', data[0]);
       return true;
     } catch (error) {
-      console.error('❌ Error in approveInvoice:', error);
+      console.error('Error in approveInvoice:', error);
       return false;
     }
   }
@@ -760,7 +743,6 @@ export class InvoiceService {
     leaseEnd: Date;
     monthlyRent: number;
     rentDueDay: number;
-    invoiceDateDaysBeforeRent?: number;
   }): Promise<Invoice[]> {
     const {
       organizationId,
@@ -773,7 +755,6 @@ export class InvoiceService {
       leaseEnd,
       monthlyRent,
       rentDueDay,
-      invoiceDateDaysBeforeRent = 7,
     } = params;
 
     const invoices: Invoice[] = [];
@@ -808,10 +789,6 @@ export class InvoiceService {
         // Due date is the rent due day of that month
         const dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), rentDueDay);
         
-        // Invoice date is X days before the rent period start date
-        const invoiceDate = new Date(periodStart);
-        invoiceDate.setDate(invoiceDate.getDate() - invoiceDateDaysBeforeRent);
-        
         // Calculate amount (pro-rate if partial month)
         const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
         const startDay = periodStart.getDate();
@@ -838,7 +815,7 @@ export class InvoiceService {
           tenant_id: tenantId,
           property_id: propertyId || null, // Can be null if no property
           invoice_number: invoiceNumber,
-          invoice_date: invoiceDate.toISOString().split('T')[0],
+          invoice_date: periodStart.toISOString().split('T')[0],
           due_date: dueDate.toISOString().split('T')[0],
           period_start: periodStart.toISOString().split('T')[0],
           period_end: periodEnd.toISOString().split('T')[0],
@@ -913,147 +890,6 @@ export class InvoiceService {
   }
 
   // =====================================================
-  // Send Invoice Email
-  // =====================================================
-
-  static async sendInvoiceEmail(
-    invoice: Invoice,
-    recipients: string[],
-    settings: InvoiceSettings | null,
-    pdfBase64?: string
-  ): Promise<{ success: boolean; error?: string; messageId?: string }> {
-    try {
-      if (recipients.length === 0) {
-        return { success: false, error: 'No recipients specified' };
-      }
-
-      console.log(`📧 Sending invoice ${invoice.invoiceNumber} to ${recipients.join(', ')}`);
-
-      // Check if we're in local development
-      const isLocalDev = typeof window !== 'undefined' && 
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-      if (isLocalDev) {
-        console.log('🔧 LOCAL DEV MODE - Invoice email details:');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📧 To:', recipients.join(', '));
-        console.log('📄 Invoice:', invoice.invoiceNumber);
-        console.log('💰 Amount:', invoice.totalAmount);
-        console.log('📅 Due:', invoice.dueDate);
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        
-        // Show dev notification
-        this.showInvoiceDevNotification(invoice, recipients);
-
-        // Still mark as sent in database for dev testing
-        await this.markAsSent(invoice.id, recipients);
-
-        return { success: true };
-      }
-
-      // Call Netlify Function to send email
-      const response = await fetch('/.netlify/functions/send-invoice-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          invoiceNumber: invoice.invoiceNumber,
-          invoiceDate: invoice.invoiceDate,
-          dueDate: invoice.dueDate,
-          periodStart: invoice.periodStart,
-          periodEnd: invoice.periodEnd,
-          amount: invoice.amount,
-          totalAmount: invoice.totalAmount,
-          lineItems: invoice.lineItems,
-          tenantName: invoice.tenantName,
-          tenantEmail: invoice.tenantEmail,
-          propertyAddress: invoice.propertyAddress,
-          companyName: settings?.companyName,
-          companyAddress: settings?.companyAddress,
-          companyEmail: settings?.companyEmail,
-          companyPhone: settings?.companyPhone,
-          paymentTerms: settings?.paymentTerms,
-          paymentInstructions: settings?.paymentInstructions,
-          footerNotes: settings?.footerNotes,
-          recipients,
-          pdfAttachment: pdfBase64,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        console.error('❌ Failed to send invoice email:', result.error);
-        return {
-          success: false,
-          error: result.error || 'Failed to send email'
-        };
-      }
-
-      console.log('✅ Invoice email sent successfully!', result.messageId);
-
-      // Update invoice status to sent
-      await this.markAsSent(invoice.id, recipients);
-
-      return {
-        success: true,
-        messageId: result.messageId
-      };
-    } catch (error: any) {
-      console.error('❌ Error sending invoice email:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to send email'
-      };
-    }
-  }
-
-  // Show invoice notification in dev mode
-  private static showInvoiceDevNotification(invoice: Invoice, recipients: string[]): void {
-    if (typeof document === 'undefined') return;
-
-    const notificationEl = document.createElement('div');
-    notificationEl.className = 'fixed top-4 right-4 bg-purple-600 text-white p-6 rounded-lg shadow-2xl z-50 max-w-md';
-    notificationEl.innerHTML = `
-      <div class="space-y-3">
-        <div class="flex items-start space-x-3">
-          <div class="flex-shrink-0">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-bold mb-1">📧 Invoice Email (Dev Mode)</p>
-            <p class="text-xs opacity-90 mb-1">Invoice: ${invoice.invoiceNumber}</p>
-            <p class="text-xs opacity-90 mb-1">Amount: £${invoice.totalAmount.toFixed(2)}</p>
-            <p class="text-xs opacity-90 mb-2">To: ${recipients.join(', ')}</p>
-            <p class="text-xs opacity-75">In production, this would send via Resend.</p>
-          </div>
-          <button onclick="this.closest('.fixed').remove()" class="text-white hover:text-purple-200 flex-shrink-0">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="text-xs opacity-75 pt-2 border-t border-purple-500">
-          💡 <strong>Tip:</strong> Deploy to Netlify or run <code class="bg-purple-700 px-1 rounded">netlify dev</code> to send real emails
-        </div>
-      </div>
-    `;
-
-    document.body.appendChild(notificationEl);
-
-    // Auto-remove after 10 seconds
-    setTimeout(() => {
-      if (notificationEl.parentNode) {
-        notificationEl.parentNode.removeChild(notificationEl);
-      }
-    }, 10000);
-  }
-
-  // =====================================================
   // Transformers
   // =====================================================
 
@@ -1072,7 +908,6 @@ export class InvoiceService {
       footerNotes: data.footer_notes,
       autoSendEnabled: data.auto_send_enabled || false,
       daysBeforeDue: data.days_before_due || 7,
-      invoiceDateDaysBeforeRent: data.invoice_date_days_before_rent ?? 7,
       sendReminderEnabled: data.send_reminder_enabled || false,
       reminderDaysAfter: data.reminder_days_after || 7,
       createdAt: data.created_at,

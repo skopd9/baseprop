@@ -13,7 +13,8 @@ import {
   ChevronDownIcon,
   QuestionMarkCircleIcon,
   Cog6ToothIcon,
-  UserIcon
+  UserIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 import { SimplifiedDashboard } from './SimplifiedDashboard';
 import { ResidentialPropertiesTable } from './ResidentialPropertiesTable';
@@ -31,6 +32,7 @@ import { InspectionWorkflows } from './InspectionWorkflows';
 import { RepairWorkflows } from './RepairWorkflows';
 import { ComplianceWorkflows } from './ComplianceWorkflows';
 import { RentTracking } from './RentTracking';
+import { InvoiceManager } from './InvoiceManager';
 import { ExpenseTracker } from './ExpenseTracker';
 
 import { SuccessMessage } from './SuccessMessage';
@@ -46,6 +48,7 @@ import { SimplifiedPropertyService } from '../services/SimplifiedPropertyService
 import { SimplifiedTenantService } from '../services/SimplifiedTenantService';
 import { OrganizationService } from '../services/OrganizationService';
 import { DemoDataSeeder } from '../utils/demoDataSeeder';
+import { generateMarketingPDF } from '../utils/generateMarketingPDF';
 
 type ViewType = 'dashboard' | 'properties' | 'tenants' | 'inspections' | 'repairs' | 'compliance' | 'rent' | 'expenses' | 'onboarding';
 
@@ -77,9 +80,9 @@ const navigationItems: NavigationItem[] = [
   },
   {
     id: 'rent',
-    name: 'Rent Tracking',
+    name: 'Invoice Manager',
     icon: CurrencyPoundIcon,
-    description: 'Track rent payments'
+    description: 'Manage rent invoices'
   },
   {
     id: 'expenses',
@@ -671,9 +674,10 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
       case 'rent':
         return (
           <div className="p-4 sm:p-6">
-            <RentTracking
-              properties={properties}
-              tenants={tenants}
+            <InvoiceManager
+              onSuccess={(message) => {
+                setSuccessMessage(message);
+              }}
             />
           </div>
         );
@@ -795,7 +799,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col border-r border-gray-200`}>
         <div className="flex items-center justify-between h-12 px-6 border-b border-gray-200 flex-shrink-0">
-          <h1 className="text-lg font-bold text-gray-900">Base Prop</h1>
+          <h1 className="text-lg font-bold text-gray-900">TurnKey</h1>
           <button
             onClick={() => {
               setSidebarOpen(false);
@@ -968,8 +972,17 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
             </button>
             <div className="flex-1" /> {/* Spacer */}
             
-            {/* Right side: Notification Bell + Workspace Switcher */}
+            {/* Right side: Download PDF + Notification Bell + Workspace Switcher */}
             <div className="flex items-center gap-2 ml-auto">
+              {/* Download Marketing PDF Button */}
+              <button
+                onClick={() => generateMarketingPDF()}
+                className="p-2 rounded-md text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                title="Download TurnKey Marketing Brochure"
+              >
+                <ArrowDownTrayIcon className="w-5 h-5" />
+              </button>
+              
               {/* Notification Bell */}
               {userEmail && (
                 <NotificationBell
