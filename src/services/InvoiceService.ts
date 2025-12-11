@@ -787,7 +787,10 @@ export class InvoiceService {
         }
         
         // Due date is the rent due day of that month
-        const dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), rentDueDay);
+        // Clamp to the last valid day if rentDueDay exceeds days in the month (e.g., Feb 31 -> Feb 28)
+        const daysInCurrentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        const clampedDueDay = Math.min(rentDueDay, daysInCurrentMonth);
+        const dueDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), clampedDueDay);
         
         // Calculate amount (pro-rate if partial month)
         const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
@@ -864,7 +867,18 @@ export class InvoiceService {
       const invoice = await this.getInvoice(invoiceId);
       if (!invoice) return false;
 
-      const newStatus = invoice.status === 'paid' ? 'sent' : 'paid';
+      let newStatus: InvoiceStatus;
+      
+      if (invoice.status === 'paid') {
+        // When unmarking as paid, restore previous status based on whether it was sent
+        // If invoice has sentAt date, it was sent before being paid -> revert to 'sent'
+        // Otherwise it was approved but never sent -> revert to 'approved'
+        newStatus = invoice.sentAt ? 'sent' : 'approved';
+      } else {
+        // Marking as paid
+        newStatus = 'paid';
+      }
+      
       const now = new Date().toISOString();
 
       const { error } = await supabase
