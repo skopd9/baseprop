@@ -6,6 +6,9 @@ import {
   WrenchScrewdriverIcon,
   ShieldCheckIcon,
   CurrencyPoundIcon,
+  CurrencyDollarIcon,
+  CurrencyEuroIcon,
+  BanknotesIcon,
   ReceiptPercentIcon,
   Bars3Icon,
   XMarkIcon,
@@ -60,57 +63,6 @@ interface NavigationItem {
   description: string;
 }
 
-const navigationItems: NavigationItem[] = [
-  {
-    id: 'dashboard',
-    name: 'Dashboard',
-    icon: HomeIcon,
-    description: 'Overview of your properties'
-  },
-  {
-    id: 'properties',
-    name: 'Properties',
-    icon: HomeIcon,
-    description: 'Manage your properties'
-  },
-  {
-    id: 'tenants',
-    name: 'Tenants',
-    icon: UserGroupIcon,
-    description: 'Manage your tenants'
-  },
-  {
-    id: 'rent',
-    name: 'Invoice Manager',
-    icon: CurrencyPoundIcon,
-    description: 'Manage rent invoices'
-  },
-  {
-    id: 'expenses',
-    name: 'Expenses',
-    icon: ReceiptPercentIcon,
-    description: 'Track property expenses'
-  },
-  {
-    id: 'inspections',
-    name: 'Inspections',
-    icon: DocumentCheckIcon,
-    description: 'Schedule inspections'
-  },
-  {
-    id: 'repairs',
-    name: 'Repairs',
-    icon: WrenchScrewdriverIcon,
-    description: 'Track maintenance'
-  },
-  {
-    id: 'compliance',
-    name: 'Compliance',
-    icon: ShieldCheckIcon,
-    description: 'Manage certificates'
-  }
-];
-
 interface SimplifiedLandlordAppProps {
   onLogout: () => void;
   showOnboarding?: boolean;
@@ -127,7 +79,68 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   onOnboardingComplete
 }) => {
   const { currentOrganization, userOrganizations, currentUserRole, switchOrganization, refreshOrganizations, error: orgError, isLoading: orgLoading } = useOrganization();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyCode } = useCurrency();
+
+  const getCurrencyIcon = () => {
+    switch (currencyCode) {
+      case 'GBP': return CurrencyPoundIcon;
+      case 'USD': return CurrencyDollarIcon;
+      case 'EUR': return CurrencyEuroIcon;
+      default: return BanknotesIcon;
+    }
+  };
+
+  const navigationItems: NavigationItem[] = [
+    {
+      id: 'dashboard',
+      name: 'Dashboard',
+      icon: HomeIcon,
+      description: 'Overview of your properties'
+    },
+    {
+      id: 'properties',
+      name: 'Properties',
+      icon: HomeIcon,
+      description: 'Manage your properties'
+    },
+    {
+      id: 'tenants',
+      name: 'Tenants',
+      icon: UserGroupIcon,
+      description: 'Manage your tenants'
+    },
+    {
+      id: 'rent',
+      name: 'Invoice Manager',
+      icon: getCurrencyIcon(),
+      description: 'Manage rent invoices'
+    },
+    {
+      id: 'expenses',
+      name: 'Expenses',
+      icon: ReceiptPercentIcon,
+      description: 'Track property expenses'
+    },
+    {
+      id: 'inspections',
+      name: 'Inspections',
+      icon: DocumentCheckIcon,
+      description: 'Schedule inspections'
+    },
+    {
+      id: 'repairs',
+      name: 'Repairs',
+      icon: WrenchScrewdriverIcon,
+      description: 'Track maintenance'
+    },
+    {
+      id: 'compliance',
+      name: 'Compliance',
+      icon: ShieldCheckIcon,
+      description: 'Manage certificates'
+    }
+  ];
+
   // Start on onboarding tab if user needs to complete onboarding
   const [currentView, setCurrentView] = useState<ViewType>(showOnboarding ? 'onboarding' : 'dashboard');
   const [properties, setProperties] = useState<SimplifiedProperty[]>([]);

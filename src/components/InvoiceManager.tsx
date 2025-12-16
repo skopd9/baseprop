@@ -4,6 +4,9 @@ import {
   CheckCircleIcon,
   ClockIcon,
   CurrencyPoundIcon,
+  CurrencyDollarIcon,
+  CurrencyEuroIcon,
+  BanknotesIcon,
   Cog6ToothIcon,
   UserGroupIcon,
   ExclamationTriangleIcon,
@@ -51,7 +54,16 @@ type FilterStatus = 'all' | 'needs_approval' | 'up_to_date' | 'overdue';
 
 export const InvoiceManager: React.FC<InvoiceManagerProps> = ({ onSuccess }) => {
   const { currentOrganization } = useOrganization();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyCode } = useCurrency();
+  
+  const CurrencyIcon = React.useMemo(() => {
+    switch (currencyCode) {
+      case 'GBP': return CurrencyPoundIcon;
+      case 'USD': return CurrencyDollarIcon;
+      case 'EUR': return CurrencyEuroIcon;
+      default: return BanknotesIcon;
+    }
+  }, [currencyCode]);
   
   const [tenants, setTenants] = useState<TenantWithInvoices[]>([]);
   const [loading, setLoading] = useState(true);
@@ -635,7 +647,7 @@ export const InvoiceManager: React.FC<InvoiceManagerProps> = ({ onSuccess }) => 
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
-              <CurrencyPoundIcon className="w-5 h-5 text-green-600" />
+              <CurrencyIcon className="w-5 h-5 text-green-600" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-gray-500">Monthly Rent</p>

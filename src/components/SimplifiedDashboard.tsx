@@ -3,6 +3,9 @@ import {
   HomeIcon,
   UserGroupIcon,
   CurrencyPoundIcon,
+  CurrencyDollarIcon,
+  CurrencyEuroIcon,
+  BanknotesIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
   ClockIcon,
@@ -42,7 +45,20 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
   selectedProperty,
   onPropertySelect
 }) => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currencyCode } = useCurrency();
+
+  const CurrencyIcon = ({ className }: { className?: string }) => {
+    switch (currencyCode) {
+      case 'GBP':
+        return <CurrencyPoundIcon className={className} />;
+      case 'USD':
+        return <CurrencyDollarIcon className={className} />;
+      case 'EUR':
+        return <CurrencyEuroIcon className={className} />;
+      default:
+        return <BanknotesIcon className={className} />;
+    }
+  };
   
   // State for collapsible categories
   const [expandedCategories, setExpandedCategories] = useState<{
@@ -206,7 +222,7 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
                 <p className="text-2xl sm:text-3xl font-bold text-gray-900">{formatCurrency(stats.totalMonthlyRent)}</p>
               </div>
               <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
-                <CurrencyPoundIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+                <CurrencyIcon className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
               </div>
             </div>
             <div className="mt-3 sm:mt-4 flex items-center text-xs sm:text-sm">
@@ -273,7 +289,7 @@ export const SimplifiedDashboard: React.FC<SimplifiedDashboardProps> = ({
                       className="w-full flex items-center justify-between p-3 bg-red-50 hover:bg-red-100 transition-colors"
                     >
                       <div className="flex items-center space-x-2">
-                        <CurrencyPoundIcon className="w-4 h-4 text-red-600" />
+                        <CurrencyIcon className="w-4 h-4 text-red-600" />
                         <h3 className="text-sm font-semibold text-gray-900">Overdue Rent</h3>
                         <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                           {urgentItemsByCategory.rent.length}
