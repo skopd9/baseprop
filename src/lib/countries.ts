@@ -1,7 +1,7 @@
 // Multi-Country Support for Property Management System
-// UK (Primary), Greece and USA (Placeholders)
+// UK (Primary), Greece, USA (Placeholders), Saudi Arabia
 
-export type CountryCode = 'UK' | 'GR' | 'US';
+export type CountryCode = 'UK' | 'GR' | 'US' | 'SA';
 
 export interface ComplianceRequirement {
   id: string;
@@ -297,11 +297,101 @@ const usaConfig: CountryConfig = {
   ]
 };
 
+// Saudi Arabia Configuration
+const saudiConfig: CountryConfig = {
+  code: 'SA',
+  name: 'Saudi Arabia',
+  currency: {
+    symbol: 'SAR',
+    code: 'SAR',
+    position: 'before'
+  },
+  dateFormat: 'DD/MM/YYYY',
+  dateFormatPlaceholder: 'dd/mm/yyyy',
+  addressFormat: {
+    line1Label: 'Street Address',
+    line2Label: 'District/Unit',
+    cityLabel: 'City',
+    stateLabel: 'Region',
+    postalCodeLabel: 'Postal Code',
+    countryLabel: 'Country'
+  },
+  terminology: {
+    landlord: 'Landlord (Mu\'ajjir)',
+    tenant: 'Tenant (Musta\'jir)',
+    rent: 'Rent (Ijar)',
+    deposit: 'Security Deposit (Ta\'min)',
+    agent: 'Real Estate Agent (Waseet)',
+    propertyTax: 'White Land Tax / Property Tax',
+    postcode: 'Postal Code'
+  },
+  depositRules: {
+    description: 'Typically 1-2 months rent equivalent'
+  },
+  compliance: [
+    {
+      id: 'ejar_registration',
+      name: 'Ejar Registration',
+      description: 'Mandatory registration of rental contract in Ejar system',
+      frequency: 'once', // Per contract
+      mandatory: true,
+      appliesToStandard: true,
+      appliesToHMO: true
+    },
+    {
+      id: 'building_permit_sa',
+      name: 'Building Permit',
+      description: 'Valid building permit for the property',
+      frequency: 'once',
+      mandatory: true,
+      appliesToStandard: true,
+      appliesToHMO: true
+    },
+    {
+      id: 'title_deed_sukuk',
+      name: 'Title Deed (Sukuk)',
+      description: 'Electronic Title Deed confirming ownership',
+      frequency: 'once',
+      mandatory: true,
+      appliesToStandard: true,
+      appliesToHMO: true
+    },
+    {
+      id: 'civil_defense_permit',
+      name: 'Civil Defense Permit',
+      description: 'Safety license for larger buildings and commercial properties',
+      frequency: 'annual',
+      mandatory: false,
+      appliesToStandard: true,
+      appliesToHMO: true
+    },
+    {
+      id: 'energy_efficiency_sa',
+      name: 'Energy Efficiency Label',
+      description: 'Energy efficiency requirements for new buildings',
+      frequency: 'once',
+      mandatory: false,
+      appliesToStandard: true,
+      appliesToHMO: true
+    },
+    {
+      id: 'watani_address',
+      name: 'National Address Registration',
+      description: 'Registered National Address for the property',
+      frequency: 'once',
+      mandatory: true,
+      appliesToStandard: true,
+      appliesToHMO: true
+    }
+  ]
+};
+
 // Country configurations map
 export const COUNTRIES: Record<CountryCode, CountryConfig> = {
   UK: ukConfig,
   GR: greeceConfig,
-  US: usaConfig
+  US: usaConfig,
+  SA: saudiConfig
 };
 
 // Default country

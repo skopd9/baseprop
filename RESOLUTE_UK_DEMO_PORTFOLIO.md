@@ -260,3 +260,6 @@ Your Resolute UK portfolio is now fully populated with realistic data including:
 *Generated: November 11, 2024*  
 *System: ReOS Property Management Platform*
 
+
+
+

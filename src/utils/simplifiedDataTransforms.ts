@@ -14,7 +14,7 @@ export interface PropertyRoom {
 export interface SimplifiedProperty {
   id: string;
   propertyReference: number; // Auto-incrementing reference number
-  countryCode: CountryCode; // Country code: UK, GR, US
+  countryCode: CountryCode; // Country code: UK, GR, US, SA
   address: string;
   propertyType: 'house' | 'flat' | 'hmo';
   bedrooms: number;

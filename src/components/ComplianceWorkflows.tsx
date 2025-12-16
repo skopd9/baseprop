@@ -155,6 +155,19 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
         return <FireIcon className="w-5 h-5 text-red-600" />;
       case 'local_permits':
         return <DocumentCheckIcon className="w-5 h-5 text-blue-600" />;
+      // Saudi Arabia Types
+      case 'ejar_registration':
+        return <DocumentCheckIcon className="w-5 h-5 text-green-600" />;
+      case 'building_permit_sa':
+        return <DocumentCheckIcon className="w-5 h-5 text-blue-600" />;
+      case 'title_deed_sukuk':
+        return <DocumentCheckIcon className="w-5 h-5 text-blue-700" />;
+      case 'civil_defense_permit':
+        return <ShieldCheckIcon className="w-5 h-5 text-red-600" />;
+      case 'energy_efficiency_sa':
+        return <BoltIcon className="w-5 h-5 text-green-600" />;
+      case 'watani_address':
+        return <MapPinIcon className="w-5 h-5 text-blue-600" />;
       default:
         return <DocumentCheckIcon className="w-5 h-5 text-gray-600" />;
     }
@@ -218,6 +231,19 @@ export const ComplianceWorkflows: React.FC<ComplianceWorkflowsProps> = ({
         return 'Smoke Detectors';
       case 'local_permits':
         return 'Local Permits';
+      // Saudi Arabia
+      case 'ejar_registration':
+        return 'Ejar Registration';
+      case 'building_permit_sa':
+        return 'Building Permit';
+      case 'title_deed_sukuk':
+        return 'Title Deed (Sukuk)';
+      case 'civil_defense_permit':
+        return 'Civil Defense Permit';
+      case 'energy_efficiency_sa':
+        return 'Energy Efficiency';
+      case 'watani_address':
+        return 'National Address';
       default:
         return String(type).replace(/_/g, ' ');
     }

@@ -293,7 +293,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ userId, user
                 const flags: Record<string, string> = {
                   'UK': '🇬🇧',
                   'GR': '🇬🇷',
-                  'US': '🇺🇸'
+                  'US': '🇺🇸',
+                  'SA': '🇸🇦'
                 };
 
                 return (

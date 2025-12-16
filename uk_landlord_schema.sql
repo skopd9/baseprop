@@ -21,7 +21,7 @@ DROP TABLE IF EXISTS user_preferences CASCADE;
 CREATE TABLE user_preferences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_email TEXT NOT NULL UNIQUE,
-  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US')),
+  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US', 'SA')),
   user_type TEXT NOT NULL DEFAULT 'direct_landlord' CHECK (user_type IN ('direct_landlord', 'agent_using_landlord', 'property_manager')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -64,7 +64,7 @@ CREATE TABLE properties (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   
   -- Country support
-  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US')),
+  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US', 'SA')),
   
   -- Basic Information
   address TEXT NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE tenants (
   property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
   
   -- Country support
-  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US')),
+  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US', 'SA')),
   
   -- Personal Information
   name TEXT NOT NULL,
@@ -205,13 +205,14 @@ CREATE TABLE compliance_certificates (
   property_id UUID REFERENCES properties(id) ON DELETE CASCADE,
   
   -- Country support
-  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US')),
+  country_code TEXT NOT NULL DEFAULT 'UK' CHECK (country_code IN ('UK', 'GR', 'US', 'SA')),
   
   -- Certificate Type
   certificate_type TEXT NOT NULL,
   -- UK: gas_safety, eicr, epc, deposit_protection, right_to_rent, legionella, smoke_alarms, co_alarms, fire_safety_hmo, hmo_license
   -- GR: epc_greece, building_permit, tax_clearance
   -- US: lead_paint, smoke_detectors_us, local_permits
+  -- SA: ejar_registration, building_permit_sa, title_deed_sukuk, civil_defense_permit, energy_efficiency_sa, watani_address
   
   -- Certificate Details
   certificate_number TEXT,

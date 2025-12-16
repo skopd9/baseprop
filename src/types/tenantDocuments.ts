@@ -3,7 +3,7 @@
 // Manages personal documents for tenants (country-specific)
 // =====================================================
 
-export type CountryCode = 'UK' | 'GR' | 'US';
+export type CountryCode = 'UK' | 'GR' | 'US' | 'SA';
 
 export type DocumentStatus = 'pending' | 'uploaded' | 'verified' | 'rejected' | 'expired';
 
@@ -47,7 +47,17 @@ export type USADocumentType =
   | 'inventory_signed'
   | 'renter_insurance';
 
-export type DocumentType = UKDocumentType | GreeceDocumentType | USADocumentType;
+// Saudi Arabia-specific document types
+export type SADocumentType =
+  | 'id_proof' // National ID / Iqama
+  | 'ejar_contract' // Ejar Contract Copy
+  | 'salary_certificate' // Salary Certificate / Employment Letter
+  | 'bank_statement'
+  | 'family_card' // Family Card (if applicable)
+  | 'marriage_certificate' // For families
+  | 'tenancy_agreement_signed'; // Internal if needed, though Ejar covers most
+
+export type DocumentType = UKDocumentType | GreeceDocumentType | USADocumentType | SADocumentType;
 
 export interface TenantDocument {
   id: string;
@@ -172,6 +182,15 @@ export function getDocumentTypeLabel(documentType: DocumentType, countryCode: Co
       tenancy_agreement_signed: 'Signed Lease Agreement',
       inventory_signed: 'Signed Move-In Checklist',
       renter_insurance: 'Renter\'s Insurance',
+    },
+    SA: {
+      id_proof: 'National ID / Iqama',
+      ejar_contract: 'Ejar Contract Copy',
+      salary_certificate: 'Salary Certificate',
+      bank_statement: 'Bank Statement (3 months)',
+      family_card: 'Family Card',
+      marriage_certificate: 'Marriage Certificate',
+      tenancy_agreement_signed: 'Signed Tenancy Agreement',
     },
   };
   

@@ -206,3 +206,6 @@ To see the new notifications:
 **Summary**: The notification system now acts like a proactive property management assistant, always giving you specific, actionable tasks tied to your real properties rather than generic advice!
 
 
+
+
+

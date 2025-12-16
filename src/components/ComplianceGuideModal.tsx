@@ -5,7 +5,8 @@ import {
   FireIcon,
   BoltIcon,
   ShieldCheckIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  MapPinIcon
 } from '@heroicons/react/24/outline';
 import { CountryCode, getCountryConfig, ComplianceRequirement } from '../lib/countries';
 
@@ -37,9 +38,12 @@ const getFrequencyText = (frequency: string) => {
 const getComplianceIcon = (req: ComplianceRequirement) => {
   if (req.id.includes('gas')) return <FireIcon className="w-6 h-6 text-orange-600" />;
   if (req.id.includes('electric') || req.id.includes('eicr')) return <BoltIcon className="w-6 h-6 text-yellow-600" />;
-  if (req.id.includes('epc')) return <ShieldCheckIcon className="w-6 h-6 text-green-600" />;
+  if (req.id.includes('epc') || req.id.includes('energy')) return <ShieldCheckIcon className="w-6 h-6 text-green-600" />;
   if (req.id.includes('lead_paint')) return <ExclamationTriangleIcon className="w-6 h-6 text-yellow-600" />;
-  if (req.id.includes('smoke') || req.id.includes('fire')) return <FireIcon className="w-6 h-6 text-red-600" />;
+  if (req.id.includes('smoke') || req.id.includes('fire') || req.id.includes('civil_defense')) return <FireIcon className="w-6 h-6 text-red-600" />;
+  if (req.id.includes('ejar')) return <DocumentCheckIcon className="w-6 h-6 text-green-600" />;
+  if (req.id.includes('title_deed')) return <DocumentCheckIcon className="w-6 h-6 text-blue-600" />;
+  if (req.id.includes('watani')) return <MapPinIcon className="w-6 h-6 text-blue-600" />;
   return <DocumentCheckIcon className="w-6 h-6 text-blue-600" />;
 };
 
@@ -130,6 +134,35 @@ const CountrySpecificInfo: React.FC<{ countryCode: CountryCode }> = ({ countryCo
             <p className="text-sm text-amber-800">
               <strong>⚠️ Tax Requirements:</strong> All rental agreements must be submitted electronically via TAXISnet. 
               Failure to declare rental income can result in substantial penalties.
+            </p>
+          </div>
+        </div>
+      );
+
+    case 'SA':
+      return (
+        <div className="space-y-4">
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+            <h4 className="font-semibold text-blue-900 mb-2">🇸🇦 Saudi Arabia Property Compliance</h4>
+            <p className="text-sm text-blue-800 mb-3">
+              Saudi rental market regulations are governed by the Ejar system.
+              All residential rental contracts must be registered electronically.
+            </p>
+            <div className="space-y-2 text-sm text-blue-800">
+              <p><strong>Key Points:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>All contracts must be registered in Ejar (mandatory)</li>
+                <li>Valid Title Deed (Sukuk) required for property registration</li>
+                <li>Building Permit must be valid and correspond to the property</li>
+                <li>National Address (Watani Address) registration is mandatory</li>
+                <li>Civil Defense permit required for some property types</li>
+              </ul>
+            </div>
+          </div>
+          <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+            <p className="text-sm text-amber-800">
+              <strong>⚠️ Ejar Registration:</strong> Contracts not registered in Ejar are not legally binding and cannot be enforced in court.
+              Ensure all tenant details match their Absher records.
             </p>
           </div>
         </div>
@@ -250,6 +283,14 @@ export const ComplianceGuideModal: React.FC<ComplianceGuideModalProps> = ({
                   <p>• <a href="https://www.aade.gr/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ΑΑΔΕ (Tax Authority)</a></p>
                   <p>• <a href="https://www.buildingcert.gr/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Building Energy Performance Certificates</a></p>
                   <p>• Consult with a local property lawyer for specific requirements</p>
+                </>
+              )}
+              {countryCode === 'SA' && (
+                <>
+                  <p>• <a href="https://www.ejar.sa/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Ejar (Rental Services Network)</a></p>
+                  <p>• <a href="https://momrah.gov.sa/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">MOMRAH (Municipal & Rural Affairs)</a></p>
+                  <p>• <a href="https://splonline.com.sa/en/national-address-1/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Saudi National Address</a></p>
+                  <p>• <a href="https://998.gov.sa/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Saudi Civil Defense</a></p>
                 </>
               )}
             </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader } from '@googlemaps/js-api-loader';
 import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
 import { MapPinIcon, ArrowsPointingOutIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface PropertyMapProps {
   properties: SimplifiedProperty[];
@@ -19,6 +20,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
   className = ''
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
+  const { formatCurrency } = useCurrency();
   const mapInstanceRef = useRef<any>(null); // Use any to avoid type errors before Google Maps loads
   const markersRef = useRef<any[]>([]); // Use any to avoid type errors before Google Maps loads
   const isLoadingRef = useRef(false);
@@ -119,6 +121,20 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
         // Filter properties with valid stored coordinates
         const propertiesWithValidCoords = properties.filter(p => p.latitude && p.longitude);
+        
+        // If we have Saudi properties, default to Riyadh if we don't have a specific single property or bounds
+        // This helps when loading the map for a Saudi workspace initially
+        if (properties.some(p => p.countryCode === 'SA')) {
+           center = { lat: 24.7136, lng: 46.6753 }; // Riyadh
+           zoom = 6;
+        } else if (properties.some(p => p.countryCode === 'US')) {
+           center = { lat: 37.0902, lng: -95.7129 }; // US
+           zoom = 4;
+        } else if (properties.some(p => p.countryCode === 'GR')) {
+           center = { lat: 37.9838, lng: 23.7275 }; // Greece
+           zoom = 7;
+        }
+
         if (propertiesWithValidCoords.length > 0) {
           if (propertiesWithValidCoords.length === 1) {
             center = { lat: propertiesWithValidCoords[0].latitude!, lng: propertiesWithValidCoords[0].longitude! };
@@ -409,6 +425,18 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
         // Default center (London, UK)
         let center = { lat: 51.5074, lng: -0.1278 };
         let zoom = 10;
+
+        // If we have Saudi properties, default to Riyadh
+        if (properties.some(p => p.countryCode === 'SA')) {
+           center = { lat: 24.7136, lng: 46.6753 }; // Riyadh
+           zoom = 6;
+        } else if (properties.some(p => p.countryCode === 'US')) {
+           center = { lat: 37.0902, lng: -95.7129 }; // US
+           zoom = 4;
+        } else if (properties.some(p => p.countryCode === 'GR')) {
+           center = { lat: 37.9838, lng: 23.7275 }; // Greece
+           zoom = 7;
+        }
 
         if (propertiesWithValidCoords.length > 0) {
           if (propertiesWithValidCoords.length === 1) {

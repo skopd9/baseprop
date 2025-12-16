@@ -565,12 +565,14 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ isOpen, on
                     <span className="text-2xl">
                       {currentOrganization?.country_code === 'UK' ? '🇬🇧' : 
                        currentOrganization?.country_code === 'US' ? '🇺🇸' : 
-                       currentOrganization?.country_code === 'GR' ? '🇬🇷' : '🌍'}
+                       currentOrganization?.country_code === 'GR' ? '🇬🇷' : 
+                       currentOrganization?.country_code === 'SA' ? '🇸🇦' : '🌍'}
                     </span>
                     <span className="font-medium">
                       {currentOrganization?.country_code === 'UK' ? 'United Kingdom' : 
                        currentOrganization?.country_code === 'US' ? 'United States' : 
                        currentOrganization?.country_code === 'GR' ? 'Greece' : 
+                       currentOrganization?.country_code === 'SA' ? 'Saudi Arabia' : 
                        'Not Set'}
                     </span>
                   </div>

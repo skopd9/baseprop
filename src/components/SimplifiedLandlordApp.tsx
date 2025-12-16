@@ -49,6 +49,7 @@ import { SimplifiedTenantService } from '../services/SimplifiedTenantService';
 import { OrganizationService } from '../services/OrganizationService';
 import { DemoDataSeeder } from '../utils/demoDataSeeder';
 import { generateMarketingPDF } from '../utils/generateMarketingPDF';
+import { useCurrency } from '../hooks/useCurrency';
 
 type ViewType = 'dashboard' | 'properties' | 'tenants' | 'inspections' | 'repairs' | 'compliance' | 'rent' | 'expenses' | 'onboarding';
 
@@ -126,6 +127,7 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   onOnboardingComplete
 }) => {
   const { currentOrganization, userOrganizations, currentUserRole, switchOrganization, refreshOrganizations, error: orgError, isLoading: orgLoading } = useOrganization();
+  const { formatCurrency } = useCurrency();
   // Start on onboarding tab if user needs to complete onboarding
   const [currentView, setCurrentView] = useState<ViewType>(showOnboarding ? 'onboarding' : 'dashboard');
   const [properties, setProperties] = useState<SimplifiedProperty[]>([]);
@@ -408,10 +410,10 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
           : null;
         
         const profitMessage = profit !== null 
-          ? ` (${profit >= 0 ? 'Profit' : 'Loss'}: £${Math.abs(profit).toLocaleString()})`
+          ? ` (${profit >= 0 ? 'Profit' : 'Loss'}: ${formatCurrency(Math.abs(profit))})`
           : '';
         
-        setSuccessMessage(`Property marked as sold for £${salesPrice.toLocaleString()}${profitMessage}`);
+        setSuccessMessage(`Property marked as sold for ${formatCurrency(salesPrice)}${profitMessage}`);
       } else {
         setSuccessMessage('Failed to mark property as sold. Please try again.');
       }

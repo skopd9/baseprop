@@ -155,7 +155,6 @@ export class SimplifiedPropertyService {
             property_data
           )
         `)
-        .or('tenant_data->>is_simplified_demo.eq.true,properties.property_data->>is_simplified_demo.eq.true')
         .order('name');
 
       // Filter by organization if provided

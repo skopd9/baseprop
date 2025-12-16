@@ -24,9 +24,13 @@ export function useCurrency() {
   const currencySymbol = getCurrencySymbol(countryCode);
   
   /**
-   * Get currency code (GBP, USD, EUR)
+   * Get currency code (GBP, USD, EUR, SAR)
    */
-  const currencyCode = countryCode === 'UK' ? 'GBP' : countryCode === 'US' ? 'USD' : 'EUR';
+  const currencyCode = 
+    countryCode === 'UK' ? 'GBP' : 
+    countryCode === 'US' ? 'USD' : 
+    countryCode === 'SA' ? 'SAR' : 
+    'EUR';
   
   return {
     countryCode,

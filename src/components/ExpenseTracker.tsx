@@ -11,6 +11,7 @@ import { ExpenseService, Expense, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '..
 import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '../lib/supabase';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface ExpenseTrackerProps {
   properties: SimplifiedProperty[];
@@ -44,6 +45,7 @@ const initialFormData: ExpenseFormData = {
 
 export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) => {
   const { currentOrganization } = useOrganization();
+  const { formatCurrency } = useCurrency();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -245,11 +247,11 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">£{summary.totalExpenses.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-blue-600">{formatCurrency(summary.totalExpenses)}</div>
               <div className="text-sm text-blue-700">Total Expenses</div>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">£{summary.taxDeductibleExpenses.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(summary.taxDeductibleExpenses)}</div>
               <div className="text-sm text-green-700">Tax Deductible</div>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
@@ -258,7 +260,7 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
             </div>
             <div className="bg-orange-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-orange-600">
-                £{summary.totalExpenses > 0 ? (summary.totalExpenses / 12).toFixed(0) : '0'}
+                {formatCurrency(summary.totalExpenses > 0 ? summary.totalExpenses / 12 : 0)}
               </div>
               <div className="text-sm text-orange-700">Avg Monthly</div>
             </div>
@@ -274,7 +276,7 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
                   .map(([category, amount]) => (
                     <div key={category} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                       <span className="text-sm font-medium text-gray-700">{category}</span>
-                      <span className="text-sm font-bold text-gray-900">£{amount.toLocaleString()}</span>
+                      <span className="text-sm font-bold text-gray-900">{formatCurrency(amount)}</span>
                     </div>
                   ))}
               </div>
@@ -353,7 +355,7 @@ export const ExpenseTracker: React.FC<ExpenseTrackerProps> = ({ properties }) =>
                       {getPropertyName(expense.propertyId)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      £{expense.amount.toLocaleString()}
+                      {formatCurrency(expense.amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

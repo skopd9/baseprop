@@ -35,7 +35,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
       const settings = {
         country: country, // Will be saved to country_code column
         country_code: country, // Explicitly set for clarity
-        default_currency: country === 'UK' ? 'GBP' : country === 'GR' ? 'EUR' : 'USD'
+        default_currency: country === 'UK' ? 'GBP' : country === 'GR' ? 'EUR' : country === 'SA' ? 'SAR' : 'USD'
       };
 
       const newWorkspace = await createOrganization(workspaceName.trim(), settings);
@@ -126,6 +126,7 @@ export const CreateWorkspaceModal: React.FC<CreateWorkspaceModalProps> = ({
                 <option value="UK">🇬🇧 United Kingdom</option>
                 <option value="GR">🇬🇷 Greece</option>
                 <option value="US">🇺🇸 United States</option>
+                <option value="SA">🇸🇦 Saudi Arabia</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
                 <svg className="w-4 h-4 inline mr-1" fill="currentColor" viewBox="0 0 20 20">

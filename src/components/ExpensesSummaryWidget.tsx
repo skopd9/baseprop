@@ -1,23 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { ReceiptPercentIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { ExpenseService, Expense } from '../services/ExpenseService';
+import { useOrganization } from '../contexts/OrganizationContext';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface ExpensesSummaryWidgetProps {
   onViewExpenses?: () => void;
 }
 
 export const ExpensesSummaryWidget: React.FC<ExpensesSummaryWidgetProps> = ({ onViewExpenses }) => {
+  const { currentOrganization } = useOrganization();
+  const { formatCurrency } = useCurrency();
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
   const [monthlyTotal, setMonthlyTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadExpensesSummary();
-  }, []);
+    if (currentOrganization?.id) {
+      loadExpensesSummary();
+    }
+  }, [currentOrganization?.id]);
 
   const loadExpensesSummary = async () => {
+    if (!currentOrganization?.id) return;
+    
     try {
-      const expenses = await ExpenseService.getExpenses();
+      const expenses = await ExpenseService.getExpenses(currentOrganization.id);
       
       // Get current month's expenses
       const currentMonth = new Date().getMonth();
@@ -63,7 +71,7 @@ export const ExpensesSummaryWidget: React.FC<ExpensesSummaryWidgetProps> = ({ on
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900">Expenses</h3>
-            <p className="text-sm text-gray-600">This month: £{monthlyTotal.toLocaleString()}</p>
+            <p className="text-sm text-gray-600">This month: {formatCurrency(monthlyTotal)}</p>
           </div>
         </div>
         {onViewExpenses && (
@@ -102,7 +110,7 @@ export const ExpensesSummaryWidget: React.FC<ExpensesSummaryWidgetProps> = ({ on
                   </p>
                 </div>
                 <div className="text-sm font-semibold text-gray-900 ml-2">
-                  £{expense.amount.toLocaleString()}
+                  {formatCurrency(expense.amount)}
                 </div>
               </div>
             ))}
