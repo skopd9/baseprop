@@ -379,7 +379,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
     <div className="bg-white rounded-lg shadow border border-gray-200 flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-200 flex-shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Properties</h3>
             <p className="text-sm text-gray-500">
@@ -387,7 +387,7 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             {/* Bulk Delete Button */}
             {selectedRows.size > 0 && onDeleteProperties && (
               <button
@@ -408,35 +408,37 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
               className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             
-            {/* Type Filter */}
-            <select
-              value={(table.getColumn('propertyType')?.getFilterValue() as string) ?? ''}
-              onChange={(e) => table.getColumn('propertyType')?.setFilterValue(e.target.value || undefined)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {propertyTypes.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-            
-            {/* Status Filter */}
-            <select
-              value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
-              onChange={(e) => table.getColumn('status')?.setFilterValue(e.target.value || undefined)}
-              className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              {statusTypes.map((status) => (
-                <option key={status.value} value={status.value}>
-                  {status.label}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2 w-full sm:w-auto">
+              {/* Type Filter */}
+              <select
+                value={(table.getColumn('propertyType')?.getFilterValue() as string) ?? ''}
+                onChange={(e) => table.getColumn('propertyType')?.setFilterValue(e.target.value || undefined)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {propertyTypes.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+              
+              {/* Status Filter */}
+              <select
+                value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
+                onChange={(e) => table.getColumn('status')?.setFilterValue(e.target.value || undefined)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {statusTypes.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <button
               onClick={onAddProperty}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 whitespace-nowrap"
             >
               <HomeIcon className="w-4 h-4 mr-2" />
               Add Property
@@ -445,78 +447,128 @@ export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProp
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
-            {table.getHeaderGroups().map(headerGroup => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <th
-                    key={header.id}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                    style={{ width: header.getSize() }}
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())
-                        }
-                      </span>
-                      {header.column.getCanSort() && (
-                        <div className="flex flex-col">
-                          {header.column.getIsSorted() === 'asc' ? (
-                            <ChevronUpIcon className="w-3 h-3 text-gray-600" />
-                          ) : header.column.getIsSorted() === 'desc' ? (
-                            <ChevronDownIcon className="w-3 h-3 text-gray-600" />
-                          ) : (
-                            <div className="w-3 h-3 opacity-0">
-                              <ChevronUpIcon className="w-3 h-3" />
-                            </div>
-                          )}
+      {/* Card Grid */}
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {table.getRowModel().rows.map(row => {
+            const property = row.original;
+            const isSelected = selectedProperty?.id === property.id;
+            const isChecked = selectedRows.has(property.id);
+            const primaryPhotoUrl = primaryPhotoUrls.get(property.id);
+            const hasFailed = failedImageIds.has(property.id);
+            const shouldShowImage = primaryPhotoUrl && !hasFailed;
+            const occupancyInfo = getOccupancyDisplay(property, safeTenants);
+            
+            // Calculate rent info
+            const propertyTenants = tenantsByProperty.get(property.id) || [];
+            const actualRent = propertyTenants.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
+
+            return (
+              <div 
+                key={row.id}
+                className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md flex flex-col
+                  ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-gray-200'}
+                  ${isChecked ? 'bg-blue-50' : ''}
+                `}
+              >
+                {/* Card Header */}
+                <div className="p-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleRowSelection(property.id);
+                        }}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                      />
+                      <span className="text-xs font-medium text-gray-500">Ref: {property.propertyReference}</span>
+                    </div>
+                    <h4 className="text-base font-semibold text-gray-900 truncate" title={property.address}>
+                      {property.address}
+                    </h4>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${getStatusColor(occupancyInfo.status)}`}>
+                    {occupancyInfo.label}
+                  </span>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-4 flex-1 space-y-4">
+                  {/* Image and Basic Info */}
+                  <div className="flex gap-4">
+                    <div 
+                      className="w-20 h-20 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPhotoViewerProperty(property);
+                      }}
+                    >
+                      {shouldShowImage ? (
+                        <img
+                          src={primaryPhotoUrl}
+                          alt={property.address}
+                          className="w-full h-full object-cover"
+                          onError={() => setFailedImageIds(prev => new Set(prev).add(property.id))}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <PhotoIcon className="w-8 h-8" />
                         </div>
                       )}
                     </div>
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {table.getRowModel().rows.map(row => {
-              const isSelected = selectedProperty?.id === row.original.id;
-              return (
-                <tr
-                  key={row.id}
-                  className={`cursor-pointer transition-colors hover:bg-blue-25 ${
-                    isSelected
-                      ? 'bg-blue-50 border-l-4 border-blue-500'
-                      : 'border-l-4 border-transparent hover:border-l-4 hover:border-blue-200'
-                  }`}
-                  onClick={() => onPropertySelect(row.original)}
-                >
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-4 py-4 whitespace-nowrap text-sm">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-          {/* End of Table Indicator */}
-          {table.getRowModel().rows.length > 0 && (
-            <tfoot className="sticky bottom-0 bg-gray-50 z-10">
-              <tr>
-                <td colSpan={9} className="px-4 py-3 text-center text-xs text-gray-500 border-t border-gray-200">
-                  End of table • {table.getRowModel().rows.length} {table.getRowModel().rows.length === 1 ? 'property' : 'properties'} shown
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-900 capitalize flex items-center gap-1">
+                        <HomeIcon className="w-4 h-4 text-gray-400" />
+                        {property.propertyType}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {property.propertyType === 'hmo' && property.unitDetails 
+                          ? `${property.unitDetails.length} units • ${property.bedrooms} bed • ${property.bathrooms} bath`
+                          : `${property.bedrooms} bed • ${property.bathrooms} bath`
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Financials */}
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
+                    <div>
+                      <p className="text-xs text-gray-500">Target Rent</p>
+                      <p className="text-sm font-medium text-gray-900">{formatCurrency(property.targetRent)}</p>
+                    </div>
+                    {actualRent > 0 && (
+                      <div>
+                        <p className="text-xs text-gray-500">Actual Rent</p>
+                        <p className={`text-sm font-medium ${actualRent >= property.targetRent ? 'text-green-600' : 'text-orange-600'}`}>
+                          {formatCurrency(actualRent)}
+                        </p>
+                      </div>
+                    )}
+                    {property.purchasePrice && (
+                      <div>
+                        <p className="text-xs text-gray-500">Purchase Price</p>
+                        <p className="text-sm font-medium text-gray-900">{formatCurrency(property.purchasePrice)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Actions */}
+                <div className="px-4 py-3 bg-gray-50 rounded-b-lg border-t border-gray-100 flex justify-end">
+                  <button
+                    onClick={() => onPropertySelect(property)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 bg-white border border-blue-200 hover:border-blue-300 rounded px-3 py-1.5 transition-colors shadow-sm"
+                  >
+                    Manage Property
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Empty State */}

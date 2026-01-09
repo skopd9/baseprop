@@ -369,7 +369,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
     <div className="bg-white rounded-lg shadow border border-gray-200 flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-200 flex-shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Tenants</h3>
             <p className="text-sm text-gray-500">
@@ -377,7 +377,7 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
             </p>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             {/* Bulk Delete Button */}
             {selectedRows.size > 0 && onDeleteTenants && (
               <button
@@ -411,93 +411,174 @@ export const ResidentialTenantsTable: React.FC<ResidentialTenantsTableProps> = (
               ))}
             </select>
 
-            <div className="flex space-x-3">
-              <button
-                onClick={onAddTenant}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <UserIcon className="w-4 h-4 mr-2" />
-                Add Tenant
-              </button>
-              
-
-            </div>
+            <button
+              onClick={onAddTenant}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 whitespace-nowrap"
+            >
+              <UserIcon className="w-4 h-4 mr-2" />
+              Add Tenant
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
-            {table.getHeaderGroups().map(headerGroup => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <th
-                    key={header.id}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none"
-                    style={{ width: header.getSize() }}
-                    onClick={header.column.getCanSort() ? header.column.getToggleSortingHandler() : undefined}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(header.column.columnDef.header, header.getContext())
-                        }
-                      </span>
-                      {header.column.getCanSort() && (
-                        <div className="flex flex-col">
-                          {header.column.getIsSorted() === 'asc' ? (
-                            <ChevronUpIcon className="w-3 h-3 text-gray-600" />
-                          ) : header.column.getIsSorted() === 'desc' ? (
-                            <ChevronDownIcon className="w-3 h-3 text-gray-600" />
-                          ) : (
-                            <div className="w-3 h-3 opacity-0">
-                              <ChevronUpIcon className="w-3 h-3" />
-                            </div>
-                          )}
-                        </div>
-                      )}
+      {/* Card Grid */}
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {table.getRowModel().rows.map(row => {
+            const tenant = row.original;
+            const isSelected = selectedTenant?.id === tenant.id;
+            const isChecked = selectedRows.has(tenant.id);
+            
+            // Onboarding Status Logic
+            const onboardingStatus = {
+              status: tenant.onboardingStatus || 'not_started',
+              progress: tenant.onboardingProgress || 0
+            };
+            const statusLabels: Record<string, string> = {
+              'not_started': 'Not Started',
+              'in_progress': 'In Progress',
+              'completed': 'Completed'
+            };
+            const statusColors: Record<string, string> = {
+              'not_started': 'bg-gray-100 text-gray-800 border-gray-200',
+              'in_progress': 'bg-blue-100 text-blue-800 border-blue-200',
+              'completed': 'bg-green-100 text-green-800 border-green-200'
+            };
+
+            // Lease Logic
+            const isExpiringSoon = tenant.leaseEnd && tenant.leaseEnd <= new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+
+            return (
+              <div 
+                key={row.id}
+                className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md flex flex-col
+                  ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-gray-200'}
+                  ${isChecked ? 'bg-blue-50' : ''}
+                `}
+                onClick={() => handleTenantRowClick(tenant)}
+              >
+                {/* Card Header */}
+                <div className="p-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleRowSelection(tenant.id);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                      />
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <UserIcon className="w-3 h-3" />
+                        <span className="truncate">{tenant.unitNumber ? `Unit: ${tenant.unitNumber}` : 'Whole property'}</span>
+                      </div>
                     </div>
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {table.getRowModel().rows.map(row => {
-              const isSelected = selectedTenant?.id === row.original.id;
-              return (
-                <tr
-                  key={row.id}
-                  className={`cursor-pointer transition-colors hover:bg-blue-25 ${
-                    isSelected
-                      ? 'bg-blue-50 border-l-4 border-blue-500'
-                      : 'border-l-4 border-transparent hover:border-l-4 hover:border-blue-200'
-                  }`}
-                  onClick={() => handleTenantRowClick(row.original)}
-                >
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-4 py-4 whitespace-nowrap text-sm">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-          {/* End of Table Indicator */}
-          {table.getRowModel().rows.length > 0 && (
-            <tfoot className="sticky bottom-0 bg-gray-50 z-10">
-              <tr>
-                <td colSpan={8} className="px-4 py-3 text-center text-xs text-gray-500 border-t border-gray-200">
-                  End of table • {table.getRowModel().rows.length} {table.getRowModel().rows.length === 1 ? 'tenant' : 'tenants'} shown
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
+                    <h4 className="text-base font-semibold text-gray-900 truncate" title={tenant.name}>
+                      {tenant.name}
+                    </h4>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${statusColors[onboardingStatus.status]}`}>
+                      {statusLabels[onboardingStatus.status]}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-4 flex-1 space-y-4">
+                  {/* Property */}
+                  <div className="flex items-start gap-2">
+                    <HomeIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-gray-600 line-clamp-2" title={tenant.propertyAddress}>
+                      {tenant.propertyAddress}
+                    </p>
+                  </div>
+
+                  {/* Contact */}
+                  <div className="space-y-1">
+                    {tenant.phone && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <PhoneIcon className="w-4 h-4 text-gray-400" />
+                        <span>{tenant.phone}</span>
+                      </div>
+                    )}
+                    {tenant.email && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <EnvelopeIcon className="w-4 h-4 text-gray-400" />
+                        <span className="truncate" title={tenant.email}>{tenant.email}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Financials & Dates */}
+                  <div className="pt-2 border-t border-gray-50 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                        <CurrencyPoundIcon className="w-3 h-3" /> Monthly Rent
+                      </p>
+                      <p className="text-sm font-medium text-gray-900">{formatCurrency(tenant.monthlyRent)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 flex items-center gap-1">
+                        <CalendarIcon className="w-3 h-3" /> Lease End
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-900">
+                          {tenant.leaseEnd ? formatDate(tenant.leaseEnd) : 'Not set'}
+                        </p>
+                        {isExpiringSoon && (
+                          <span className="w-2 h-2 rounded-full bg-yellow-400" title="Expires soon" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Onboarding Progress Bar */}
+                  {onboardingStatus.progress > 0 && (
+                    <div className="pt-2">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Onboarding Progress</span>
+                        <span>{onboardingStatus.progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-1.5 rounded-full transition-all duration-500" 
+                          style={{ width: `${onboardingStatus.progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Card Actions */}
+                <div className="px-4 py-3 bg-gray-50 rounded-b-lg border-t border-gray-100 flex justify-between items-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOnboardingAction(e, tenant);
+                    }}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    Manage Onboarding
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewDetails(e, tenant);
+                    }}
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900 bg-white border border-gray-300 hover:bg-gray-50 rounded px-3 py-1.5 transition-colors shadow-sm"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Empty State */}

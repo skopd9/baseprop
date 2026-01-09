@@ -706,10 +706,10 @@ export const InvoiceManager: React.FC<InvoiceManagerProps> = ({ onSuccess }) => 
         </div>
       </div>
 
-      {/* Tenant Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      {/* Tenant Grid */}
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 300px)' }}>
         {filteredTenants.length === 0 ? (
-          <div className="p-12 text-center">
+          <div className="p-12 text-center bg-white rounded-lg shadow-sm">
             <DocumentTextIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               {tenants.length === 0 ? 'No tenants found' : 'No matching tenants'}
@@ -721,96 +721,95 @@ export const InvoiceManager: React.FC<InvoiceManagerProps> = ({ onSuccess }) => 
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tenant
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Property
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Monthly Rent
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Next Invoice
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Pending Approval
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTenants.map((tenant) => {
-                  const hasPendingApproval = tenant.nextInvoice && !isAutoMode;
-                  return (
-                  <tr
-                    key={tenant.id}
-                    onClick={() => setSelectedTenant(tenant)}
-                    className={`cursor-pointer transition-colors ${
-                      hasPendingApproval
-                        ? 'bg-amber-50 hover:bg-amber-100 border-l-4 border-amber-500'
-                        : tenant.overdueCount > 0
-                          ? 'bg-red-50 hover:bg-red-100 border-l-4 border-red-500'
-                          : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm ${
-                          tenant.overdueCount > 0 
-                            ? 'bg-red-100 text-red-600'
-                            : tenant.nextInvoice 
-                              ? 'bg-amber-100 text-amber-600' 
-                              : 'bg-blue-100 text-blue-600'
-                        }`}>
-                          {tenant.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-900">{tenant.name}</p>
-                          <p className="text-xs text-gray-500">{tenant.email || 'No email'}</p>
-                        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredTenants.map((tenant) => {
+              const hasPendingApproval = tenant.nextInvoice && !isAutoMode;
+              const isSelected = selectedTenant?.id === tenant.id;
+              
+              return (
+                <div
+                  key={tenant.id}
+                  onClick={() => setSelectedTenant(tenant)}
+                  className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md flex flex-col cursor-pointer
+                    ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-gray-200'}
+                    ${hasPendingApproval ? 'border-l-4 border-l-amber-500' : ''}
+                    ${tenant.overdueCount > 0 ? 'border-l-4 border-l-red-500' : ''}
+                  `}
+                >
+                  {/* Card Header */}
+                  <div className="p-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0 ${
+                        tenant.overdueCount > 0 
+                          ? 'bg-red-100 text-red-600'
+                          : tenant.nextInvoice 
+                            ? 'bg-amber-100 text-amber-600' 
+                            : 'bg-blue-100 text-blue-600'
+                      }`}>
+                        {tenant.name.charAt(0).toUpperCase()}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-900 max-w-xs truncate">{tenant.propertyAddress}</p>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <p className="text-sm font-medium text-gray-900">{formatCurrency(tenant.monthlyRent)}</p>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {tenant.nextInvoice ? (
-                        <div>
-                          <p className="text-sm text-gray-900">{formatDate(tenant.nextInvoice.invoiceDate)}</p>
-                          <p className="text-xs text-gray-500">Due: {formatDate(tenant.nextInvoice.dueDate)}</p>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-500">-</p>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold text-gray-900 truncate" title={tenant.name}>{tenant.name}</p>
+                        <p className="text-xs text-gray-500 truncate" title={tenant.email}>{tenant.email || 'No email'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Body */}
+                  <div className="p-4 flex-1 space-y-4">
+                    {/* Property */}
+                    <div className="flex items-start gap-2">
+                      <HomeIcon className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-gray-600 line-clamp-2" title={tenant.propertyAddress}>
+                        {tenant.propertyAddress}
+                      </p>
+                    </div>
+
+                    {/* Financials & Dates */}
+                    <div className="pt-2 border-t border-gray-50 grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <CurrencyIcon className="w-3 h-3" /> Monthly Rent
+                        </p>
+                        <p className="text-sm font-medium text-gray-900">{formatCurrency(tenant.monthlyRent)}</p>
+                      </div>
+                      <div>
+                        {tenant.nextInvoice ? (
+                          <>
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              <ClockIcon className="w-3 h-3" /> Next Invoice
+                            </p>
+                            <p className="text-sm font-medium text-gray-900">{formatDate(tenant.nextInvoice.invoiceDate)}</p>
+                            <p className="text-xs text-gray-400">Due: {formatDate(tenant.nextInvoice.dueDate)}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-xs text-gray-500">Next Invoice</p>
+                            <p className="text-sm text-gray-400">-</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Actions/Footer */}
+                  <div className="px-4 py-3 bg-gray-50 rounded-b-lg border-t border-gray-100 flex items-center justify-between gap-2">
+                    <div className="flex-1">
                       {getStatusBadge(tenant)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      {hasPendingApproval ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <BellAlertIconSolid className="w-5 h-5 text-amber-500 animate-pulse" />
-                          <span className="text-xs font-medium text-amber-700">Yes</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    </div>
+                    
+                    {hasPendingApproval && tenant.nextInvoice && (
+                      <button
+                        onClick={(e) => handleApprove(tenant.nextInvoice!, e)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                      >
+                        Approve
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
