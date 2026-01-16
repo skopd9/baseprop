@@ -105,7 +105,7 @@ Changed `sendOrganizationInvitationEmail()` to:
 
 ### 3. Updated Configuration
 **Files:** 
-- `netlify.toml` - Added functions configuration
+- Netlify configuration - Added functions configuration
 - `package.json` - Added `@netlify/functions` dependency
 
 ### 4. Fixed Logging Issue
@@ -217,7 +217,7 @@ FROM_EMAIL=...                  # ✅ Private
 
 **Solutions:**
 1. Make sure you deployed to Netlify
-2. Check `netlify.toml` has `[functions]` section
+2. Check Netlify configuration has a `[functions]` section
 3. Verify function file is in `netlify/functions/` directory
 4. Check Netlify build logs for errors
 

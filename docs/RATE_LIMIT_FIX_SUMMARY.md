@@ -119,7 +119,7 @@ Your magic link emails now feature:
 ### Modified Files:
 - `src/lib/supabase.ts` - Updated `signInWithMagicLink()`
 - `src/components/AuthModal.tsx` - Enhanced protection
-- `netlify.toml` - Added env var documentation
+- Netlify configuration - Added env var documentation
 
 ---
 

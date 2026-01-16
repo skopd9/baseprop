@@ -20,8 +20,6 @@ interface SimplifiedDashboardProps {
   onViewRent?: () => void;
   onViewInspections?: () => void;
   onViewExpenses?: () => void;
-  onLoadDemoData?: () => void;
-  isLoadingDemo?: boolean;
   selectedProperty?: SimplifiedProperty | null;
   onPropertySelect?: (property: SimplifiedProperty) => void;
 }

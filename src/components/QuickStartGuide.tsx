@@ -14,8 +14,6 @@ interface QuickStartGuideProps {
   onAddTenant: () => void;
   onViewRent: () => void;
   onViewInspections: () => void;
-  onLoadDemoData?: () => void;
-  isLoadingDemo?: boolean;
 }
 
 export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({
@@ -25,8 +23,6 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({
   onAddTenant,
   onViewRent,
   onViewInspections,
-  onLoadDemoData,
-  isLoadingDemo = false
 }) => {
   const steps = [
     {
@@ -157,27 +153,6 @@ export const QuickStartGuide: React.FC<QuickStartGuideProps> = ({
           );
         })}
       </div>
-
-      {/* Demo data option for new users */}
-      {properties.length === 0 && tenants.length === 0 && onLoadDemoData && (
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-blue-900">Want to explore first?</h4>
-              <p className="text-sm text-blue-700">
-                Load sample properties and tenants to see how the system works before adding your own data.
-              </p>
-            </div>
-            <button
-              onClick={onLoadDemoData}
-              disabled={isLoadingDemo}
-              className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {isLoadingDemo ? 'Loading...' : 'Try Demo Data'}
-            </button>
-          </div>
-        </div>
-      )}
 
       {completedSteps === steps.length && (
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">

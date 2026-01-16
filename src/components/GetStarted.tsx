@@ -9,8 +9,6 @@ interface GetStartedProps {
   onAddTenant: (tenant: SimplifiedTenant) => void;
   onViewRent: () => void;
   onViewInspections: () => void;
-  onLoadDemoData?: () => void;
-  isLoadingDemo?: boolean;
   onComplete?: () => void;
 }
 
@@ -21,8 +19,6 @@ export const GetStarted: React.FC<GetStartedProps> = ({
   onAddTenant,
   onViewRent,
   onViewInspections,
-  onLoadDemoData,
-  isLoadingDemo,
   onComplete
 }) => {
   return (

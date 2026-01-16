@@ -151,7 +151,7 @@ Make sure these are set in Netlify:
 ### Netlify Functions
 The new `check-user-exists` function will be automatically deployed when you push to your repository, as long as:
 1. Files are in `netlify/functions/` directory ✅
-2. `netlify.toml` has functions directory configured ✅
+2. Netlify functions directory is configured ✅
 3. Environment variables are set in Netlify UI
 
 ### Testing Locally with Netlify CLI

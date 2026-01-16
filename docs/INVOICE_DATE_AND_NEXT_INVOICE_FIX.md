@@ -231,7 +231,7 @@ The new setting only applies to **newly created invoices**. Existing invoices ne
 **Note:** This only affects unapproved/unpaid invoices. Already paid invoices will be recreated but marked correctly.
 
 ### Option 2: SQL Update (For All Tenants at Once)
-Run the script `scripts/update_existing_invoice_dates.sql` in your database:
+Run this SQL in your database:
 
 ```sql
 -- Update all invoices to have invoice_date 7 days before period_start
@@ -284,4 +284,3 @@ After this, you should see:
 
 **Files Added:**
 - `src/components/RegenerateInvoicesButton.tsx` - UI button to regenerate invoices
-- `scripts/update_existing_invoice_dates.sql` - SQL script to update all invoices at once

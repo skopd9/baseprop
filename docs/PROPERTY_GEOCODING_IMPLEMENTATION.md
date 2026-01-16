@@ -29,11 +29,8 @@ Successfully implemented lat/lon storage for properties to eliminate repeated Go
 - Updated map initialization to use stored `latitude`/`longitude` directly
 - Properties without coordinates are automatically filtered out
 
-### 5. Backfill Script ✅
-- **File**: `src/scripts/backfill-property-coordinates.ts`
-- Created script to geocode all existing properties
-- Includes rate limiting (100ms delay between requests)
-- Comprehensive error handling and progress reporting
+### 5. Backfill ✅
+- Existing properties can be backfilled using a one-off admin process in Supabase
 
 ## How It Works
 
@@ -54,45 +51,9 @@ When the map loads:
 - **After**: 1 geocoding API call per property (only when created/updated)
 - **Estimated savings**: 99% reduction in geocoding API calls
 
-## Running the Backfill Script
+## Backfilling Existing Properties
 
-The backfill script geocodes all existing properties that don't have coordinates yet.
-
-### Prerequisites
-1. Make sure your `.env` or `.env.local` file contains:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_GOOGLE_MAP_API=your_google_maps_api_key
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # Required due to RLS
-   ```
-
-2. Get your Supabase Service Role Key:
-   - Go to [Supabase Dashboard](https://app.supabase.com)
-   - Navigate to: Project Settings > API
-   - Copy the `service_role` key (keep it secret!)
-   - Add it to your `.env` file as `SUPABASE_SERVICE_ROLE_KEY`
-
-### Running the Script
-```bash
-cd /Users/re/Projects/reos-2
-npx tsx src/scripts/backfill-property-coordinates.ts
-```
-
-### Why Service Role Key is Needed
-The `properties` table has Row Level Security (RLS) enabled. The backfill script needs admin access to read and update all properties, which requires the service role key that bypasses RLS.
-
-### Alternative: Disable RLS Temporarily
-If you prefer not to use the service role key, you can temporarily disable RLS:
-
-```sql
--- Disable RLS temporarily
-ALTER TABLE properties DISABLE ROW LEVEL SECURITY;
-
--- Run backfill script with VITE_SUPABASE_ANON_KEY
-
--- Re-enable RLS
-ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
-```
+If you need to backfill coordinates for existing properties, use an admin process in Supabase (service role required) to geocode and update missing `latitude`/`longitude` values.
 
 ## Testing
 
@@ -135,7 +96,7 @@ Optional improvements for later:
 2. `src/utils/simplifiedDataTransforms.ts` - Modified
 3. `src/services/SimplifiedPropertyService.ts` - Modified
 4. `src/components/PropertyMap.tsx` - Modified
-5. `src/scripts/backfill-property-coordinates.ts` - New
+5. Backfill process (admin-only) - New
 
 ## Notes
 

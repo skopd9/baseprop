@@ -24,7 +24,7 @@ CORS policy: No 'Access-Control-Allow-Origin' header
 - `sendOrganizationInvitationEmail()` updated
 
 ### 3. Configuration Changes ⚙️
-- `netlify.toml` - Added functions config
+- Netlify configuration - Added functions config
 - `package.json` - Added `@netlify/functions` dependency
 
 ### 4. Fixed Email Logging 🐛
@@ -94,7 +94,7 @@ Open: `http://localhost:8888` (not 5173)
 
 ✅ Modified:
 - `src/services/EmailNotificationService.ts` - Use function instead of direct API
-- `netlify.toml` - Functions configuration
+- Netlify configuration - Functions configuration
 - `package.json` - Added @netlify/functions
 
 ---

@@ -114,19 +114,7 @@ If we added `organization_id` to `user_profiles`, we could only store ONE organi
 
 ## Migration Steps
 
-### Step 1: Run Migration Check
-```bash
-# In Supabase SQL Editor, run:
-scripts/checkMigrationStatus.sql
-```
-
-This will tell you:
-- ✅ Which tables exist
-- ✅ If you have a user profile
-- ✅ If you have organization memberships
-- ✅ If RLS is enabled
-
-### Step 2: Run Schema Improvements
+### Step 1: Run Schema Improvements
 ```bash
 # In Supabase SQL Editor, run:
 migrations/improve_user_profiles_schema.sql
@@ -137,11 +125,8 @@ This adds:
 - Convenient views for querying
 - Helper functions
 
-### Step 3: Create Your Organization
-```bash
-# In Supabase SQL Editor, run:
-scripts/createOrganization.sql
-```
+### Step 2: Create Your Organization
+Create a new organization from the app UI, or insert via SQL if you prefer.
 
 ### Step 4: Verify
 ```sql

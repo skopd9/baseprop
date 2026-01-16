@@ -52,7 +52,6 @@ import { SimplifiedProperty, SimplifiedTenant } from '../utils/simplifiedDataTra
 import { SimplifiedPropertyService } from '../services/SimplifiedPropertyService';
 import { SimplifiedTenantService } from '../services/SimplifiedTenantService';
 import { OrganizationService } from '../services/OrganizationService';
-import { DemoDataSeeder } from '../utils/demoDataSeeder';
 import { generateMarketingPDF } from '../utils/generateMarketingPDF';
 import { useCurrency } from '../hooks/useCurrency';
 
@@ -175,7 +174,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
   const [tenantForManagement, setTenantForManagement] = useState<SimplifiedTenant | null>(null);
   
   // Demo data loading state
-  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
 
   // Leave workspace state
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -634,8 +632,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
             onAddTenant={handleTenantAdded}
             onViewRent={() => setCurrentView('rent')}
             onViewInspections={() => setCurrentView('inspections')}
-            onLoadDemoData={loadDemoData}
-            isLoadingDemo={isLoadingDemo}
             onComplete={() => {
               setSuccessMessage('Onboarding completed! Welcome to your dashboard.');
               setCurrentView('dashboard');
@@ -653,8 +649,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
             onViewRent={() => setCurrentView('rent')}
             onViewInspections={() => setCurrentView('inspections')}
             onViewExpenses={() => setCurrentView('expenses')}
-            onLoadDemoData={loadDemoData}
-            isLoadingDemo={isLoadingDemo}
             selectedProperty={selectedProperty}
             onPropertySelect={handlePropertySelect}
           />
@@ -752,20 +746,6 @@ export const SimplifiedLandlordApp: React.FC<SimplifiedLandlordAppProps> = ({
 
   const currentNavItem = navigationItems.find(item => item.id === currentView);
 
-  const loadDemoData = async () => {
-    setIsLoadingDemo(true);
-    try {
-      const { properties: demoProperties, tenants: demoTenants } = await DemoDataSeeder.seedDemoData();
-      setProperties(demoProperties);
-      setTenants(demoTenants);
-      setSuccessMessage('Demo data loaded! Explore the features with sample properties and tenants.');
-    } catch (error) {
-      console.error('Error loading demo data:', error);
-      setSuccessMessage('Failed to load demo data. Please try again.');
-    } finally {
-      setIsLoadingDemo(false);
-    }
-  };
 
   const handleLeaveWorkspace = () => {
     setShowLeaveConfirm(true);

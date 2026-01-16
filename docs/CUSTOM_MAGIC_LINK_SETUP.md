@@ -131,7 +131,7 @@ User receives beautiful email instantly
 ### Updated Files:
 - `src/lib/supabase.ts` - Updated `signInWithMagicLink` to use custom function
 - `src/components/AuthModal.tsx` - Enhanced rate limit protection
-- `netlify.toml` - Added environment variable documentation
+- Netlify configuration - Added environment variable documentation
 
 ---
 

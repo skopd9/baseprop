@@ -121,7 +121,7 @@ and property-related workflows
 We've added security headers to improve the site's reputation. Additional steps:
 
 1. **Ensure consistent HTTPS**: ✅ Already done (Let's Encrypt)
-2. **Add security headers**: ✅ Added to netlify.toml
+2. **Add security headers**: ✅ Added in hosting configuration
 3. **Get business verification**: Submit business details to categorization services
 4. **Build domain age**: As the domain ages, it gains reputation
 5. **Monitor security**: Keep SSL certificates up to date
@@ -169,7 +169,7 @@ When contacting IT, provide:
 - [ ] SSL Certificate: Valid Let's Encrypt (expires Feb 2026)
 - [ ] Hosting provider: Netlify
 - [ ] Business purpose: Property management application
-- [ ] Security headers: Configured (see netlify.toml)
+- [ ] Security headers: Configured (see hosting configuration)
 - [ ] HTTPS: Enabled and working
 - [ ] Certificate transparency: Publicly logged
 
@@ -214,6 +214,6 @@ These headers help firewalls recognize the site as legitimate and secure.
 
 If IT needs additional information:
 - Check Netlify dashboard for SSL certificate details
-- Review security headers in `netlify.toml`
+- Review security headers in hosting configuration
 - Check domain status at: https://www.ssllabs.com/ssltest/analyze.html?d=base-prop.com
 

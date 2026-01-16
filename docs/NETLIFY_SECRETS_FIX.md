@@ -16,11 +16,10 @@ Removed hardcoded placeholder text that looked like secrets:
 - ✅ Changed to generic variable names with reference to documentation
 
 ### 2. Excluded Build Output from Secret Scanning
-**File:** `netlify.toml`
 
-Updated SECRETS_SCAN_OMIT_PATHS to exclude the dist directory:
-```toml
-SECRETS_SCAN_OMIT_PATHS = "*.md,*.MD,dist/**"
+Configure `SECRETS_SCAN_OMIT_PATHS` in Netlify site settings to exclude build output:
+```
+SECRETS_SCAN_OMIT_PATHS=*.md,*.MD,dist/**
 ```
 
 This prevents scanning the production bundle where client-side API keys are intentionally embedded.
@@ -89,15 +88,5 @@ Your next Netlify deploy should succeed because:
 - [Google Maps API Key Best Practices](https://developers.google.com/maps/api-security-best-practices)
 - [Supabase Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
 
-## Commit Details
-```
-Commit: Fix Netlify secrets scanner issues
-Files changed:
-  - netlify.toml (excluded dist/ from scanning)
-  - src/services/DocuSignService.ts (removed placeholder values)
-```
-
----
-
-**Status:** ✅ Fixed and pushed to main branch  
+**Status:** ✅ Fixed and ready for deployment  
 **Next:** Monitor the Netlify deployment logs to confirm successful build

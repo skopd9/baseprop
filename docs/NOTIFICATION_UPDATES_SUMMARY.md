@@ -72,7 +72,6 @@ The notification system has been upgraded to show **6 actionable, property-speci
 
 3. **Documentation**
    - Updated `NOTIFICATION_SYSTEM_GUIDE.md` with new types
-   - Updated `NOTIFICATION_DEMO.html` to show property-specific examples
 
 ### New Notification Types Enum
 ```typescript

@@ -95,7 +95,7 @@ It includes:
 - ✅ Mobile responsive
 - ✅ Professional styling
 
-**Preview:** Open `INVITATION_EMAIL_PREVIEW.html` in your browser to see it!
+**Preview:** Use the Supabase email template preview in the dashboard to verify rendering.
 
 ---
 

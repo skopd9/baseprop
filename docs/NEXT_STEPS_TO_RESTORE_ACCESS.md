@@ -26,7 +26,7 @@ I've created a complete diagnostic and repair toolkit for restoring access to yo
 2. **Select your project**
 3. **Click "SQL Editor"** in the left sidebar
 4. **Click "New query"**
-5. **Open the file** [`diagnose_workspace_issue.sql`](diagnose_workspace_issue.sql) from this project
+5. **Run the diagnostic SQL** from `RESTORE_WORKSPACE_ACCESS.md`
 6. **Follow the instructions in the file:**
    - Replace `'YOUR_EMAIL_HERE'` with your actual email
    - Run Step 1 to get your User ID
@@ -38,31 +38,22 @@ I've created a complete diagnostic and repair toolkit for restoring access to yo
 
 ### Step 3: Apply the Appropriate Fix (2 minutes)
 
-Based on what the diagnostic shows, use ONE of these files:
+Based on what the diagnostic shows, apply the matching SQL fix:
 
 #### Scenario A: Membership Record Missing (Most Common)
 **Symptoms:** Step 3 in diagnostic returns NO ROWS
 
-**Fix:** Use [`fix_option_a_restore_membership.sql`](fix_option_a_restore_membership.sql)
-- Replace `'YOUR_USER_ID_HERE'` with your User ID
-- Run the entire script
-- This recreates your membership record
+**Fix:** Restore the membership record via SQL in Supabase
 
 #### Scenario B: Status is Inactive
 **Symptoms:** Step 3 returns a row but `status` column shows 'pending' or something other than 'active'
 
-**Fix:** Use [`fix_option_b_update_status.sql`](fix_option_b_update_status.sql)
-- Replace `'YOUR_USER_ID_HERE'` with your User ID
-- Run the entire script
-- This changes status to 'active'
+**Fix:** Update membership status to `active` via SQL in Supabase
 
 #### Scenario C: RLS Policy Problem
 **Symptoms:** Step 5 in diagnostic returns FALSE
 
-**Fix:** Use [`fix_option_c_rls_policy.sql`](fix_option_c_rls_policy.sql)
-- Run the entire script (no replacements needed for most of it)
-- At the end, replace `'YOUR_USER_ID_HERE'` in the test queries
-- This re-applies the security policies
+**Fix:** Re-apply the RLS policies via SQL in Supabase
 
 ### Step 4: Verify It Worked (1 minute)
 
@@ -89,15 +80,7 @@ location.reload();
 
 ## 📁 Files Available
 
-All these files are in your project root:
-
-1. **[RESTORE_WORKSPACE_ACCESS.md](RESTORE_WORKSPACE_ACCESS.md)** - Complete guide with troubleshooting
-2. **[diagnose_workspace_issue.sql](diagnose_workspace_issue.sql)** - Run this first to diagnose
-3. **[fix_option_a_restore_membership.sql](fix_option_a_restore_membership.sql)** - Fix for deleted membership
-4. **[fix_option_b_update_status.sql](fix_option_b_update_status.sql)** - Fix for inactive status
-5. **[fix_option_c_rls_policy.sql](fix_option_c_rls_policy.sql)** - Fix for RLS issues
-
----
+- **`RESTORE_WORKSPACE_ACCESS.md`** - Complete guide with troubleshooting
 
 ## 🎯 Expected Timeline
 

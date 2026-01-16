@@ -63,32 +63,6 @@ Open your app and check:
 
 ---
 
-## 🧪 Testing Tools
-
-### Option 1: Automated Check (Recommended)
-```bash
-node check-maps-setup.js
-```
-
-This will verify:
-- ✅ .env file exists
-- ✅ API key is configured correctly
-- ✅ Required dependencies are installed
-- ⚠️  Common issues
-
-### Option 2: Interactive Browser Test
-```bash
-# Open in browser
-open test-google-maps.html
-```
-
-This interactive tool will:
-- Test your API key
-- Show specific error messages
-- Display a test map if successful
-
----
-
 ## 📁 Documentation Files
 
 | File | Purpose |
@@ -96,19 +70,12 @@ This interactive tool will:
 | **START_HERE_MAPS_FIX.md** | This file - quick start guide |
 | **GOOGLE_MAPS_SETUP.md** | Complete detailed setup guide |
 | **GOOGLE_MAPS_FIX_SUMMARY.md** | Technical details of the fix |
-| **check-maps-setup.js** | Automated verification script |
-| **test-google-maps.html** | Interactive browser test tool |
 
 ---
 
 ## ❓ Troubleshooting
 
 ### Maps Still Not Working?
-
-Run the check script first:
-```bash
-node check-maps-setup.js
-```
 
 ### Common Issues
 
@@ -134,7 +101,7 @@ node check-maps-setup.js
 
 1. Check browser console (F12) for specific error
 2. See detailed solutions in `GOOGLE_MAPS_SETUP.md`
-3. Use test tools to diagnose the issue
+3. Double-check your API key and environment variables
 
 ---
 
@@ -188,19 +155,16 @@ Your API key in `.env` is safe for local development (file is gitignored).
 ## 📚 Next Steps
 
 1. **Right Now**: Add API key to `.env` and restart server
-2. **Test**: Run `node check-maps-setup.js`
-3. **Verify**: Check maps work in your app
-4. **Deploy**: Add API key to production environment variables
-5. **Optimize**: Review usage in [Google Cloud Console](https://console.cloud.google.com/apis/dashboard)
+2. **Verify**: Check maps work in your app
+3. **Deploy**: Add API key to production environment variables
+4. **Optimize**: Review usage in [Google Cloud Console](https://console.cloud.google.com/apis/dashboard)
 
 ---
 
 ## 📖 Need More Details?
 
 - **Full Setup Guide**: See `GOOGLE_MAPS_SETUP.md`
-- **Technical Details**: See `GOOGLE_MAPS_FIX_SUMMARY.md`  
-- **Test Your Setup**: Run `node check-maps-setup.js`
-- **Interactive Test**: Open `test-google-maps.html`
+- **Technical Details**: See `GOOGLE_MAPS_FIX_SUMMARY.md`
 
 ---
 

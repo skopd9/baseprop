@@ -24,7 +24,6 @@ Successfully transformed PropertyFlow from a complex, AI-heavy, workflow-templat
 - `TemplateEditor.tsx` - Custom template editing
 - `StartWorkflowModal.tsx` - Dynamic workflow starting
 - `lib/workflowEngine.ts` - Complex workflow engine
-- `scripts/createSampleWorkflows.ts` - Dynamic workflow creation
 
 **Result:** System now uses standard hardcoded workflows instead of complex customizable templates.
 
