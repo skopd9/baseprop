@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Management Notification System - Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-green-50 to-blue-50 min-h-screen p-8">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold text-gray-900 mb-4">
+                🔔 Smart Notification System
+            </h1>
+            <p class="text-xl text-gray-600">
+                Helping landlords stay on top of their property management
+            </p>
+        </div>
+
+        <!-- Demo Container -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-6">Live Preview</h2>
+            
+            <!-- Notification Bell Demo -->
+            <div class="relative inline-block mb-8">
+                <button class="relative p-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors border-2 border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                    </svg>
+                    <span class="absolute top-1 right-1 flex h-6 w-6 items-center justify-center">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-6 w-6 bg-green-500 text-white text-xs font-bold items-center justify-center">
+                            7
+                        </span>
+                    </span>
+                </button>
+                <p class="text-sm text-gray-500 mt-2">Click to view notifications →</p>
+            </div>
+
+            <!-- Notification Dropdown Preview -->
+            <div class="w-full max-w-md bg-white rounded-lg shadow-2xl border-2 border-gray-200">
+                <div class="p-4 border-b border-gray-200 bg-gray-50">
+                    <h3 class="text-sm font-bold text-gray-900">
+                        Notifications <span class="text-xs font-normal text-gray-500">(7)</span>
+                    </h3>
+                </div>
+
+                <div class="max-h-[500px] overflow-y-auto">
+                    <!-- Property Management Section -->
+                    <div class="px-4 py-2 bg-gray-50 border-b">
+                        <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                            Property Management
+                        </h4>
+                    </div>
+
+                    <!-- High Priority - Right to Rent -->
+                    <div class="p-4 hover:bg-gray-50 transition-colors bg-red-50 border-l-4 border-red-500 border-b">
+                        <p class="text-sm font-semibold text-gray-900 mb-2">
+                            ⚠️ Right to Rent Check Required
+                        </p>
+                        <p class="text-xs text-gray-600 mb-2 leading-relaxed">
+                            Sarah Johnson needs a Right to Rent check. This is legally required before tenancy starts.
+                        </p>
+                        <p class="text-xs text-gray-500 mb-3">⏰ Action required now</p>
+                        <div class="flex items-center gap-2">
+                            <button class="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md hover:bg-gray-800 transition-colors">
+                                Update Status
+                            </button>
+                            <button class="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-700 transition-colors">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- High Priority - Lease Renewal -->
+                    <div class="p-4 hover:bg-gray-50 transition-colors bg-red-50 border-l-4 border-red-500 border-b">
+                        <p class="text-sm font-semibold text-gray-900 mb-2">
+                            📝 Lease Renewal Coming Up
+                        </p>
+                        <p class="text-xs text-gray-600 mb-2 leading-relaxed">
+                            John Smith's lease at 123 Oak Street ends in 25 days. Contact tenant about renewal.
+                        </p>
+                        <p class="text-xs text-gray-500 mb-3">⏰ 25 days remaining</p>
+                        <div class="flex items-center gap-2">
+                            <button class="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md hover:bg-gray-800 transition-colors">
+                                View Tenant
+                            </button>
+                            <button class="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-700 transition-colors">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- High Priority - Deposit Protection -->
+                    <div class="p-4 hover:bg-gray-50 transition-colors bg-red-50 border-l-4 border-red-500 border-b">
+                        <p class="text-sm font-semibold text-gray-900 mb-2">
+                            💰 Deposit Protection Required
+                        </p>
+                        <p class="text-xs text-gray-600 mb-2 leading-relaxed">
+                            Mike Davis's deposit for 456 Pine Avenue needs to be protected. This is legally required.
+                        </p>
+                        <p class="text-xs text-gray-500 mb-3">⏰ Action required now</p>
+                        <div class="flex items-center gap-2">
+                            <button class="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md hover:bg-gray-800 transition-colors">
+                                Update Details
+                            </button>
+                            <button class="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-700 transition-colors">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Medium Priority - HMO License -->
+                    <div class="p-4 hover:bg-gray-50 transition-colors bg-yellow-50 border-l-4 border-yellow-500 border-b">
+                        <p class="text-sm font-semibold text-gray-900 mb-2">
+                            ⚠️ HMO License Expiring Soon
+                        </p>
+                        <p class="text-xs text-gray-600 mb-2 leading-relaxed">
+                            HMO license for 789 Elm Road expires in 60 days. Start renewal process now.
+                        </p>
+                        <p class="text-xs text-gray-500 mb-3">⏰ 60 days remaining</p>
+                        <div class="flex items-center gap-2">
+                            <button class="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md hover:bg-gray-800 transition-colors">
+                                View Property
+                            </button>
+                            <button class="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-700 transition-colors">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Medium Priority - Property Inspection -->
+                    <div class="p-4 hover:bg-gray-50 transition-colors bg-yellow-50 border-l-4 border-yellow-500 border-b">
+                        <p class="text-sm font-semibold text-gray-900 mb-2">
+                            🏠 Property Inspection Recommended
+                        </p>
+                        <p class="text-xs text-gray-600 mb-2 leading-relaxed">
+                            Consider scheduling an inspection for 321 Maple Drive. Regular inspections help identify maintenance issues early.
+                        </p>
+                        <p class="text-xs text-gray-500 mb-3">⏰ 30 days remaining</p>
+                        <div class="flex items-center gap-2">
+                            <button class="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md hover:bg-gray-800 transition-colors">
+                                Schedule Inspection
+                            </button>
+                            <button class="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-700 transition-colors">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Medium Priority - Vacant Property -->
+                    <div class="p-4 hover:bg-gray-50 transition-colors bg-yellow-50 border-l-4 border-yellow-500 border-b">
+                        <p class="text-sm font-semibold text-gray-900 mb-2">
+                            🏚️ Vacant Property
+                        </p>
+                        <p class="text-xs text-gray-600 mb-2 leading-relaxed">
+                            555 Birch Lane has been vacant. Consider marketing it or scheduling a viewing.
+                        </p>
+                        <div class="flex items-center gap-2 mt-3">
+                            <button class="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md hover:bg-gray-800 transition-colors">
+                                Add Tenant
+                            </button>
+                            <button class="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-700 transition-colors">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Medium Priority - Safety Certificates -->
+                    <div class="p-4 hover:bg-gray-50 transition-colors bg-yellow-50 border-l-4 border-yellow-500">
+                        <p class="text-sm font-semibold text-gray-900 mb-2">
+                            🔒 Safety Certificate Tracking
+                        </p>
+                        <p class="text-xs text-gray-600 mb-3 leading-relaxed">
+                            Set up safety certificate reminders for 321 Maple Drive (Gas Safety, EPC, EICR). Never miss renewal deadlines.
+                        </p>
+                        <div class="flex items-center gap-2">
+                            <button class="px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md hover:bg-gray-800 transition-colors">
+                                Set Up Tracking
+                            </button>
+                            <button class="px-2 py-1.5 text-gray-500 text-xs hover:text-gray-700 transition-colors">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Features Grid -->
+        <div class="grid md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <div class="text-4xl mb-3">⚡</div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Smart & Contextual</h3>
+                <p class="text-gray-600 text-sm">
+                    Analyzes your properties and tenants to generate relevant, timely notifications based on actual data.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <div class="text-4xl mb-3">🎯</div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Priority-Based</h3>
+                <p class="text-gray-600 text-sm">
+                    High-priority items (legal compliance) appear first with red borders. Never miss critical deadlines.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <div class="text-4xl mb-3">✅</div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Always Actionable</h3>
+                <p class="text-gray-600 text-sm">
+                    Every notification is tied to a specific property or tenant with clear action buttons. No generic tips!
+                </p>
+            </div>
+        </div>
+
+        <!-- Notification Types -->
+        <div class="bg-white rounded-2xl shadow-2xl p-8 mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-6">Notification Types</h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">🏠 Property Inspections</p>
+                    <p class="text-sm text-gray-600">Reminds you to schedule regular inspections every 6 months</p>
+                </div>
+
+                <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">📝 Lease Renewals</p>
+                    <p class="text-sm text-gray-600">Alerts 60 days before lease ends to contact tenant</p>
+                </div>
+
+                <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">⚠️ Right to Rent (UK)</p>
+                    <p class="text-sm text-gray-600">Ensures legal compliance with UK right to rent checks</p>
+                </div>
+
+                <div class="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">🏢 HMO Licenses</p>
+                    <p class="text-sm text-gray-600">Tracks HMO license expiry with 90-day advance notice</p>
+                </div>
+
+                <div class="border-l-4 border-red-500 bg-red-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">💰 Deposit Protection</p>
+                    <p class="text-sm text-gray-600">Ensures deposits are registered in approved schemes</p>
+                </div>
+
+                <div class="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">🏚️ Vacant Properties</p>
+                    <p class="text-sm text-gray-600">Reminds you to market vacant properties</p>
+                </div>
+
+                <div class="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">🔒 Safety Certificates</p>
+                    <p class="text-sm text-gray-600">Track Gas Safety, EPC, EICR certificate renewals</p>
+                </div>
+
+                <div class="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">📸 Property Photos</p>
+                    <p class="text-sm text-gray-600">Upload photos for marketing and documentation</p>
+                </div>
+
+                <div class="border-l-4 border-blue-500 bg-blue-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">📋 Property Details</p>
+                    <p class="text-sm text-gray-600">Complete missing property information</p>
+                </div>
+
+                <div class="border-l-4 border-yellow-500 bg-yellow-50 p-4 rounded">
+                    <p class="font-semibold text-gray-900 mb-1">📄 Tenant Documents</p>
+                    <p class="text-sm text-gray-600">Complete lease agreements and tenant paperwork</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Benefits -->
+        <div class="bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl shadow-2xl p-8 text-white mb-8">
+            <h2 class="text-3xl font-bold mb-6">Why This Matters</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-xl font-bold mb-2">⚖️ Stay Compliant</h3>
+                    <p class="text-green-50">Never miss legal requirements like right to rent checks, deposit protection, or license renewals.</p>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">💰 Save Money</h3>
+                    <p class="text-green-50">Catch maintenance issues early, minimize vacancy periods, avoid compliance penalties.</p>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">⏰ Save Time</h3>
+                    <p class="text-green-50">Proactive reminders mean less reactive firefighting and last-minute scrambling.</p>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-2">📈 Improve Skills</h3>
+                    <p class="text-green-50">Learn property management best practices through educational tips and guidance.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center text-gray-600">
+            <p class="text-sm">
+                🏠 Built to help landlords manage properties with confidence
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

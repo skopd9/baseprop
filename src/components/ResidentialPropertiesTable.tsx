@@ -1,0 +1,608 @@
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+  ColumnDef,
+  SortingState,
+  ColumnFiltersState,
+} from '@tanstack/react-table';
+import { 
+  HomeIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  CurrencyPoundIcon,
+  TrashIcon,
+  PhotoIcon
+} from '@heroicons/react/24/outline';
+import { PropertyPhotoViewer } from './PropertyPhotoViewer';
+import { PropertyPhotoService } from '../services/PropertyPhotoService';
+import { SimplifiedProperty, SimplifiedTenant, getOccupancyDisplay } from '../utils/simplifiedDataTransforms';
+import { useCurrency } from '../hooks/useCurrency';
+
+interface ResidentialPropertiesTableProps {
+  properties: SimplifiedProperty[];
+  tenants: SimplifiedTenant[];
+  selectedProperty: SimplifiedProperty | null;
+  onPropertySelect: (property: SimplifiedProperty) => void;
+  onAddProperty: () => void;
+  onDeleteProperties?: (properties: SimplifiedProperty[]) => void;
+}
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'occupied':
+      return 'bg-green-100 text-green-800 border-green-200';
+    case 'partially_occupied':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'vacant':
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'under_management':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
+    case 'sold':
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+};
+
+const propertyTypes = [
+  { value: '', label: 'All Types' },
+  { value: 'house', label: 'House' },
+  { value: 'flat', label: 'Flat' },
+  { value: 'hmo', label: 'HMO' },
+];
+
+const statusTypes = [
+  { value: '', label: 'All Status' },
+  { value: 'occupied', label: 'Occupied' },
+  { value: 'partially_occupied', label: 'Partially Occupied' },
+  { value: 'vacant', label: 'Vacant' },
+  { value: 'maintenance', label: 'Under Maintenance' },
+  { value: 'sold', label: 'Sold' },
+];
+
+export const ResidentialPropertiesTable: React.FC<ResidentialPropertiesTableProps> = ({
+  properties,
+  tenants,
+  selectedProperty,
+  onPropertySelect,
+  onAddProperty,
+  onDeleteProperties,
+}) => {
+  const { formatCurrency, currencySymbol } = useCurrency();
+  
+  // Safety checks: ensure arrays are valid
+  const safeProperties = Array.isArray(properties) ? properties : [];
+  const safeTenants = Array.isArray(tenants) ? tenants : [];
+  
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: 'propertyReference', desc: false }
+  ]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState('');
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [photoViewerProperty, setPhotoViewerProperty] = useState<SimplifiedProperty | null>(null);
+  const [primaryPhotoUrls, setPrimaryPhotoUrls] = useState<Map<string, string>>(new Map());
+  const [failedImageIds, setFailedImageIds] = useState<Set<string>>(new Set());
+
+  // Create a map for quick tenant lookup by property
+  const tenantsByProperty = useMemo(() => {
+    const map = new Map<string, SimplifiedTenant[]>();
+    tenants.forEach(tenant => {
+      const existing = map.get(tenant.propertyId) || [];
+      map.set(tenant.propertyId, [...existing, tenant]);
+    });
+    return map;
+  }, [tenants]);
+
+  // Load primary photos for all properties
+  useEffect(() => {
+    const loadPrimaryPhotos = async () => {
+      const photoMap = new Map<string, string>();
+      
+      // Load primary photos for all properties in parallel
+      const photoPromises = safeProperties.map(async (property) => {
+        try {
+          const primaryPhoto = await PropertyPhotoService.getPrimaryPhoto(property.id);
+          if (primaryPhoto?.url) {
+            photoMap.set(property.id, primaryPhoto.url);
+          }
+        } catch (error) {
+          console.error(`Error loading primary photo for property ${property.id}:`, error);
+        }
+      });
+
+      await Promise.all(photoPromises);
+      setPrimaryPhotoUrls(photoMap);
+      // Reset failed images when loading new photos
+      setFailedImageIds(new Set());
+    };
+
+    if (safeProperties.length > 0) {
+      loadPrimaryPhotos();
+    }
+  }, [safeProperties]);
+
+  // Checkbox handlers
+  const toggleRowSelection = useCallback((propertyId: string) => {
+    setSelectedRows(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(propertyId)) {
+        newSelected.delete(propertyId);
+      } else {
+        newSelected.add(propertyId);
+      }
+      return newSelected;
+    });
+  }, []);
+
+  const toggleAllRows = useCallback(() => {
+    if (selectedRows.size === safeProperties.length && safeProperties.length > 0) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(safeProperties.map(p => p.id)));
+    }
+  }, [selectedRows.size, safeProperties]);
+
+  const handleBulkDelete = useCallback(() => {
+    if (onDeleteProperties && selectedRows.size > 0) {
+      const propertiesToDelete = safeProperties.filter(p => selectedRows.has(p.id));
+      onDeleteProperties(propertiesToDelete);
+      setSelectedRows(new Set());
+    }
+  }, [onDeleteProperties, selectedRows, safeProperties]);
+
+  const columns = useMemo<ColumnDef<SimplifiedProperty>[]>(() => [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={selectedRows.size === safeProperties.length && safeProperties.length > 0}
+          onChange={toggleAllRows}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      cell: ({ row }) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selectedRows.has(row.original.id)}
+            onChange={(e) => {
+              e.stopPropagation();
+              toggleRowSelection(row.original.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+        </div>
+      ),
+      size: 50,
+    },
+    {
+      accessorKey: 'propertyReference',
+      header: 'Ref',
+      cell: info => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <span className="text-sm font-medium text-gray-900">
+            {info.getValue() as number}
+          </span>
+        </div>
+      ),
+      size: 60,
+    },
+    {
+      accessorKey: 'address',
+      header: 'Address',
+      cell: info => {
+        const property = info.row.original;
+        return (
+          <div className="text-sm font-medium text-gray-900 truncate">
+            {property.address}
+          </div>
+        );
+      },
+      size: 300,
+    },
+    {
+      id: 'photos',
+      header: 'Photos',
+      cell: info => {
+        const property = info.row.original;
+        const primaryPhotoUrl = primaryPhotoUrls.get(property.id);
+        const hasFailed = failedImageIds.has(property.id);
+        const shouldShowImage = primaryPhotoUrl && !hasFailed;
+        
+        return (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setPhotoViewerProperty(property);
+            }}
+            className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors overflow-hidden"
+            title="View property photos"
+          >
+            {shouldShowImage ? (
+              <img
+                src={primaryPhotoUrl}
+                alt={`${property.address} - Primary photo`}
+                className="w-full h-full object-cover"
+                onError={() => {
+                  setFailedImageIds(prev => new Set(prev).add(property.id));
+                }}
+              />
+            ) : (
+              <PhotoIcon className="w-5 h-5" />
+            )}
+          </button>
+        );
+      },
+      size: 80,
+    },
+    {
+      accessorKey: 'propertyType',
+      header: 'Type',
+      cell: info => (
+        <div className="text-sm text-gray-900 capitalize">
+          {info.getValue() as string}
+        </div>
+      ),
+      filterFn: 'equals',
+      size: 80,
+    },
+    {
+      id: 'bedrooms_bathrooms',
+      header: 'Bed/Bath',
+      cell: info => {
+        const property = info.row.original;
+        
+        if (property.propertyType === 'hmo' && property.unitDetails) {
+          return (
+            <div className="text-sm">
+              <div className="text-gray-900 font-medium">
+                {property.unitDetails.length} units
+              </div>
+              <div className="text-xs text-gray-500">
+                {property.bedrooms} bed, {property.bathrooms} bath
+              </div>
+            </div>
+          );
+        }
+        
+        return (
+          <div className="text-sm text-gray-900">
+            {property.bedrooms} bed, {property.bathrooms} bath
+          </div>
+        );
+      },
+      size: 100,
+    },
+    {
+      id: 'rent_info',
+      header: 'Rent/Month',
+      cell: info => {
+        const property = info.row.original;
+        const propertyTenants = tenantsByProperty.get(property.id) || [];
+        const actualRent = propertyTenants.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
+        
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center space-x-1">
+              <span className="text-xs text-gray-500">Target:</span>
+              <span className="text-sm font-medium text-gray-900">
+                {formatCurrency(property.targetRent)}
+              </span>
+            </div>
+            {actualRent > 0 && (
+              <div className="flex items-center space-x-1">
+                <span className="text-xs text-gray-500">Actual:</span>
+                <span className={`text-sm font-medium ${actualRent >= property.targetRent ? 'text-green-600' : 'text-orange-600'}`}>
+                  {formatCurrency(actualRent)}
+                </span>
+              </div>
+            )}
+            {property.propertyType === 'hmo' && property.unitDetails && (
+              <div className="text-xs text-gray-500">
+                {property.unitDetails.length} units: {currencySymbol}{Math.round(property.targetRent / property.unitDetails.length)}/unit avg
+              </div>
+            )}
+          </div>
+        );
+      },
+      size: 140,
+    },
+    {
+      id: 'financial_info',
+      header: 'Purchase Price',
+      cell: info => {
+        const property = info.row.original;
+        return (
+          <div className="space-y-1">
+            {property.purchasePrice && (
+              <div className="text-xs text-gray-500">
+                {formatCurrency(property.purchasePrice)}
+              </div>
+            )}
+            {property.salesPrice && (
+              <div className="text-xs text-green-600">
+                Sold: {formatCurrency(property.salesPrice)}
+              </div>
+            )}
+            {!property.purchasePrice && !property.salesPrice && (
+              <div className="text-xs text-gray-400">Not set</div>
+            )}
+          </div>
+        );
+      },
+      size: 120,
+    },
+    {
+      accessorKey: 'status',
+      header: 'Occupancy',
+      cell: ({ row }) => {
+        const property = row.original;
+        const occupancyInfo = getOccupancyDisplay(property, safeTenants);
+        
+        return (
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(occupancyInfo.status)}`}>
+            {occupancyInfo.label}
+          </span>
+        );
+      },
+      filterFn: 'equals',
+      size: 140,
+    },
+  ], [tenantsByProperty, selectedRows, safeProperties, toggleAllRows, toggleRowSelection, primaryPhotoUrls, failedImageIds]);
+
+  const table = useReactTable({
+    data: safeProperties,
+    columns,
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    globalFilterFn: 'includesString',
+  });
+
+
+  return (
+    <div className="bg-white rounded-lg shadow border border-gray-200 flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+      {/* Header */}
+      <div className="px-4 py-4 border-b border-gray-200 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Properties</h3>
+            <p className="text-sm text-gray-500">
+              {table.getFilteredRowModel().rows.length} of {safeProperties.length} properties
+            </p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {/* Bulk Delete Button */}
+            {selectedRows.size > 0 && onDeleteProperties && (
+              <button
+                onClick={handleBulkDelete}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                <TrashIcon className="w-4 h-4 mr-2" />
+                Delete ({selectedRows.size})
+              </button>
+            )}
+
+            {/* Search */}
+            <input
+              type="text"
+              placeholder="Search properties..."
+              value={globalFilter}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            
+            <div className="flex gap-2 w-full sm:w-auto">
+              {/* Type Filter */}
+              <select
+                value={(table.getColumn('propertyType')?.getFilterValue() as string) ?? ''}
+                onChange={(e) => table.getColumn('propertyType')?.setFilterValue(e.target.value || undefined)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {propertyTypes.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+              
+              {/* Status Filter */}
+              <select
+                value={(table.getColumn('status')?.getFilterValue() as string) ?? ''}
+                onChange={(e) => table.getColumn('status')?.setFilterValue(e.target.value || undefined)}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {statusTypes.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={onAddProperty}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 whitespace-nowrap"
+            >
+              <HomeIcon className="w-4 h-4 mr-2" />
+              Add Property
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Card Grid */}
+      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {table.getRowModel().rows.map(row => {
+            const property = row.original;
+            const isSelected = selectedProperty?.id === property.id;
+            const isChecked = selectedRows.has(property.id);
+            const primaryPhotoUrl = primaryPhotoUrls.get(property.id);
+            const hasFailed = failedImageIds.has(property.id);
+            const shouldShowImage = primaryPhotoUrl && !hasFailed;
+            const occupancyInfo = getOccupancyDisplay(property, safeTenants);
+            
+            // Calculate rent info
+            const propertyTenants = tenantsByProperty.get(property.id) || [];
+            const actualRent = propertyTenants.reduce((sum, tenant) => sum + tenant.monthlyRent, 0);
+
+            return (
+              <div 
+                key={row.id}
+                className={`bg-white rounded-lg shadow-sm border transition-all duration-200 hover:shadow-md flex flex-col
+                  ${isSelected ? 'ring-2 ring-blue-500 border-transparent' : 'border-gray-200'}
+                  ${isChecked ? 'bg-blue-50' : ''}
+                `}
+              >
+                {/* Card Header */}
+                <div className="p-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          toggleRowSelection(property.id);
+                        }}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                      />
+                      <span className="text-xs font-medium text-gray-500">Ref: {property.propertyReference}</span>
+                    </div>
+                    <h4 className="text-base font-semibold text-gray-900 truncate" title={property.address}>
+                      {property.address}
+                    </h4>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border whitespace-nowrap ${getStatusColor(occupancyInfo.status)}`}>
+                    {occupancyInfo.label}
+                  </span>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-4 flex-1 space-y-4">
+                  {/* Image and Basic Info */}
+                  <div className="flex gap-4">
+                    <div 
+                      className="w-20 h-20 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPhotoViewerProperty(property);
+                      }}
+                    >
+                      {shouldShowImage ? (
+                        <img
+                          src={primaryPhotoUrl}
+                          alt={property.address}
+                          className="w-full h-full object-cover"
+                          onError={() => setFailedImageIds(prev => new Set(prev).add(property.id))}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <PhotoIcon className="w-8 h-8" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-900 capitalize flex items-center gap-1">
+                        <HomeIcon className="w-4 h-4 text-gray-400" />
+                        {property.propertyType}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {property.propertyType === 'hmo' && property.unitDetails 
+                          ? `${property.unitDetails.length} units • ${property.bedrooms} bed • ${property.bathrooms} bath`
+                          : `${property.bedrooms} bed • ${property.bathrooms} bath`
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Financials */}
+                  <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-50">
+                    <div>
+                      <p className="text-xs text-gray-500">Target Rent</p>
+                      <p className="text-sm font-medium text-gray-900">{formatCurrency(property.targetRent)}</p>
+                    </div>
+                    {actualRent > 0 && (
+                      <div>
+                        <p className="text-xs text-gray-500">Actual Rent</p>
+                        <p className={`text-sm font-medium ${actualRent >= property.targetRent ? 'text-green-600' : 'text-orange-600'}`}>
+                          {formatCurrency(actualRent)}
+                        </p>
+                      </div>
+                    )}
+                    {property.purchasePrice && (
+                      <div>
+                        <p className="text-xs text-gray-500">Purchase Price</p>
+                        <p className="text-sm font-medium text-gray-900">{formatCurrency(property.purchasePrice)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Actions */}
+                <div className="px-4 py-3 bg-gray-50 rounded-b-lg border-t border-gray-100 flex justify-end">
+                  <button
+                    onClick={() => onPropertySelect(property)}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 bg-white border border-blue-200 hover:border-blue-300 rounded px-3 py-1.5 transition-colors shadow-sm"
+                  >
+                    Manage Property
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Empty State */}
+      {table.getRowModel().rows.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <HomeIcon className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No properties found</h3>
+          <p className="text-gray-500 mb-4">
+            {globalFilter || columnFilters.length > 0
+              ? 'Try adjusting your search or filters'
+              : 'Get started by adding your first property'
+            }
+          </p>
+          <button
+            onClick={onAddProperty}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+          >
+            <HomeIcon className="w-4 h-4 mr-2" />
+            Add Property
+          </button>
+        </div>
+      )}
+
+      {/* Property Photo Viewer */}
+      {photoViewerProperty && (
+        <PropertyPhotoViewer
+          propertyId={photoViewerProperty.id}
+          propertyName={photoViewerProperty.address}
+          isOpen={!!photoViewerProperty}
+          onClose={() => setPhotoViewerProperty(null)}
+        />
+      )}
+    </div>
+  );
+};

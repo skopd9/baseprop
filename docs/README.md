@@ -1,0 +1,26 @@
+# Documentation Index
+
+This folder contains all project documentation moved from the repo root.
+
+## Start Here
+- `CURRENT_STATUS.md`
+- `START_HERE_INVITATION_AUTO_LOGIN.md`
+- `START_HERE.md`
+- `QUICK_FIX_CHECKLIST.md`
+- `COMPLETE_DATABASE_SETUP.md`
+
+## Core Guides
+- `UK_COMPLIANCE_GUIDE.md`
+- `OCCUPANCY_TRACKING_GUIDE.md`
+- `RENT_PAYMENTS_IMPLEMENTATION_COMPLETE.md`
+- `TENANT_DOCUMENTS_SETUP.md`
+- `PROPERTY_PHOTOS_FEATURE.md`
+- `TROUBLESHOOTING.md`
+
+## Setup and Integrations
+- `SUPABASE_AUTH_IMPLEMENTATION.md`
+- `DATABASE_SETUP_INSTRUCTIONS.md`
+- `NETLIFY_SECRETS_FIX.md`
+- `GOOGLE_MAPS_SETUP.md`
+- `RESEND_SETUP_GUIDE.md`
+- `DOCUSIGN_SETUP_GUIDE.md`

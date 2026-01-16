@@ -1,0 +1,2985 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  XMarkIcon,
+  HomeIcon,
+  CurrencyPoundIcon,
+  ExclamationTriangleIcon,
+  Squares2X2Icon,
+  SparklesIcon,
+  ShieldCheckIcon,
+  DocumentTextIcon,
+  ArrowUpTrayIcon,
+  TrashIcon,
+  EyeIcon,
+  PaperClipIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
+} from '@heroicons/react/24/outline';
+import { SimplifiedProperty } from '../utils/simplifiedDataTransforms';
+import { validatePropertyData } from '../utils/simplifiedDataTransforms';
+import type { CountryCode } from '../types/tenantDocuments';
+import { useCurrency } from '../hooks/useCurrency';
+import { useOrganization } from '../contexts/OrganizationContext';
+import { supabase } from '../lib/supabase';
+import { ConfirmationDialog } from './ConfirmationDialog';
+
+interface PropertyEditModalProps {
+  property: SimplifiedProperty | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (property: SimplifiedProperty) => void;
+}
+
+
+// Property Document Types by Country
+interface PropertyDocumentType {
+  id: string;
+  name: string;
+  description: string;
+  required?: boolean;
+}
+
+const UK_PROPERTY_DOCUMENTS: PropertyDocumentType[] = [
+  { id: 'title_deeds', name: 'Title Deeds', description: 'Legal ownership documentation', required: false },
+  { id: 'property_survey', name: 'Property Survey/Valuation', description: 'Professional property survey report', required: false },
+  { id: 'building_insurance', name: 'Building Insurance Policy', description: 'Current building insurance certificate', required: false },
+  { id: 'purchase_documents', name: 'Purchase Documents', description: 'Property purchase contracts and completion documents', required: false },
+  { id: 'mortgage_documents', name: 'Mortgage Documents', description: 'Mortgage agreement and statements', required: false },
+  { id: 'property_tax', name: 'Property Tax Documents', description: 'Council tax, stamp duty, and other tax records', required: false },
+  { id: 'planning_permission', name: 'Planning Permissions', description: 'Approved planning applications and certificates', required: false },
+  { id: 'building_regulations', name: 'Building Regulations Certificates', description: 'Building control completion certificates', required: false },
+  { id: 'warranty', name: 'Warranty Documents', description: 'NHBC or other warranty certificates', required: false },
+  { id: 'floor_plans', name: 'Floor Plans', description: 'Property layout and floor plans', required: false },
+  { id: 'other', name: 'Other Documents', description: 'Any other relevant property documents', required: false }
+];
+
+const GREECE_PROPERTY_DOCUMENTS: PropertyDocumentType[] = [
+  { id: 'title_deeds', name: 'Title Deeds (Τίτλος Ιδιοκτησίας)', description: 'Legal ownership documentation', required: false },
+  { id: 'building_permit', name: 'Building Permit (Οικοδομική Άδεια)', description: 'Valid building permit', required: false },
+  { id: 'property_tax_greece', name: 'ENFIA Tax Documents', description: 'Property tax documentation', required: false },
+  { id: 'cadastral', name: 'Cadastral Registry', description: 'Land registry documentation', required: false },
+  { id: 'topographic', name: 'Topographic Diagram', description: 'Official topographic diagram', required: false },
+  { id: 'other', name: 'Other Documents', description: 'Any other relevant property documents', required: false }
+];
+
+const USA_PROPERTY_DOCUMENTS: PropertyDocumentType[] = [
+  { id: 'deed', name: 'Property Deed', description: 'Legal ownership documentation', required: false },
+  { id: 'title_insurance', name: 'Title Insurance', description: 'Title insurance policy', required: false },
+  { id: 'home_inspection', name: 'Home Inspection Report', description: 'Professional inspection report', required: false },
+  { id: 'homeowners_insurance', name: 'Homeowners Insurance', description: 'Property insurance policy', required: false },
+  { id: 'property_tax_us', name: 'Property Tax Records', description: 'Property tax assessments and receipts', required: false },
+  { id: 'hoa_documents', name: 'HOA Documents', description: 'Homeowners association documentation (if applicable)', required: false },
+  { id: 'permits', name: 'Building Permits', description: 'Permits for renovations or improvements', required: false },
+  { id: 'lead_paint', name: 'Lead Paint Disclosure', description: 'Required for pre-1978 properties', required: false },
+  { id: 'other', name: 'Other Documents', description: 'Any other relevant property documents', required: false }
+];
+
+function getPropertyDocumentTypes(countryCode: CountryCode): PropertyDocumentType[] {
+  switch (countryCode) {
+    case 'UK':
+      return UK_PROPERTY_DOCUMENTS;
+    case 'GR':
+      return GREECE_PROPERTY_DOCUMENTS;
+    case 'US':
+      return USA_PROPERTY_DOCUMENTS;
+    default:
+      return UK_PROPERTY_DOCUMENTS;
+  }
+}
+
+interface PropertyDocument {
+  id: string;
+  documentTypeId: string;
+  fileName: string;
+  fileSize: number;
+  uploadedAt: Date;
+  fileUrl?: string;
+  fileType: string;
+  fileData?: string; // Base64 encoded file data for preview
+}
+
+export const PropertyEditModal: React.FC<PropertyEditModalProps> = ({
+  property,
+  isOpen,
+  onClose,
+  onSave
+}) => {
+  const { formatCurrency } = useCurrency();
+  const { currentOrganization } = useOrganization();
+  const [formData, setFormData] = useState<SimplifiedProperty>({
+    id: '',
+    propertyReference: 0,
+    countryCode: 'UK',
+    address: '',
+    propertyType: 'house',
+    bedrooms: 2,
+    bathrooms: 1,
+    targetRent: 1200,
+    tenantCount: 0,
+    status: 'under_management',
+    units: 1,
+    totalArea: undefined,
+    yearBuilt: undefined,
+    furnished: 'unfurnished',
+    parking: 'none',
+    garden: false,
+    maxOccupancy: undefined,
+    licenseRequired: false,
+    licenseNumber: undefined,
+    licenseExpiry: undefined,
+    rooms: []
+  });
+  
+  // Structured address fields
+  const [addressFields, setAddressFields] = useState({
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    postcode: ''
+  });
+  
+  const [errors, setErrors] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [documents, setDocuments] = useState<PropertyDocument[]>([]);
+  const [selectedDocumentType, setSelectedDocumentType] = useState<string>('');
+  const [viewingDocument, setViewingDocument] = useState<PropertyDocument | null>(null);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [originalData, setOriginalData] = useState<SimplifiedProperty | null>(null);
+  const [originalAddressFields, setOriginalAddressFields] = useState({
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    postcode: ''
+  });
+  const pendingCloseRef = useRef<(() => void) | null>(null);
+  const updatePropertyInfoRef = useRef<string>('');
+  const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [propertyUniqueId, setPropertyUniqueId] = useState<string>('');
+  const [propertyUniqueIdError, setPropertyUniqueIdError] = useState<string | null>(null);
+  const [originalPropertyUniqueId, setOriginalPropertyUniqueId] = useState<string>('');
+  
+  // Track expanded/collapsed state for each section
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    basicInfo: false,
+    specifications: false,
+    features: false,
+    financial: false,
+    hmoDetails: false,
+    documents: false
+  });
+
+  const toggleSection = (sectionKey: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
+  };
+
+  // Wizard state - only for new properties
+  const [currentWizardStep, setCurrentWizardStep] = useState(0);
+  const [isWizardMode, setIsWizardMode] = useState(false);
+
+  // Define wizard steps
+  const wizardSteps = [
+    { key: 'basicInfo', title: 'Address', icon: HomeIcon, required: true },
+    { key: 'specifications', title: 'Specs', icon: Squares2X2Icon, required: true },
+    { key: 'features', title: 'Features', icon: SparklesIcon, required: false },
+    { key: 'financial', title: 'Financial', icon: CurrencyPoundIcon, required: false },
+    { key: 'hmoDetails', title: 'HMO', icon: ShieldCheckIcon, required: false, condition: () => formData.propertyType === 'hmo' },
+    { key: 'documents', title: 'Documents', icon: DocumentTextIcon, required: false }
+  ];
+
+  const getVisibleWizardSteps = () => {
+    return wizardSteps.filter(step => !step.condition || step.condition());
+  };
+
+  // Update form data when property changes
+  useEffect(() => {
+    if (property && isOpen) {
+      // Determine if this is a new property (wizard mode)
+      const isNewProperty = !property.id || property.id === '';
+      setIsWizardMode(isNewProperty);
+      setCurrentWizardStep(0);
+      
+      // Clear errors immediately when switching properties
+      setErrors([]);
+      setPropertyUniqueIdError(null);
+      
+      // Set initial form data immediately to prevent stale data comparison
+      const initialFormData = {
+        ...property,
+        address: property.address || '',
+        propertyType: property.propertyType || 'house',
+        bedrooms: property.bedrooms || 2,
+        bathrooms: property.bathrooms || 1,
+        targetRent: property.targetRent || 1200,
+        tenantCount: property.tenantCount || 0,
+        status: property.status || 'under_management',
+        units: property.units || 1,
+        purchasePrice: property.purchasePrice || undefined,
+        salesPrice: property.salesPrice || undefined,
+        actualRent: property.actualRent || undefined,
+        totalArea: property.totalArea || undefined,
+        yearBuilt: property.yearBuilt || undefined,
+        furnished: property.furnished || 'unfurnished',
+        parking: property.parking || 'none',
+        garden: property.garden || false,
+        maxOccupancy: property.maxOccupancy || undefined,
+        licenseRequired: property.licenseRequired || false,
+        licenseNumber: property.licenseNumber || undefined,
+        licenseExpiry: property.licenseExpiry || undefined,
+        rooms: property.rooms || [],
+        ownershipType: property.ownershipType || undefined,
+        companyName: property.companyName || undefined
+      };
+      
+      setFormData(initialFormData);
+      setOriginalData(initialFormData);
+      
+      // Fetch property_data from database to get structured address
+      const loadPropertyData = async () => {
+        try {
+          const { data: propertyRecord, error } = await supabase
+            .from('properties')
+            .select('property_data, address')
+            .eq('id', property.id)
+            .single();
+
+          if (error) {
+            console.error('Error loading property data:', error);
+          }
+
+          const propertyData = propertyRecord?.property_data || {};
+          
+          // Try to parse structured address from property_data
+          let addressLine1 = '';
+          let addressLine2 = '';
+          let city = '';
+          let postcode = '';
+          
+          if (propertyData.address_line_1) {
+            addressLine1 = propertyData.address_line_1;
+            addressLine2 = propertyData.address_line_2 || '';
+            city = propertyData.city || '';
+            postcode = propertyData.postcode || '';
+          } else if (propertyRecord?.address || property.address) {
+            // Fallback: try to parse from full address string
+            const fullAddress = propertyRecord?.address || property.address || '';
+            const addressParts = fullAddress.split(',').map((s: string) => s.trim());
+            if (addressParts.length >= 2) {
+              addressLine1 = addressParts[0];
+              if (addressParts.length >= 3) {
+                addressLine2 = addressParts[1];
+                city = addressParts[addressParts.length - 2] || '';
+                postcode = addressParts[addressParts.length - 1] || '';
+              } else {
+                city = addressParts[addressParts.length - 2] || '';
+                postcode = addressParts[addressParts.length - 1] || '';
+              }
+            } else {
+              addressLine1 = fullAddress;
+            }
+          }
+          
+          setAddressFields({
+            addressLine1,
+            addressLine2,
+            city,
+            postcode
+          });
+          
+          // Store original address fields for change detection
+          setOriginalAddressFields({
+            addressLine1,
+            addressLine2,
+            city,
+            postcode
+          });
+
+          // Load reference from property_reference column
+          const referenceValue = String(property.propertyReference || '');
+          setPropertyUniqueId(referenceValue);
+          setOriginalPropertyUniqueId(referenceValue);
+          updatePropertyInfoRef.current = referenceValue;
+        } catch (err) {
+          console.error('Error in loadPropertyData:', err);
+        }
+      };
+
+      loadPropertyData();
+      setShowCloseConfirm(false);
+    }
+  }, [property, isOpen]);
+
+  const handleInputChange = (field: keyof SimplifiedProperty, value: any) => {
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
+      
+      // For HMO properties, calculate targetRent from room rents
+      if (updated.propertyType === 'hmo' && field === 'rooms') {
+        updated.targetRent = (value || []).reduce((sum: number, room: any) => sum + (room.monthlyRent || 0), 0);
+      }
+      
+      return updated;
+    });
+    
+    // Clear errors when user starts typing
+    if (errors.length > 0) {
+      setErrors([]);
+    }
+  };
+
+  // Auto-calculate targetRent from rooms for HMO properties
+  useEffect(() => {
+    if (formData.propertyType === 'hmo' && formData.rooms) {
+      const calculatedRent = (formData.rooms || []).reduce((sum: number, room: any) => sum + (room.monthlyRent || 0), 0);
+      if (formData.targetRent !== calculatedRent) {
+        setFormData(prev => ({
+          ...prev,
+          targetRent: calculatedRent
+        }));
+      }
+    }
+  }, [formData.propertyType, formData.rooms]);
+
+  // Cleanup validation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = (): boolean => {
+    if (!originalData || !property) return false;
+    
+    // Ensure we're comparing the same property (prevent race conditions when switching properties)
+    if (property.id && originalData.id && property.id !== originalData.id) {
+      return false; // Different property, no changes to current one
+    }
+    
+    // For new properties (wizard mode), check if any essential fields are filled
+    if (isWizardMode) {
+      return addressFields.addressLine1.trim() !== '' ||
+             addressFields.city.trim() !== '' ||
+             addressFields.postcode.trim() !== '' ||
+             propertyUniqueId.trim() !== '';
+    }
+    
+    // Check address fields
+    const addressChanged = 
+      addressFields.addressLine1 !== originalAddressFields.addressLine1 ||
+      addressFields.addressLine2 !== originalAddressFields.addressLine2 ||
+      addressFields.city !== originalAddressFields.city ||
+      addressFields.postcode !== originalAddressFields.postcode;
+    
+    if (addressChanged) return true;
+
+    // Check unique ID
+    if (propertyUniqueId !== originalPropertyUniqueId) return true;
+    
+    // Deep comparison of form data
+    const compareValues = (a: any, b: any): boolean => {
+      if (a === b) return true;
+      if (a == null || b == null) return a === b;
+      if (typeof a !== typeof b) return false;
+      if (typeof a === 'object') {
+        if (Array.isArray(a) !== Array.isArray(b)) return false;
+        if (Array.isArray(a)) {
+          if (a.length !== b.length) return false;
+          return a.every((item, index) => compareValues(item, b[index]));
+        }
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+        return keysA.every(key => compareValues(a[key], b[key]));
+      }
+      return false;
+    };
+    
+    // Compare key fields
+    const fieldsToCompare: (keyof SimplifiedProperty)[] = [
+      'propertyReference', 'propertyType', 'bedrooms', 'bathrooms', 'targetRent',
+      'status', 'units', 'purchasePrice', 'salesPrice', 'actualRent',
+      'totalArea', 'yearBuilt', 'furnished', 'parking', 'garden',
+      'maxOccupancy', 'licenseRequired', 'licenseNumber', 'licenseExpiry', 'rooms',
+      'ownershipType', 'companyName'
+    ];
+    
+    for (const field of fieldsToCompare) {
+      if (!compareValues(formData[field], originalData[field])) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  const handleClose = () => {
+    if (hasUnsavedChanges()) {
+      setShowCloseConfirm(true);
+      pendingCloseRef.current = onClose;
+    } else {
+      onClose();
+    }
+  };
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirm(false);
+    if (pendingCloseRef.current) {
+      pendingCloseRef.current();
+      pendingCloseRef.current = null;
+    }
+  };
+
+  // Check if property reference is unique within the workspace
+  const checkPropertyUniqueIdUniqueness = async (uniqueId: string): Promise<boolean> => {
+    if (!currentOrganization?.id || !property || !uniqueId.trim()) return true;
+    
+    const trimmedUniqueId = uniqueId.trim();
+    
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('id, property_reference')
+        .eq('organization_id', currentOrganization.id);
+      
+      if (error) {
+        console.error('Error checking property reference uniqueness:', error);
+        return true; // Allow save if check fails
+      }
+      
+      console.log('Checking uniqueness for:', trimmedUniqueId);
+      console.log('Current property ID:', property.id);
+      console.log('All properties in workspace:', data);
+      
+      // Check if any other property has this reference
+      if (data && data.length > 0) {
+        const conflictingProperties = data.filter(p => {
+          if (p.id === property.id) {
+            console.log('Skipping current property:', p.id);
+            return false; // Skip current property
+          }
+          const existingReference = String(p.property_reference || '');
+          
+          // Check both exact match and trimmed match
+          const matches = existingReference && 
+            (existingReference === trimmedUniqueId || 
+             existingReference.trim() === trimmedUniqueId);
+          
+          if (matches) {
+            console.log('CONFLICT FOUND! Property', p.id, 'has property_reference:', existingReference);
+          }
+          
+          return matches;
+        });
+        
+        console.log('Conflicting properties found:', conflictingProperties.length);
+        return conflictingProperties.length === 0;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in checkPropertyUniqueIdUniqueness:', error);
+      return true; // Allow save if check fails
+    }
+  };
+
+  const handleSave = async () => {
+    if (!hasUnsavedChanges()) {
+      return; // No changes to save
+    }
+    
+    // Validate reference uniqueness
+    if (propertyUniqueId.trim()) {
+      console.log('🔍 Validating reference uniqueness for:', propertyUniqueId);
+      const isUnique = await checkPropertyUniqueIdUniqueness(propertyUniqueId);
+      console.log('✅ Uniqueness check result:', isUnique);
+      if (!isUnique) {
+        console.log('❌ BLOCKING SAVE - Reference is not unique!');
+        setPropertyUniqueIdError('This reference is already in use in this workspace');
+        setErrors(['Reference must be unique within the workspace']);
+        return;
+      }
+      console.log('✅ Reference is unique, continuing with save');
+      setPropertyUniqueIdError(null);
+    } else {
+      console.log('⚠️ No reference value to validate (empty)');
+    }
+    
+    // Validate address fields
+    if (!addressFields.addressLine1.trim()) {
+      setErrors(['Address Line 1 is required']);
+      return;
+    }
+    if (!addressFields.city.trim()) {
+      setErrors(['City is required']);
+      return;
+    }
+    if (!addressFields.postcode.trim()) {
+      setErrors([`${currentOrganization?.country_code === 'US' ? 'ZIP Code' : 'Postcode'} is required`]);
+      return;
+    }
+
+    // Build full address string for backward compatibility
+    const fullAddress = [
+      addressFields.addressLine1,
+      addressFields.addressLine2,
+      addressFields.city,
+      addressFields.postcode
+    ].filter(Boolean).join(', ');
+    
+    // Validate property data with the full address
+    const validationErrors = validatePropertyData({
+      ...formData,
+      address: fullAddress
+    });
+    
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    // Parse the reference as a number if possible, otherwise keep as string
+    const parsedReference = propertyUniqueId.trim() ? 
+      (isNaN(Number(propertyUniqueId)) ? 0 : Number(propertyUniqueId)) : 0;
+
+    // Update formData with full address and reference
+    const updatedFormData = {
+      ...formData,
+      address: fullAddress,
+      propertyReference: parsedReference,
+      // Store structured address in a way that can be passed to the save function
+      // We'll need to update the save function to handle this
+    };
+
+    setIsSaving(true);
+    
+    try {
+      // Pass structured address fields along with formData
+      await onSave({
+        ...updatedFormData,
+        // Add structured address fields that will be saved to property_data
+        _addressFields: addressFields
+      } as any);
+      
+      // Update original data after successful save
+      setOriginalData(updatedFormData);
+      setOriginalAddressFields({ ...addressFields });
+      setOriginalPropertyUniqueId(propertyUniqueId);
+      
+      onClose();
+    } catch (error) {
+      console.error('Error saving property:', error);
+      setErrors(['Failed to save property. Please try again.']);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedDocumentType) return;
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setErrors(['File size must be less than 10MB']);
+      return;
+    }
+
+    // Read the file and store as base64 for preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const fileData = e.target?.result as string;
+      
+      // Create a new document entry
+      const newDocument: PropertyDocument = {
+        id: `doc-${Date.now()}`,
+        documentTypeId: selectedDocumentType,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        uploadedAt: new Date(),
+        fileData: fileData, // Store base64 data for preview
+        // In production, you'd upload to Supabase Storage and store the URL instead
+      };
+
+      setDocuments(prev => [...prev, newDocument]);
+      setSelectedDocumentType('');
+    };
+
+    reader.readAsDataURL(file);
+    
+    // Clear the file input
+    event.target.value = '';
+  };
+
+  const handleDeleteDocument = (documentId: string) => {
+    setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+  };
+
+  const handleViewDocument = (document: PropertyDocument) => {
+    setViewingDocument(document);
+  };
+
+  const handleDownloadDocument = (document: PropertyDocument) => {
+    if (!document.fileData) return;
+    
+    // Create a download link
+    const link = window.document.createElement('a');
+    link.href = document.fileData;
+    link.download = document.fileName;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+  };
+
+  const availableDocumentTypes = getPropertyDocumentTypes(property?.countryCode || 'UK');
+
+  // Wizard navigation functions
+  const handleNextStep = () => {
+    const visibleSteps = getVisibleWizardSteps();
+    if (currentWizardStep < visibleSteps.length - 1) {
+      setCurrentWizardStep(prev => prev + 1);
+    }
+  };
+
+  const handlePreviousStep = () => {
+    if (currentWizardStep > 0) {
+      setCurrentWizardStep(prev => prev - 1);
+    }
+  };
+
+  const handleGoToStep = (stepIndex: number) => {
+    setCurrentWizardStep(stepIndex);
+  };
+
+  const isStepCompleted = (stepKey: string): boolean => {
+    if (stepKey === 'basicInfo') {
+      // Address fields are required
+      return addressFields.addressLine1.trim() !== '' &&
+             addressFields.city.trim() !== '' &&
+             addressFields.postcode.trim() !== '';
+    }
+    
+    // Other steps are optional, so they're always "completed"
+    return true;
+  };
+
+  const canProceedToNextStep = (): boolean => {
+    const visibleSteps = getVisibleWizardSteps();
+    const currentStep = visibleSteps[currentWizardStep];
+    
+    return isStepCompleted(currentStep.key);
+  };
+
+  if (!isOpen || !property) return null;
+
+  return (
+    <>
+      {isWizardMode ? (
+        // Centered modal for adding new properties
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center"
+            onClick={handleClose}
+          >
+            {/* Modal */}
+            <div 
+              className="bg-white rounded-xl shadow-2xl z-50 flex flex-col max-h-[90vh] w-[600px]"
+              onClick={(e) => e.stopPropagation()}
+            >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0 rounded-t-xl">
+          <div className="flex items-center space-x-3 flex-1">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <HomeIcon className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-gray-900">
+                {isWizardMode ? 'Add New Property' : 'Edit Property'}
+              </h2>
+              {!isWizardMode && (
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-sm font-medium text-gray-700">Reference:</span>
+                  <input
+                    ref={(el) => { if (el) updatePropertyInfoRef.current = el.value; }}
+                    type="text"
+                    value={propertyUniqueId}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setPropertyUniqueId(value);
+                      updatePropertyInfoRef.current = value;
+                      
+                      // Clear previous timeout
+                      if (validationTimeoutRef.current) {
+                        clearTimeout(validationTimeoutRef.current);
+                      }
+                      
+                      // Real-time validation with debouncing (500ms delay)
+                      if (value.trim()) {
+                        validationTimeoutRef.current = setTimeout(async () => {
+                          const isUnique = await checkPropertyUniqueIdUniqueness(value);
+                          if (!isUnique) {
+                            setPropertyUniqueIdError('Already in use');
+                          } else {
+                            setPropertyUniqueIdError(null);
+                          }
+                        }, 500);
+                      } else {
+                        setPropertyUniqueIdError(null);
+                      }
+                    }}
+                    className={`px-3 py-2 border rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-20 ${
+                      propertyUniqueIdError ? 'border-red-300' : 'border-gray-300'
+                    }`}
+                    placeholder="10"
+                  />
+                  {propertyUniqueIdError && (
+                    <span className="text-xs text-red-600 whitespace-nowrap">{propertyUniqueIdError}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors ml-4"
+          >
+            <XMarkIcon className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Horizontal Progress Steps - Only shown in wizard mode */}
+        {isWizardMode && (
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              {getVisibleWizardSteps().map((step, index) => {
+                const StepIcon = step.icon;
+                const isActive = index === currentWizardStep;
+                const isPast = index < currentWizardStep;
+                const isCompleted = isPast && isStepCompleted(step.key);
+                const isLast = index === getVisibleWizardSteps().length - 1;
+                
+                return (
+                  <div key={step.key} className="flex items-center flex-1">
+                    <button
+                      onClick={() => handleGoToStep(index)}
+                      className="flex flex-col items-center"
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                        isActive
+                          ? 'bg-blue-600 ring-4 ring-blue-100'
+                          : isCompleted
+                          ? 'bg-green-500'
+                          : 'bg-gray-300'
+                      }`}>
+                        {isCompleted ? (
+                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <StepIcon className={`w-5 h-5 ${isActive || isCompleted ? 'text-white' : 'text-gray-600'}`} />
+                        )}
+                      </div>
+                      <div className="text-center mt-2">
+                        <p className={`text-xs font-medium ${
+                          isActive ? 'text-blue-900' : isCompleted ? 'text-gray-900' : 'text-gray-500'
+                        }`}>
+                          {step.title}
+                        </p>
+                      </div>
+                    </button>
+                    {!isLast && (
+                      <div className={`flex-1 h-0.5 mx-2 transition-colors ${
+                        isCompleted ? 'bg-green-500' : 'bg-gray-300'
+                      }`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6 min-h-0">
+            {/* Error Messages */}
+            {errors.length > 0 && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <ExclamationTriangleIcon className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-medium text-red-800">Please fix the following errors:</h3>
+                    <ul className="mt-2 text-sm text-red-700 space-y-1">
+                      {errors.map((error, index) => (
+                        <li key={index}>• {error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-5">
+            {/* SECTION 1: Address */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'basicInfo') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('basicInfo')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <HomeIcon className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Address</h3>
+                  </div>
+                  {expandedSections.basicInfo ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <HomeIcon className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Address</h3>
+                    <span className="text-red-500 text-sm">*</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Enter the property reference and address details</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.basicInfo) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Structured Address Fields */}
+                <div className="space-y-3">
+                  {/* Property Reference - Shown in wizard mode */}
+                  {isWizardMode && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Property Reference
+                      </label>
+                      <input
+                        ref={(el) => { if (el) updatePropertyInfoRef.current = el.value; }}
+                        type="text"
+                        value={propertyUniqueId}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPropertyUniqueId(value);
+                          updatePropertyInfoRef.current = value;
+                          
+                          // Clear previous timeout
+                          if (validationTimeoutRef.current) {
+                            clearTimeout(validationTimeoutRef.current);
+                          }
+                          
+                          // Real-time validation with debouncing (500ms delay)
+                          if (value.trim()) {
+                            validationTimeoutRef.current = setTimeout(async () => {
+                              const isUnique = await checkPropertyUniqueIdUniqueness(value);
+                              if (!isUnique) {
+                                setPropertyUniqueIdError('Already in use');
+                              } else {
+                                setPropertyUniqueIdError(null);
+                              }
+                            }, 500);
+                          } else {
+                            setPropertyUniqueIdError(null);
+                          }
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white ${
+                          propertyUniqueIdError ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="e.g., 10"
+                      />
+                      {propertyUniqueIdError && (
+                        <p className="mt-1 text-xs text-red-600">{propertyUniqueIdError}</p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">
+                        A unique identifier for this property in your workspace
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Address Line 1 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={addressFields.addressLine1}
+                      onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine1: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder={currentOrganization?.country_code === 'US' ? 'e.g., 123 Main Street' : 'e.g., 123 High Street'}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Address Line 2
+                    </label>
+                    <input
+                      type="text"
+                      value={addressFields.addressLine2}
+                      onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine2: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="Apartment, suite, unit, etc."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        City <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addressFields.city}
+                        onChange={(e) => setAddressFields(prev => ({ ...prev, city: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                        placeholder={currentOrganization?.country_code === 'US' ? 'New York' : currentOrganization?.country_code === 'GR' ? 'Athens' : 'London'}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {currentOrganization?.country_code === 'US' ? 'ZIP Code' : 'Postcode'} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addressFields.postcode}
+                        onChange={(e) => setAddressFields(prev => ({ ...prev, postcode: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                        placeholder={currentOrganization?.country_code === 'US' ? '10001' : currentOrganization?.country_code === 'GR' ? '106 82' : 'SW1A 1AA'}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 2: Property Specifications */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'specifications') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('specifications')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Squares2X2Icon className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Specifications</h3>
+                  </div>
+                  {expandedSections.specifications ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Squares2X2Icon className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Specifications</h3>
+                    <span className="text-red-500 text-sm">*</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Define the property type and key specifications</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.specifications) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Property Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Property Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.propertyType}
+                    onChange={(e) => handleInputChange('propertyType', e.target.value as SimplifiedProperty['propertyType'])}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="house">House</option>
+                    <option value="flat">Flat</option>
+                    <option value="hmo">HMO</option>
+                  </select>
+                </div>
+
+                {/* Bedrooms & Bathrooms */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bedrooms
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.bedrooms}
+                      onChange={(e) => handleInputChange('bedrooms', parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bathrooms
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={formData.bathrooms}
+                      onChange={(e) => handleInputChange('bathrooms', parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Total Area & Year Built */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Total Area (m²)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.totalArea || ''}
+                      onChange={(e) => handleInputChange('totalArea', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. 120"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Year Built
+                    </label>
+                    <input
+                      type="number"
+                      min="1800"
+                      max={new Date().getFullYear()}
+                      value={formData.yearBuilt || ''}
+                      onChange={(e) => handleInputChange('yearBuilt', e.target.value ? parseInt(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. 1995"
+                    />
+                  </div>
+                </div>
+
+                {/* Room Configuration - Only for HMO properties */}
+                {formData.propertyType === 'hmo' && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900">Room Configuration</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">Define individual rooms and their rent</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newRoom = {
+                            id: `room-${Date.now()}`,
+                            name: `Room ${(formData.rooms || []).length + 1}`,
+                            area: 12,
+                            monthlyRent: 500,
+                            isOccupied: false
+                          };
+                          handleInputChange('rooms', [...(formData.rooms || []), newRoom]);
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        + Add Room
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {(formData.rooms || []).map((room, index) => (
+                        <div key={room.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Room Name
+                              </label>
+                              <input
+                                type="text"
+                                value={room.name}
+                                onChange={(e) => {
+                                  const updatedRooms = [...(formData.rooms || [])];
+                                  updatedRooms[index] = { ...room, name: e.target.value };
+                                  handleInputChange('rooms', updatedRooms);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="e.g. Master Bedroom"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Area (m²)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={room.area}
+                                  onChange={(e) => {
+                                    const updatedRooms = [...(formData.rooms || [])];
+                                    updatedRooms[index] = { ...room, area: parseFloat(e.target.value) || 0 };
+                                    handleInputChange('rooms', updatedRooms);
+                                  }}
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Monthly Rent
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={room.monthlyRent}
+                                  onChange={(e) => {
+                                    const updatedRooms = [...(formData.rooms || [])];
+                                    updatedRooms[index] = { ...room, monthlyRent: parseFloat(e.target.value) || 0 };
+                                    handleInputChange('rooms', updatedRooms);
+                                  }}
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedRooms = (formData.rooms || []).filter((_, i) => i !== index);
+                                handleInputChange('rooms', updatedRooms);
+                              }}
+                              className="w-full px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              Remove Room
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {(!formData.rooms || formData.rooms.length === 0) && (
+                        <div className="text-center py-6 text-gray-500 text-sm bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                          <HomeIcon className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                          <p className="font-medium">No rooms defined yet</p>
+                          <p className="text-xs mt-1">Click "Add Room" to create rooms for this HMO</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 3: Features & Amenities */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'features') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('features')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <SparklesIcon className="w-5 h-5 text-amber-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Features & Amenities</h3>
+                  </div>
+                  {expandedSections.features ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <SparklesIcon className="w-5 h-5 text-amber-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Features & Amenities</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Specify property features and amenities</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.features) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Furnished & Parking */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Furnished Status
+                    </label>
+                    <select
+                      value={formData.furnished || 'unfurnished'}
+                      onChange={(e) => handleInputChange('furnished', e.target.value as 'furnished' | 'unfurnished' | 'part_furnished')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    >
+                      <option value="unfurnished">Unfurnished</option>
+                      <option value="part_furnished">Part Furnished</option>
+                      <option value="furnished">Fully Furnished</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Parking
+                    </label>
+                    <select
+                      value={formData.parking || 'none'}
+                      onChange={(e) => handleInputChange('parking', e.target.value as 'none' | 'street' | 'driveway' | 'garage')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    >
+                      <option value="none">No Parking</option>
+                      <option value="street">Street Parking</option>
+                      <option value="driveway">Driveway</option>
+                      <option value="garage">Garage</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Garden */}
+                <div className="border border-gray-200 rounded-lg p-3">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.garden || false}
+                      onChange={(e) => handleInputChange('garden', e.target.checked)}
+                      className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 checked:bg-blue-600 checked:border-blue-600"
+                      style={{ backgroundColor: formData.garden ? '' : 'white' }}
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">Property has a garden</span>
+                      <p className="text-xs text-gray-500">Check if this property includes garden space</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 4: Financial Details */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'financial') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('financial')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <CurrencyPoundIcon className="w-5 h-5 text-green-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Financial Details</h3>
+                  </div>
+                  {expandedSections.financial ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <CurrencyPoundIcon className="w-5 h-5 text-green-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Financial Details</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Add rent, purchase price and ownership information</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.financial) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => handleInputChange('status', e.target.value as SimplifiedProperty['status'])}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="under_management">Under Management</option>
+                    <option value="sold">Sold</option>
+                  </select>
+                </div>
+
+                {/* Sold Price - Only shown when status is "sold" */}
+                {formData.status === 'sold' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sold Price
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={formData.salesPrice || ''}
+                        onChange={(e) => handleInputChange('salesPrice', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="250000"
+                      />
+                    </div>
+                    {formData.salesPrice && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {formatCurrency(formData.salesPrice)}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      The price at which this property was sold
+                    </p>
+                  </div>
+                )}
+
+                {/* Target Rent - Hidden for HMO properties */}
+                {formData.propertyType !== 'hmo' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Target Monthly Rent
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={formData.targetRent}
+                        onChange={(e) => handleInputChange('targetRent', parseInt(e.target.value) || 0)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="1200"
+                      />
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {formatCurrency(formData.targetRent)} per month
+                    </p>
+                  </div>
+                )}
+
+                {/* HMO Total Rent Display */}
+                {formData.propertyType === 'hmo' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <CurrencyPoundIcon className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900">Total Monthly Rent</span>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-900">
+                          {formatCurrency((formData.rooms || []).reduce((sum, room) => sum + (room.monthlyRent || 0), 0))}
+                        </p>
+                        <p className="text-xs text-blue-700 mt-1">
+                          Calculated from {(formData.rooms || []).length} room{(formData.rooms || []).length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Purchase Price */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Purchase Price
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={formData.purchasePrice || ''}
+                      onChange={(e) => handleInputChange('purchasePrice', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="250000"
+                    />
+                  </div>
+                  {formData.purchasePrice && (
+                    <p className="mt-1 text-sm text-gray-500">
+                      {formatCurrency(formData.purchasePrice)}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    The original acquisition cost of this property
+                  </p>
+                </div>
+
+                {/* Ownership Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ownership Type
+                  </label>
+                  <select
+                    value={formData.ownershipType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value as 'individual' | 'company' | '';
+                      handleInputChange('ownershipType', value || undefined);
+                      // Clear company name if switching to individual
+                      if (value !== 'company') {
+                        handleInputChange('companyName', undefined);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="">Select ownership type...</option>
+                    <option value="individual">Individual</option>
+                    <option value="company">Company</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Select whether the property is owned by an individual or a company
+                  </p>
+                </div>
+
+                {/* Company Name - Only show if ownership type is company */}
+                {formData.ownershipType === 'company' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Company Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.companyName || ''}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. ABC Property Holdings Ltd"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter the legal name of the company that owns this property (optional)
+                    </p>
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 5: HMO-Specific Details (only shown for HMO properties) */}
+            {formData.propertyType === 'hmo' && (!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'hmoDetails') && (
+              <div className="bg-white border border-gray-200 rounded-lg p-5">
+                {!isWizardMode && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('hmoDetails')}
+                    className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <ShieldCheckIcon className="w-5 h-5 text-indigo-600" />
+                      <h3 className="text-base font-semibold text-gray-900">HMO Details</h3>
+                    </div>
+                    {expandedSections.hmoDetails ? (
+                      <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                    )}
+                  </button>
+                )}
+                
+                {isWizardMode && (
+                  <div className="mb-4">
+                    <div className="flex items-center space-x-2">
+                      <ShieldCheckIcon className="w-5 h-5 text-indigo-600" />
+                      <h3 className="text-base font-semibold text-gray-900">HMO Details</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">Specify HMO-specific licensing and occupancy information</p>
+                  </div>
+                )}
+                
+                {(isWizardMode || expandedSections.hmoDetails) && (
+                  <div className="space-y-4 transition-all duration-200 ease-in-out">
+                  {/* Max Occupancy */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Maximum Occupancy
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={formData.maxOccupancy || ''}
+                      onChange={(e) => handleInputChange('maxOccupancy', e.target.value ? parseInt(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. 6"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Maximum number of tenants allowed in this HMO
+                    </p>
+                  </div>
+
+                  {/* License Requirement */}
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <label className="flex items-start space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="licenseRequired"
+                        checked={formData.licenseRequired || false}
+                        onChange={(e) => {
+                          handleInputChange('licenseRequired', e.target.checked);
+                          if (!e.target.checked) {
+                            handleInputChange('licenseNumber', undefined);
+                            handleInputChange('licenseExpiry', undefined);
+                          }
+                        }}
+                        className="w-5 h-5 mt-0.5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 checked:bg-blue-600 checked:border-blue-600"
+                        style={{ backgroundColor: formData.licenseRequired ? '' : 'white' }}
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">HMO License Required</span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Check if your local authority requires an HMO license for this property
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* License Details - Only show if license is required */}
+                  {formData.licenseRequired && (
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            License Number <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.licenseNumber || ''}
+                            onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                            placeholder="HMO License Number"
+                            required={formData.licenseRequired}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            License Expiry Date <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.licenseExpiry ? formData.licenseExpiry.toISOString().split('T')[0] : ''}
+                            onChange={(e) => handleInputChange('licenseExpiry', e.target.value ? new Date(e.target.value) : undefined)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                            required={formData.licenseRequired}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                )}
+              </div>
+            )}
+
+            {/* SECTION 6: Property Documents */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'documents') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('documents')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <DocumentTextIcon className="w-5 h-5 text-teal-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Documents</h3>
+                  </div>
+                  {expandedSections.documents ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <DocumentTextIcon className="w-5 h-5 text-teal-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Documents</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Upload important property documents (optional)</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.documents) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-700">
+                    <strong>Tip:</strong> Check off documents you have, upload files, and add notes. Maximum file size: 10MB per document.
+                  </p>
+                </div>
+
+                {/* Document Checklist with Upload */}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  {availableDocumentTypes.map((docType) => {
+                    const uploadedDoc = documents.find(d => d.documentTypeId === docType.id);
+                    
+                    return (
+                      <div 
+                        key={docType.id} 
+                        className={`border rounded-lg p-4 transition-colors ${
+                          uploadedDoc
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={!!uploadedDoc}
+                            onChange={() => {
+                              if (uploadedDoc) {
+                                handleDeleteDocument(uploadedDoc.id);
+                              }
+                            }}
+                            className="mt-1 w-5 h-5 rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {docType.name}
+                                  </span>
+                                  {uploadedDoc && (
+                                    <CheckIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">{docType.description}</p>
+                              </div>
+                            </div>
+                            
+                            {/* Upload Section */}
+                            <div className="mt-3 space-y-2">
+                              {uploadedDoc ? (
+                                // Show uploaded file with actions
+                                <div className="flex items-center justify-between p-2 bg-white border border-green-200 rounded-md">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <DocumentTextIcon className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-medium text-gray-900 truncate">
+                                        {uploadedDoc.fileName}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {formatFileSize(uploadedDoc.fileSize)} • {uploadedDoc.uploadedAt.toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="View"
+                                    >
+                                      <EyeIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                      title="Download"
+                                    >
+                                      <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteDocument(uploadedDoc.id)}
+                                      className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Remove"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Show upload button
+                                <label className="block" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="file"
+                                    onChange={(e) => {
+                                      setSelectedDocumentType(docType.id);
+                                      handleFileUpload(e);
+                                    }}
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <div className="flex items-center justify-center px-3 py-2 border border-dashed border-blue-300 rounded-md cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                                    <DocumentTextIcon className="w-4 h-4 text-blue-600 mr-2" />
+                                    <span className="text-xs font-medium text-blue-600">
+                                      Upload Document
+                                    </span>
+                                  </div>
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary */}
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">Documents uploaded:</span>
+                    <span className="font-semibold text-green-600">
+                      {documents.length} / {availableDocumentTypes.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              )}
+            </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer - Sticky at bottom */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 shadow-lg flex-shrink-0 rounded-b-xl">
+          {/* Wizard mode footer with navigation */}
+          <div className="flex items-center justify-between">
+              <button
+                onClick={handlePreviousStep}
+                disabled={currentWizardStep === 0}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ← Previous
+              </button>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || !hasUnsavedChanges() || propertyUniqueIdError !== null}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save & Close
+                </button>
+                
+                {currentWizardStep < getVisibleWizardSteps().length - 1 ? (
+                  <button
+                    onClick={handleNextStep}
+                    disabled={!canProceedToNextStep()}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next →
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSave}
+                    disabled={isSaving || !hasUnsavedChanges() || propertyUniqueIdError !== null}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Complete Setup'
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+        </div>
+        </div>
+          </div>
+        </>
+      ) : (
+        // Side modal for editing existing properties
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-25 z-40"
+            onClick={handleClose}
+          />
+          
+          {/* Side Modal */}
+          <div 
+            className="fixed right-0 top-0 h-full w-1/3 min-w-[500px] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center space-x-3 flex-1">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <HomeIcon className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-gray-900">Edit Property</h2>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <span className="text-sm font-medium text-gray-700">Reference:</span>
+                    <input
+                      ref={(el) => { if (el) updatePropertyInfoRef.current = el.value; }}
+                      type="text"
+                      value={propertyUniqueId}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setPropertyUniqueId(value);
+                        updatePropertyInfoRef.current = value;
+                        
+                        // Clear previous timeout
+                        if (validationTimeoutRef.current) {
+                          clearTimeout(validationTimeoutRef.current);
+                        }
+                        
+                        // Real-time validation with debouncing (500ms delay)
+                        if (value.trim()) {
+                          validationTimeoutRef.current = setTimeout(async () => {
+                            const isUnique = await checkPropertyUniqueIdUniqueness(value);
+                            if (!isUnique) {
+                              setPropertyUniqueIdError('Already in use');
+                            } else {
+                              setPropertyUniqueIdError(null);
+                            }
+                          }, 500);
+                        } else {
+                          setPropertyUniqueIdError(null);
+                        }
+                      }}
+                      className={`px-3 py-2 border rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-20 ${
+                        propertyUniqueIdError ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      placeholder="10"
+                    />
+                    {propertyUniqueIdError && (
+                      <span className="text-xs text-red-600 whitespace-nowrap">{propertyUniqueIdError}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={handleClose}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors ml-4"
+              >
+                <XMarkIcon className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 min-h-0">
+              {/* Error Messages */}
+              {errors.length > 0 && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <ExclamationTriangleIcon className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h3 className="text-sm font-medium text-red-800">Please fix the following errors:</h3>
+                      <ul className="mt-2 text-sm text-red-700 space-y-1">
+                        {errors.map((error, index) => (
+                          <li key={index}>• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-5">
+            {/* SECTION 1: Address */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'basicInfo') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('basicInfo')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <HomeIcon className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Address</h3>
+                  </div>
+                  {expandedSections.basicInfo ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <HomeIcon className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Address</h3>
+                    <span className="text-red-500 text-sm">*</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Enter the property reference and address details</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.basicInfo) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Structured Address Fields */}
+                <div className="space-y-3">
+                  {/* Property Reference - Shown in wizard mode */}
+                  {isWizardMode && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Property Reference
+                      </label>
+                      <input
+                        ref={(el) => { if (el) updatePropertyInfoRef.current = el.value; }}
+                        type="text"
+                        value={propertyUniqueId}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setPropertyUniqueId(value);
+                          updatePropertyInfoRef.current = value;
+                          
+                          // Clear previous timeout
+                          if (validationTimeoutRef.current) {
+                            clearTimeout(validationTimeoutRef.current);
+                          }
+                          
+                          // Real-time validation with debouncing (500ms delay)
+                          if (value.trim()) {
+                            validationTimeoutRef.current = setTimeout(async () => {
+                              const isUnique = await checkPropertyUniqueIdUniqueness(value);
+                              if (!isUnique) {
+                                setPropertyUniqueIdError('Already in use');
+                              } else {
+                                setPropertyUniqueIdError(null);
+                              }
+                            }, 500);
+                          } else {
+                            setPropertyUniqueIdError(null);
+                          }
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white ${
+                          propertyUniqueIdError ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="e.g., 10"
+                      />
+                      {propertyUniqueIdError && (
+                        <p className="mt-1 text-xs text-red-600">{propertyUniqueIdError}</p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">
+                        A unique identifier for this property in your workspace
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Address Line 1 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={addressFields.addressLine1}
+                      onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine1: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder={currentOrganization?.country_code === 'US' ? 'e.g., 123 Main Street' : 'e.g., 123 High Street'}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Address Line 2
+                    </label>
+                    <input
+                      type="text"
+                      value={addressFields.addressLine2}
+                      onChange={(e) => setAddressFields(prev => ({ ...prev, addressLine2: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="Apartment, suite, unit, etc."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        City <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addressFields.city}
+                        onChange={(e) => setAddressFields(prev => ({ ...prev, city: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                        placeholder={currentOrganization?.country_code === 'US' ? 'New York' : currentOrganization?.country_code === 'GR' ? 'Athens' : 'London'}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {currentOrganization?.country_code === 'US' ? 'ZIP Code' : 'Postcode'} <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={addressFields.postcode}
+                        onChange={(e) => setAddressFields(prev => ({ ...prev, postcode: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                        placeholder={currentOrganization?.country_code === 'US' ? '10001' : currentOrganization?.country_code === 'GR' ? '106 82' : 'SW1A 1AA'}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 2: Property Specifications */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'specifications') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('specifications')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Squares2X2Icon className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Specifications</h3>
+                  </div>
+                  {expandedSections.specifications ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Squares2X2Icon className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Specifications</h3>
+                    <span className="text-red-500 text-sm">*</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Define the property type and key specifications</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.specifications) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Property Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Property Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.propertyType}
+                    onChange={(e) => handleInputChange('propertyType', e.target.value as SimplifiedProperty['propertyType'])}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="house">House</option>
+                    <option value="flat">Flat</option>
+                    <option value="hmo">HMO</option>
+                  </select>
+                </div>
+
+                {/* Bedrooms & Bathrooms */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bedrooms
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.bedrooms}
+                      onChange={(e) => handleInputChange('bedrooms', parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bathrooms
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="5"
+                      value={formData.bathrooms}
+                      onChange={(e) => handleInputChange('bathrooms', parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Total Area & Year Built */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Total Area (m²)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.totalArea || ''}
+                      onChange={(e) => handleInputChange('totalArea', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. 120"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Year Built
+                    </label>
+                    <input
+                      type="number"
+                      min="1800"
+                      max={new Date().getFullYear()}
+                      value={formData.yearBuilt || ''}
+                      onChange={(e) => handleInputChange('yearBuilt', e.target.value ? parseInt(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. 1995"
+                    />
+                  </div>
+                </div>
+
+                {/* Room Configuration - Only for HMO properties */}
+                {formData.propertyType === 'hmo' && (
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900">Room Configuration</h4>
+                        <p className="text-xs text-gray-500 mt-0.5">Define individual rooms and their rent</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newRoom = {
+                            id: `room-${Date.now()}`,
+                            name: `Room ${(formData.rooms || []).length + 1}`,
+                            area: 12,
+                            monthlyRent: 500,
+                            isOccupied: false
+                          };
+                          handleInputChange('rooms', [...(formData.rooms || []), newRoom]);
+                        }}
+                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        + Add Room
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      {(formData.rooms || []).map((room, index) => (
+                        <div key={room.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Room Name
+                              </label>
+                              <input
+                                type="text"
+                                value={room.name}
+                                onChange={(e) => {
+                                  const updatedRooms = [...(formData.rooms || [])];
+                                  updatedRooms[index] = { ...room, name: e.target.value };
+                                  handleInputChange('rooms', updatedRooms);
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="e.g. Master Bedroom"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Area (m²)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={room.area}
+                                  onChange={(e) => {
+                                    const updatedRooms = [...(formData.rooms || [])];
+                                    updatedRooms[index] = { ...room, area: parseFloat(e.target.value) || 0 };
+                                    handleInputChange('rooms', updatedRooms);
+                                  }}
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  Monthly Rent
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={room.monthlyRent}
+                                  onChange={(e) => {
+                                    const updatedRooms = [...(formData.rooms || [])];
+                                    updatedRooms[index] = { ...room, monthlyRent: parseFloat(e.target.value) || 0 };
+                                    handleInputChange('rooms', updatedRooms);
+                                  }}
+                                  className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updatedRooms = (formData.rooms || []).filter((_, i) => i !== index);
+                                handleInputChange('rooms', updatedRooms);
+                              }}
+                              className="w-full px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
+                            >
+                              Remove Room
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {(!formData.rooms || formData.rooms.length === 0) && (
+                        <div className="text-center py-6 text-gray-500 text-sm bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                          <HomeIcon className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                          <p className="font-medium">No rooms defined yet</p>
+                          <p className="text-xs mt-1">Click "Add Room" to create rooms for this HMO</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 3: Features & Amenities */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'features') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('features')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <SparklesIcon className="w-5 h-5 text-amber-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Features & Amenities</h3>
+                  </div>
+                  {expandedSections.features ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <SparklesIcon className="w-5 h-5 text-amber-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Features & Amenities</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Specify property features and amenities</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.features) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Furnished & Parking */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Furnished Status
+                    </label>
+                    <select
+                      value={formData.furnished || 'unfurnished'}
+                      onChange={(e) => handleInputChange('furnished', e.target.value as 'furnished' | 'unfurnished' | 'part_furnished')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    >
+                      <option value="unfurnished">Unfurnished</option>
+                      <option value="part_furnished">Part Furnished</option>
+                      <option value="furnished">Fully Furnished</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Parking
+                    </label>
+                    <select
+                      value={formData.parking || 'none'}
+                      onChange={(e) => handleInputChange('parking', e.target.value as 'none' | 'street' | 'driveway' | 'garage')}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                    >
+                      <option value="none">No Parking</option>
+                      <option value="street">Street Parking</option>
+                      <option value="driveway">Driveway</option>
+                      <option value="garage">Garage</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Garden */}
+                <div className="border border-gray-200 rounded-lg p-3">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.garden || false}
+                      onChange={(e) => handleInputChange('garden', e.target.checked)}
+                      className="w-5 h-5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 checked:bg-blue-600 checked:border-blue-600"
+                      style={{ backgroundColor: formData.garden ? '' : 'white' }}
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">Property has a garden</span>
+                      <p className="text-xs text-gray-500">Check if this property includes garden space</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 4: Financial Details */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'financial') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('financial')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <CurrencyPoundIcon className="w-5 h-5 text-green-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Financial Details</h3>
+                  </div>
+                  {expandedSections.financial ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <CurrencyPoundIcon className="w-5 h-5 text-green-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Financial Details</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Add rent, purchase price and ownership information</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.financial) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => handleInputChange('status', e.target.value as SimplifiedProperty['status'])}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="under_management">Under Management</option>
+                    <option value="sold">Sold</option>
+                  </select>
+                </div>
+
+                {/* Sold Price - Only shown when status is "sold" */}
+                {formData.status === 'sold' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Sold Price
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={formData.salesPrice || ''}
+                        onChange={(e) => handleInputChange('salesPrice', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="250000"
+                      />
+                    </div>
+                    {formData.salesPrice && (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {formatCurrency(formData.salesPrice)}
+                      </p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">
+                      The price at which this property was sold
+                    </p>
+                  </div>
+                )}
+
+                {/* Target Rent - Hidden for HMO properties */}
+                {formData.propertyType !== 'hmo' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Target Monthly Rent
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={formData.targetRent}
+                        onChange={(e) => handleInputChange('targetRent', parseInt(e.target.value) || 0)}
+                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="1200"
+                      />
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {formatCurrency(formData.targetRent)} per month
+                    </p>
+                  </div>
+                )}
+
+                {/* HMO Total Rent Display */}
+                {formData.propertyType === 'hmo' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <CurrencyPoundIcon className="w-4 h-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900">Total Monthly Rent</span>
+                        </div>
+                        <p className="text-2xl font-bold text-blue-900">
+                          {formatCurrency((formData.rooms || []).reduce((sum, room) => sum + (room.monthlyRent || 0), 0))}
+                        </p>
+                        <p className="text-xs text-blue-700 mt-1">
+                          Calculated from {(formData.rooms || []).length} room{(formData.rooms || []).length !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Purchase Price */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Purchase Price
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <CurrencyPoundIcon className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={formData.purchasePrice || ''}
+                      onChange={(e) => handleInputChange('purchasePrice', e.target.value ? parseFloat(e.target.value) : undefined)}
+                      className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="250000"
+                    />
+                  </div>
+                  {formData.purchasePrice && (
+                    <p className="mt-1 text-sm text-gray-500">
+                      {formatCurrency(formData.purchasePrice)}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-gray-500">
+                    The original acquisition cost of this property
+                  </p>
+                </div>
+
+                {/* Ownership Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ownership Type
+                  </label>
+                  <select
+                    value={formData.ownershipType || ''}
+                    onChange={(e) => {
+                      const value = e.target.value as 'individual' | 'company' | '';
+                      handleInputChange('ownershipType', value || undefined);
+                      // Clear company name if switching to individual
+                      if (value !== 'company') {
+                        handleInputChange('companyName', undefined);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                  >
+                    <option value="">Select ownership type...</option>
+                    <option value="individual">Individual</option>
+                    <option value="company">Company</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Select whether the property is owned by an individual or a company
+                  </p>
+                </div>
+
+                {/* Company Name - Only show if ownership type is company */}
+                {formData.ownershipType === 'company' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Company Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.companyName || ''}
+                      onChange={(e) => handleInputChange('companyName', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. ABC Property Holdings Ltd"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Enter the legal name of the company that owns this property (optional)
+                    </p>
+                  </div>
+                )}
+              </div>
+              )}
+            </div>
+            )}
+
+            {/* SECTION 5: HMO-Specific Details (only shown for HMO properties) */}
+            {formData.propertyType === 'hmo' && (!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'hmoDetails') && (
+              <div className="bg-white border border-gray-200 rounded-lg p-5">
+                {!isWizardMode && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('hmoDetails')}
+                    className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <ShieldCheckIcon className="w-5 h-5 text-indigo-600" />
+                      <h3 className="text-base font-semibold text-gray-900">HMO Details</h3>
+                    </div>
+                    {expandedSections.hmoDetails ? (
+                      <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                    )}
+                  </button>
+                )}
+                
+                {isWizardMode && (
+                  <div className="mb-4">
+                    <div className="flex items-center space-x-2">
+                      <ShieldCheckIcon className="w-5 h-5 text-indigo-600" />
+                      <h3 className="text-base font-semibold text-gray-900">HMO Details</h3>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">Specify HMO-specific licensing and occupancy information</p>
+                  </div>
+                )}
+                
+                {(isWizardMode || expandedSections.hmoDetails) && (
+                  <div className="space-y-4 transition-all duration-200 ease-in-out">
+                  {/* Max Occupancy */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Maximum Occupancy
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={formData.maxOccupancy || ''}
+                      onChange={(e) => handleInputChange('maxOccupancy', e.target.value ? parseInt(e.target.value) : undefined)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                      placeholder="e.g. 6"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Maximum number of tenants allowed in this HMO
+                    </p>
+                  </div>
+
+                  {/* License Requirement */}
+                  <div className="border border-gray-200 rounded-lg p-3">
+                    <label className="flex items-start space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        id="licenseRequired"
+                        checked={formData.licenseRequired || false}
+                        onChange={(e) => {
+                          handleInputChange('licenseRequired', e.target.checked);
+                          if (!e.target.checked) {
+                            handleInputChange('licenseNumber', undefined);
+                            handleInputChange('licenseExpiry', undefined);
+                          }
+                        }}
+                        className="w-5 h-5 mt-0.5 rounded border-2 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 checked:bg-blue-600 checked:border-blue-600"
+                        style={{ backgroundColor: formData.licenseRequired ? '' : 'white' }}
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900">HMO License Required</span>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Check if your local authority requires an HMO license for this property
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* License Details - Only show if license is required */}
+                  {formData.licenseRequired && (
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            License Number <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={formData.licenseNumber || ''}
+                            onChange={(e) => handleInputChange('licenseNumber', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                            placeholder="HMO License Number"
+                            required={formData.licenseRequired}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            License Expiry Date <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={formData.licenseExpiry ? formData.licenseExpiry.toISOString().split('T')[0] : ''}
+                            onChange={(e) => handleInputChange('licenseExpiry', e.target.value ? new Date(e.target.value) : undefined)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white"
+                            required={formData.licenseRequired}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                )}
+              </div>
+            )}
+
+            {/* SECTION 6: Property Documents */}
+            {(!isWizardMode || getVisibleWizardSteps()[currentWizardStep]?.key === 'documents') && (
+            <div className="bg-white border border-gray-200 rounded-lg p-5">
+              {!isWizardMode && (
+                <button
+                  type="button"
+                  onClick={() => toggleSection('documents')}
+                  className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity"
+                >
+                  <div className="flex items-center space-x-2">
+                    <DocumentTextIcon className="w-5 h-5 text-teal-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Documents</h3>
+                  </div>
+                  {expandedSections.documents ? (
+                    <ChevronUpIcon className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDownIcon className="w-5 h-5 text-gray-500" />
+                  )}
+                </button>
+              )}
+              
+              {isWizardMode && (
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2">
+                    <DocumentTextIcon className="w-5 h-5 text-teal-600" />
+                    <h3 className="text-base font-semibold text-gray-900">Property Documents</h3>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">Upload important property documents (optional)</p>
+                </div>
+              )}
+              
+              {(isWizardMode || expandedSections.documents) && (
+                <div className="space-y-4 transition-all duration-200 ease-in-out">
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-700">
+                    <strong>Tip:</strong> Check off documents you have, upload files, and add notes. Maximum file size: 10MB per document.
+                  </p>
+                </div>
+
+                {/* Document Checklist with Upload */}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  {availableDocumentTypes.map((docType) => {
+                    const uploadedDoc = documents.find(d => d.documentTypeId === docType.id);
+                    
+                    return (
+                      <div 
+                        key={docType.id} 
+                        className={`border rounded-lg p-4 transition-colors ${
+                          uploadedDoc
+                            ? 'border-green-300 bg-green-50' 
+                            : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <input
+                            type="checkbox"
+                            checked={!!uploadedDoc}
+                            onChange={() => {
+                              if (uploadedDoc) {
+                                handleDeleteDocument(uploadedDoc.id);
+                              }
+                            }}
+                            className="mt-1 w-5 h-5 rounded border-2 border-gray-300 text-green-600 focus:ring-2 focus:ring-green-500 focus:ring-offset-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {docType.name}
+                                  </span>
+                                  {uploadedDoc && (
+                                    <CheckIcon className="w-5 h-5 text-green-600 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">{docType.description}</p>
+                              </div>
+                            </div>
+                            
+                            {/* Upload Section */}
+                            <div className="mt-3 space-y-2">
+                              {uploadedDoc ? (
+                                // Show uploaded file with actions
+                                <div className="flex items-center justify-between p-2 bg-white border border-green-200 rounded-md">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <DocumentTextIcon className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-medium text-gray-900 truncate">
+                                        {uploadedDoc.fileName}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {formatFileSize(uploadedDoc.fileSize)} • {uploadedDoc.uploadedAt.toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1 ml-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="View"
+                                    >
+                                      <EyeIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDownloadDocument(uploadedDoc)}
+                                      className="p-1 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                                      title="Download"
+                                    >
+                                      <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteDocument(uploadedDoc.id)}
+                                      className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                      title="Remove"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                // Show upload button
+                                <label className="block" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="file"
+                                    onChange={(e) => {
+                                      setSelectedDocumentType(docType.id);
+                                      handleFileUpload(e);
+                                    }}
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <div className="flex items-center justify-center px-3 py-2 border border-dashed border-blue-300 rounded-md cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                                    <DocumentTextIcon className="w-4 h-4 text-blue-600 mr-2" />
+                                    <span className="text-xs font-medium text-blue-600">
+                                      Upload Document
+                                    </span>
+                                  </div>
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary */}
+                <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-700">Documents uploaded:</span>
+                    <span className="font-semibold text-green-600">
+                      {documents.length} / {availableDocumentTypes.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              )}
+            </div>
+            )}
+          </div>
+        </div>
+
+            {/* Footer */}
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 shadow-lg flex-shrink-0">
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleClose}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={isSaving}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving || !hasUnsavedChanges() || propertyUniqueIdError !== null}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Document Viewer Modal */}
+      {viewingDocument && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-75 z-[60] flex items-center justify-center p-4"
+            onClick={() => setViewingDocument(null)}
+          >
+            {/* Viewer Modal */}
+            <div 
+              className="bg-white rounded-lg shadow-2xl z-[70] flex flex-col w-full max-w-4xl max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <DocumentTextIcon className="w-6 h-6 text-teal-600 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 truncate">
+                    {viewingDocument.fileName}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {availableDocumentTypes.find(dt => dt.id === viewingDocument.documentTypeId)?.name} • {formatFileSize(viewingDocument.fileSize)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2 ml-4">
+                <button
+                  onClick={() => handleDownloadDocument(viewingDocument)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                >
+                  <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
+                  <span>Download</span>
+                </button>
+                <button
+                  onClick={() => setViewingDocument(null)}
+                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <XMarkIcon className="w-6 h-6 text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            {/* Document Content */}
+            <div className="flex-1 overflow-auto bg-gray-100 p-4">
+              {viewingDocument.fileType === 'application/pdf' ? (
+                // PDF Viewer
+                <div className="h-full bg-white rounded-lg shadow-sm">
+                  <iframe
+                    src={viewingDocument.fileData}
+                    className="w-full h-full rounded-lg"
+                    title={viewingDocument.fileName}
+                  />
+                </div>
+              ) : viewingDocument.fileType.startsWith('image/') ? (
+                // Image Viewer
+                <div className="h-full flex items-center justify-center">
+                  <img
+                    src={viewingDocument.fileData}
+                    alt={viewingDocument.fileName}
+                    className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                  />
+                </div>
+              ) : (
+                // Unsupported file type
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <DocumentTextIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-lg font-medium text-gray-900 mb-2">Preview not available</p>
+                    <p className="text-sm text-gray-600 mb-4">
+                      This file type cannot be previewed in the browser.
+                    </p>
+                    <button
+                      onClick={() => handleDownloadDocument(viewingDocument)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors inline-flex items-center space-x-2"
+                    >
+                      <ArrowUpTrayIcon className="w-4 h-4 transform rotate-180" />
+                      <span>Download to view</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Close Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showCloseConfirm}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Are you sure you want to close without saving?"
+        confirmText="Discard Changes"
+        cancelText="Cancel"
+        type="warning"
+        onConfirm={handleConfirmClose}
+        onCancel={() => {
+          setShowCloseConfirm(false);
+          pendingCloseRef.current = null;
+        }}
+      />
+    </>
+  );
+};
