@@ -78,6 +78,13 @@ export function parseDate(
   
   const date = new Date(year, month - 1, day);
   if (isNaN(date.getTime())) return null;
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
   
   return date;
 }
