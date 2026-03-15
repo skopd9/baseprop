@@ -255,6 +255,7 @@ export const transformToSimplifiedTenant = (
 // Validation functions for residential property constraints
 export const validatePropertyData = (property: SimplifiedProperty): string[] => {
   const errors: string[] = [];
+  const unitCount = Array.isArray(property.units) ? property.units.length : property.units;
 
   if (!property.address.trim()) {
     errors.push('Property address is required');
@@ -272,7 +273,7 @@ export const validatePropertyData = (property: SimplifiedProperty): string[] => 
     errors.push('Target rent cannot be negative');
   }
 
-  if (property.tenantCount > property.units * 4) {
+  if (property.tenantCount > unitCount * 4) {
     errors.push('Too many tenants for the number of units available');
   }
 
